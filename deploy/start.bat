@@ -35,7 +35,7 @@ if not exist ".env" (
     )
 )
 
-echo Imaj indiriliyor...
+echo [1/2] Imaj indiriliyor...
 docker compose pull
 if !errorlevel! neq 0 (
     echo [HATA] Imaj indirilemedi.
@@ -43,7 +43,7 @@ if !errorlevel! neq 0 (
     exit /b 1
 )
 
-echo Uygulama baslatiliyor...
+echo [2/2] Uygulama baslatiliyor...
 docker compose up -d
 if !errorlevel! neq 0 (
     echo [HATA] Uygulama baslatilamadi.
@@ -57,6 +57,8 @@ echo   Uygulama baslatildi!
 echo   http://localhost:8080
 echo.
 echo   Kullanici: admin / Sifre: admin
+echo.
+echo   Loglar: docker compose logs -f app
 echo ===========================================
 pause
 exit /b 0

@@ -26,7 +26,7 @@ services:
           memory: 512M
 
   app:
-    image: ${DOCKER_IMAGE:-ghcr.io/rasimtuzluoglu/raspel-fin:latest}
+    image: ${DOCKER_IMAGE:-raspel/cardtracker:latest}
     container_name: cardtracker-app
     pull_policy: always
     depends_on:
