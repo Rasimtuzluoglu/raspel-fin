@@ -1,0 +1,13 @@
+target/
+.idea/
+*.iml
+*.class
+*.jar
+node_modules/
+.env
+frontend/generated/
+uploads/
+backups/
+.vscode/
+*.log
+

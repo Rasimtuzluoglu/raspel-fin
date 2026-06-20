@@ -1,0 +1,24 @@
+package com.raspel.cardtracker.config;
+
+import com.vaadin.flow.component.notification.Notification;
+import com.vaadin.flow.component.notification.NotificationVariant;
+import com.vaadin.flow.server.ErrorEvent;
+import com.vaadin.flow.server.ErrorHandler;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.stereotype.Component;
+
+@Component
+public class GlobalExceptionHandler implements ErrorHandler {
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @Override
+    public void error(ErrorEvent event) {
+        log.error("Unhandled exception", event.getThrowable());
+        if (event.getThrowable() != null) {
+            Notification.show("Bir hata oluştu. Lütfen daha sonra tekrar deneyin.",
+                5000, Notification.Position.MIDDLE)
+                .addThemeVariants(NotificationVariant.LUMO_ERROR);
+        }
+    }
+}

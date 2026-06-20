@@ -1,0 +1,1 @@
+ALTER TABLE employee_task ADD COLUMN IF NOT EXISTS created_by VARCHAR(50);
