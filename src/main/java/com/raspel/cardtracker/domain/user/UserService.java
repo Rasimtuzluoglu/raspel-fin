@@ -28,7 +28,7 @@ public class UserService implements UserDetailsService {
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         AppUser appUser = userRepository.findByUsername(username)
-                .orElseThrow(() -> new UsernameNotFoundException("Kullanıcı bulunamadı: " + username));
+                .orElseThrow(() -> new UsernameNotFoundException("Geçersiz kullanıcı adı veya şifre"));
 
         if (!appUser.getActive()) {
             throw new DisabledException("Kullanıcı devre dışı: " + username);
@@ -110,6 +110,9 @@ public class UserService implements UserDetailsService {
     }
 
     public void updatePassword(Long userId, String newPassword) {
+        if (newPassword == null || newPassword.length() < 4) {
+            throw new IllegalArgumentException("Şifre en az 4 karakter olmalıdır");
+        }
         userRepository.findById(userId).ifPresent(user -> {
             user.setPassword(passwordEncoder.encode(newPassword));
             userRepository.save(user);

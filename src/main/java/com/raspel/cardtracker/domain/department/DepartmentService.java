@@ -22,7 +22,7 @@ public class DepartmentService {
 
     public List<Department> findAllActive() {
         return departmentRepository.findAll().stream()
-                .filter(Department::getIsActive)
+                .filter(d -> d.getIsActive() != null && d.getIsActive())
                 .collect(java.util.stream.Collectors.toList());
     }
 

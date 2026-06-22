@@ -126,8 +126,7 @@ public class ProfileView extends VerticalLayout {
         // Istatistikler karti
         Div statsCard = createCard("Hesap Ozeti");
         long activeCards = cardService.findAllActive().size();
-        long totalExpenses = expenseService.findAll().stream()
-                .filter(e -> username.equals(e.getCreatedBy())).count();
+        long totalExpenses = expenseService.countByCreatedBy(username);
         DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm", Locale.of("tr"));
         String createdDate = user.getCreatedAt() != null ? user.getCreatedAt().format(dtf) : "-";
         String lastLogin = user.getLastLoginAt() != null ? user.getLastLoginAt().format(dtf) : "Ilk giris";
@@ -197,10 +196,7 @@ public class ProfileView extends VerticalLayout {
         recentList.setPadding(false);
         recentList.setSpacing(false);
 
-        List<Expense> recentExpenses = expenseService.findAll().stream()
-                .filter(e -> username.equals(e.getCreatedBy()))
-                .sorted(Comparator.comparing(Expense::getCreatedAt, Comparator.nullsLast(Comparator.reverseOrder())))
-                .limit(3).collect(Collectors.toList());
+        List<Expense> recentExpenses = expenseService.findRecentByCreatedBy(username, 3);
         List<Cheque> recentCheques = chequeService.findAll().stream()
                 .sorted(Comparator.comparing(c -> c.getMaturityDate(), Comparator.reverseOrder()))
                 .limit(2).collect(Collectors.toList());

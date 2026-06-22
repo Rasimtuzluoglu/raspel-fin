@@ -19,7 +19,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
     @Query("SELECT e FROM Expense e LEFT JOIN FETCH e.card LEFT JOIN FETCH e.contact WHERE e.expenseDate BETWEEN :startDate AND :endDate")
     List<Expense> findByDateRange(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 
-    @Query("SELECT e FROM Expense e JOIN FETCH e.card WHERE e.card.id = :cardId AND e.expenseDate BETWEEN :startDate AND :endDate")
+    @Query("SELECT e FROM Expense e JOIN FETCH e.card LEFT JOIN FETCH e.contact WHERE e.card.id = :cardId AND e.expenseDate BETWEEN :startDate AND :endDate")
     List<Expense> findByCardIdAndDateRange(@Param("cardId") Long cardId, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 
     @Query("SELECT e FROM Expense e JOIN FETCH e.card LEFT JOIN FETCH e.contact")
@@ -29,7 +29,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
     @Query("DELETE FROM Expense e WHERE e.card.id = :cardId")
     void deleteAllByCardId(@Param("cardId") Long cardId);
 
-    @Query(value = "SELECT e FROM Expense e JOIN FETCH e.card WHERE " +
+    @Query(value = "SELECT e FROM Expense e JOIN FETCH e.card LEFT JOIN FETCH e.contact WHERE " +
            "(:term IS NULL OR :term = '' OR LOWER(e.description) LIKE LOWER(CONCAT('%', :term, '%')) " +
            "OR LOWER(e.category) LIKE LOWER(CONCAT('%', :term, '%')) " +
            "OR LOWER(e.card.name) LIKE LOWER(CONCAT('%', :term, '%')))",
@@ -41,4 +41,9 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
 
     @Query("SELECT e.category, COUNT(e) FROM Expense e WHERE LOWER(e.description) LIKE LOWER(CONCAT('%', :desc, '%')) AND e.category IS NOT NULL AND e.category <> '' GROUP BY e.category ORDER BY COUNT(e) DESC")
     List<Object[]> findCategoryByDescriptionKeyword(@Param("desc") String desc);
+
+    long countByCreatedBy(String createdBy);
+
+    @Query("SELECT e FROM Expense e JOIN FETCH e.card LEFT JOIN FETCH e.contact WHERE e.createdBy = :createdBy ORDER BY e.createdAt DESC")
+    List<Expense> findRecentByCreatedBy(@Param("createdBy") String createdBy, org.springframework.data.domain.Pageable pageable);
 }

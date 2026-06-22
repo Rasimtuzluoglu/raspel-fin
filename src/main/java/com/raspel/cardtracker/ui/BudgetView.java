@@ -9,6 +9,7 @@ import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.grid.GridVariant;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H3;
+import com.vaadin.flow.component.html.H4;
 import com.vaadin.flow.component.html.Span;
 import com.vaadin.flow.component.icon.Icon;
 import com.vaadin.flow.component.icon.VaadinIcon;
@@ -17,18 +18,23 @@ import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.progressbar.ProgressBar;
+import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.raspel.cardtracker.domain.budget.DepartmentBudget;
 import com.raspel.cardtracker.domain.budget.DepartmentBudgetService;
+import com.raspel.cardtracker.domain.card.Card;
+import com.raspel.cardtracker.domain.card.CardService;
 import com.raspel.cardtracker.domain.department.Department;
 import com.raspel.cardtracker.domain.department.DepartmentService;
-import com.raspel.cardtracker.domain.card.CardService;
+import com.raspel.cardtracker.domain.expense.Expense;
+import com.raspel.cardtracker.domain.expense.ExpenseService;
 import com.raspel.cardtracker.ui.utils.FormatUtils;
 import jakarta.annotation.security.PermitAll;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -40,14 +46,18 @@ public class BudgetView extends VerticalLayout {
     private final DepartmentBudgetService budgetService;
     private final DepartmentService departmentService;
     private final CardService cardService;
+    private final ExpenseService expenseService;
     
     private final Grid<DepartmentBudget> grid = new Grid<>(DepartmentBudget.class, false);
     private final ProgressBar loadingBar = new ProgressBar();
     private final Div emptyState = new Div();
-    public BudgetView(DepartmentBudgetService budgetService, CardService cardService, DepartmentService departmentService) {
+    private final VerticalLayout deptListSection = new VerticalLayout();
+
+    public BudgetView(DepartmentBudgetService budgetService, CardService cardService, DepartmentService departmentService, ExpenseService expenseService) {
         this.budgetService = budgetService;
         this.departmentService = departmentService;
         this.cardService = cardService;
+        this.expenseService = expenseService;
 
         addClassName("budget-view");
         setSizeFull();
@@ -66,7 +76,11 @@ public class BudgetView extends VerticalLayout {
         HorizontalLayout deptAddSection = createDepartmentAddSection();
         deptAddSection.getStyle().set("margin-bottom", "16px");
 
-        add(toolbar, deptAddSection, grid);
+        deptListSection.setPadding(false);
+        deptListSection.setSpacing(false);
+        refreshDeptList();
+
+        add(toolbar, deptAddSection, deptListSection, grid);
         configureEmptyState();
         add(emptyState);
         refreshGrid();
@@ -101,6 +115,7 @@ public class BudgetView extends VerticalLayout {
                     .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
             deptNameField.clear();
             deptSelect.setItems(departmentService.findAllActive());
+            refreshDeptList();
             refreshGrid();
         });
         addBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_SMALL);
@@ -117,6 +132,7 @@ public class BudgetView extends VerticalLayout {
                     .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
             deptSelect.setItems(departmentService.findAllActive());
             deptSelect.clear();
+            refreshDeptList();
             refreshGrid();
         });
         deleteBtn.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_SMALL);
@@ -127,30 +143,42 @@ public class BudgetView extends VerticalLayout {
         section.setWidthFull();
         section.getStyle().set("flex-wrap", "wrap");
 
-        VerticalLayout deptListSection = new VerticalLayout();
-        deptListSection.setPadding(false);
-        deptListSection.setSpacing(false);
+        return section;
+    }
+
+    private void refreshDeptList() {
+        deptListSection.removeAll();
         Span deptListTitle = new Span("Mevcut Departmanlar:");
-        deptListTitle.getStyle().set("font-weight", "600").set("font-size", "0.9em").set("color", "var(--lumo-secondary-text-color)");
+        deptListTitle.getStyle().set("font-weight", "600").set("font-size", "0.9em").set("color", "var(--lumo-secondary-text-color)").set("margin-bottom", "0.5em");
         deptListSection.add(deptListTitle);
         List<Department> departments = departmentService.findAllActive();
         if (departments.isEmpty()) {
             deptListSection.add(new Span("Henüz departman eklenmemiş."));
         } else {
+            HorizontalLayout deptCards = new HorizontalLayout();
+            deptCards.setSpacing(true);
+            deptCards.getStyle().set("flex-wrap", "wrap").set("gap", "8px");
             for (Department d : departments) {
-                Span deptSpan = new Span("• " + d.getName());
-                deptSpan.getStyle().set("font-size", "0.85em").set("padding", "0.2em 0");
-                deptListSection.add(deptSpan);
+                long cardCount = cardService.findAllActive().stream().filter(c -> c.getDepartment() != null && c.getDepartment().getId().equals(d.getId())).count();
+                LocalDate now = LocalDate.now();
+                var budgetOpt = budgetService.findByDepartmentAndYearAndMonth(d.getId(), now.getYear(), now.getMonthValue());
+                String budgetInfo = budgetOpt.map(b -> FormatUtils.formatNumber(b.getBudgetLimit()) + " ₺").orElse("Bütçe yok");
+
+                Div card = new Div();
+                card.getStyle()
+                        .set("background", "var(--lumo-contrast-5pct)")
+                        .set("border-radius", "10px")
+                        .set("padding", "0.7em 1em")
+                        .set("min-width", "160px");
+                Span name = new Span(d.getName());
+                name.getStyle().set("font-weight", "600").set("font-size", "0.9em").set("display", "block");
+                Span info = new Span(cardCount + " kart · " + budgetInfo);
+                info.getStyle().set("font-size", "0.7em").set("color", "var(--lumo-secondary-text-color)").set("display", "block").set("margin-top", "0.2em");
+                card.add(name, info);
+                deptCards.add(card);
             }
+            deptListSection.add(deptCards);
         }
-
-        VerticalLayout wrapper = new VerticalLayout(section, deptListSection);
-        wrapper.setPadding(false);
-        wrapper.setSpacing(true);
-
-        HorizontalLayout result = new HorizontalLayout(wrapper);
-        result.setWidthFull();
-        return result;
     }
 
     private HorizontalLayout createToolbar() {
@@ -183,13 +211,36 @@ public class BudgetView extends VerticalLayout {
                 .setHeader("Bütçe Limiti").setSortable(true).setAutoWidth(true);
 
         grid.addComponentColumn(budget -> {
+            String deptName = budget.getDepartment() != null ? budget.getDepartment().getName() : "";
+            BigDecimal spent = expenseService.getDepartmentSpentForMonth(deptName, budget.getBudgetYear(), budget.getBudgetMonth());
+            BigDecimal limit = budget.getBudgetLimit();
+            BigDecimal remaining = limit != null ? limit.subtract(spent) : BigDecimal.ZERO;
+            if (remaining.compareTo(BigDecimal.ZERO) < 0) remaining = BigDecimal.ZERO;
+
+            double pct = limit != null && limit.compareTo(BigDecimal.ZERO) > 0
+                    ? spent.divide(limit, 4, RoundingMode.HALF_UP).doubleValue() * 100 : 0;
+            if (pct > 100) pct = 100;
+
+            Span pctSpan = new Span(FormatUtils.formatNumber(spent) + " ₺ / %" + String.format("%.0f", pct));
+            pctSpan.getStyle().set("font-size", "0.8em");
+            pctSpan.getStyle().set("color", pct >= 80 ? "var(--lumo-error-color)" : "var(--lumo-body-text-color)");
+            return pctSpan;
+        }).setHeader("Harcanan / %").setAutoWidth(true);
+
+        grid.addComponentColumn(budget -> {
+            Button spendBtn = new Button(new Icon(VaadinIcon.MONEY), e -> openSpendDialog(budget));
+            spendBtn.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_SUCCESS);
+            spendBtn.getElement().setAttribute("title", "Harca");
+
             Button editBtn = new Button(new Icon(VaadinIcon.EDIT), e -> openEditDialog(budget));
             editBtn.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
+            editBtn.getElement().setAttribute("title", "Düzenle");
 
             Button deleteBtn = new Button(new Icon(VaadinIcon.TRASH), e -> deleteBudget(budget));
             deleteBtn.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_ERROR);
+            deleteBtn.getElement().setAttribute("title", "Sil");
 
-            HorizontalLayout layout = new HorizontalLayout(editBtn, deleteBtn);
+            HorizontalLayout layout = new HorizontalLayout(spendBtn, editBtn, deleteBtn);
             layout.setSpacing(true);
             return layout;
         }).setHeader("İşlemler").setAutoWidth(true);
@@ -226,6 +277,7 @@ public class BudgetView extends VerticalLayout {
             grid.setVisible(true);
             emptyState.getStyle().set("display", "none");
         }
+        refreshDeptList();
         loadingBar.setVisible(false);
     }
 
@@ -351,5 +403,91 @@ public class BudgetView extends VerticalLayout {
         Button noBtn = new Button("Vazgeç", e -> confirm.close());
         confirm.getFooter().add(noBtn, yesBtn);
         confirm.open();
+    }
+
+    private void openSpendDialog(DepartmentBudget budget) {
+        String deptName = budget.getDepartment() != null ? budget.getDepartment().getName() : "";
+        BigDecimal spent = expenseService.getDepartmentSpentForMonth(deptName, budget.getBudgetYear(), budget.getBudgetMonth());
+        BigDecimal rawRemaining = budget.getBudgetLimit().subtract(spent);
+        final BigDecimal remaining = rawRemaining.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : rawRemaining;
+
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle(deptName + " - Bütçeden Harca");
+        dialog.setWidth("480px");
+
+        FormLayout form = new FormLayout();
+
+        Span remainingSpan = new Span("Kalan bütçe: " + FormatUtils.formatNumber(remaining) + " ₺");
+        remainingSpan.getStyle()
+                .set("font-weight", "600")
+                .set("color", remaining.compareTo(BigDecimal.ZERO) <= 0 ? "var(--lumo-error-color)" : "var(--lumo-success-color)")
+                .set("font-size", "1.1em")
+                .set("padding", "0.8em")
+                .set("background", "var(--lumo-contrast-5pct)")
+                .set("border-radius", "8px")
+                .set("display", "block")
+                .set("text-align", "center");
+
+        ComboBox<Card> cardField = new ComboBox<>("Kart Seçin");
+        List<Card> cards = cardService.findAllActive().stream()
+                .filter(c -> c.getDepartment() != null && c.getDepartment().getId().equals(budget.getDepartment().getId()))
+                .collect(java.util.stream.Collectors.toList());
+        cardField.setItems(cards);
+        cardField.setItemLabelGenerator(c -> c.getName() + " (" + c.getBank() + ")");
+        cardField.setWidthFull();
+
+        TextArea descField = new TextArea("Açıklama");
+        descField.setPlaceholder("Harcama açıklaması...");
+        descField.setWidthFull();
+
+        TextField amountField = new TextField("Tutar (TL)");
+        amountField.setValue("0,00");
+        FormatUtils.attachCurrencyFormatting(amountField);
+        amountField.setWidthFull();
+
+        form.add(remainingSpan, cardField, descField, amountField);
+
+        Button saveBtn = new Button("Harca", e -> {
+            if (cardField.isEmpty()) {
+                Notification.show("Lütfen bir kart seçin", 3000, Notification.Position.MIDDLE).addThemeVariants(NotificationVariant.LUMO_ERROR);
+                return;
+            }
+            BigDecimal amt = FormatUtils.parseTurkishCurrency(amountField.getValue());
+            if (amt == null || amt.compareTo(BigDecimal.ZERO) <= 0) {
+                Notification.show("Geçerli bir tutar girin", 3000, Notification.Position.MIDDLE).addThemeVariants(NotificationVariant.LUMO_ERROR);
+                return;
+            }
+            if (amt.compareTo(remaining) > 0) {
+                Notification.show("Tutar kalan bütçeyi aşıyor! (Kalan: " + FormatUtils.formatNumber(remaining) + " ₺)", 4000, Notification.Position.MIDDLE).addThemeVariants(NotificationVariant.LUMO_ERROR);
+                return;
+            }
+
+            try {
+                Expense expense = Expense.builder()
+                        .card(cardField.getValue())
+                        .description(descField.getValue() != null ? descField.getValue() : deptName + " bütçe harcaması")
+                        .totalAmount(amt)
+                        .originalAmount(amt)
+                        .installments(1)
+                        .expenseDate(LocalDate.now())
+                        .currency("TRY")
+                        .category(deptName)
+                        .build();
+                expenseService.createExpense(expense);
+                Notification.show("Harcama kaydedildi. " + FormatUtils.formatNumber(amt) + " ₺", 3000, Notification.Position.MIDDLE)
+                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                dialog.close();
+                refreshGrid();
+            } catch (Exception ex) {
+                Notification.show("Bir hata oluştu, lütfen tekrar deneyin.", 3000, Notification.Position.MIDDLE)
+                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
+            }
+        });
+        saveBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+
+        Button cancelBtn = new Button("İptal", e -> dialog.close());
+        dialog.getFooter().add(cancelBtn, saveBtn);
+        dialog.add(form);
+        dialog.open();
     }
 }

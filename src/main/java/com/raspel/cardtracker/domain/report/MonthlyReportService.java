@@ -17,6 +17,11 @@ import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.awt.image.BufferedImage;
+import java.awt.Graphics2D;
+import java.awt.Color;
+import java.awt.RenderingHints;
+import javax.imageio.ImageIO;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.text.NumberFormat;
@@ -146,6 +151,18 @@ public class MonthlyReportService {
                     cardTable.addCell(createCell(formatTL(entry.getValue()), cellFont, Element.ALIGN_RIGHT));
                 }
                 document.add(cardTable);
+
+                if (!cardTotals.isEmpty()) {
+                    try {
+                        BufferedImage chartImg = createBarChart("Kart Bazlı Harcama (TL)", cardTotals);
+                        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                        ImageIO.write(chartImg, "png", baos);
+                        com.lowagie.text.Image pdfImg = com.lowagie.text.Image.getInstance(baos.toByteArray());
+                        pdfImg.scaleToFit(500, 250);
+                        pdfImg.setSpacingBefore(10);
+                        document.add(pdfImg);
+                    } catch (Exception ignored) {}
+                }
             }
 
             // --- BÖLÜM 3: DEPARTMAN BÜTÇE DURUMU ---
@@ -183,6 +200,24 @@ public class MonthlyReportService {
                     budgetTable.addCell(createCell(String.format("%%%.1f", pct), cellFont, Element.ALIGN_CENTER));
                 }
                 document.add(budgetTable);
+
+                try {
+                    java.util.LinkedHashMap<String, BigDecimal> budgetMap = new java.util.LinkedHashMap<>();
+                    for (DepartmentBudget budget : budgets) {
+                        String deptName = budget.getDepartment() != null ? budget.getDepartment().getName() : "";
+                        BigDecimal spent = expenseService.getDepartmentSpentForMonth(deptName, year, month);
+                        budgetMap.put(deptName, spent);
+                    }
+                    if (!budgetMap.isEmpty()) {
+                        BufferedImage chartImg = createBarChart("Departman Bütçe Kullanımı (TL)", budgetMap);
+                        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                        ImageIO.write(chartImg, "png", baos);
+                        com.lowagie.text.Image pdfImg = com.lowagie.text.Image.getInstance(baos.toByteArray());
+                        pdfImg.scaleToFit(500, 250);
+                        pdfImg.setSpacingBefore(10);
+                        document.add(pdfImg);
+                    }
+                } catch (Exception ignored) {}
             }
 
             // --- BÖLÜM 4: MEVCUT AY TAKSİT DETAYLARI ---
@@ -218,7 +253,7 @@ public class MonthlyReportService {
 
             document.close();
         } catch (Exception e) {
-            throw new RuntimeException("PDF oluşturulamadı: " + e.getMessage(), e);
+            throw new RuntimeException("PDF oluşturulamadı, lütfen daha sonra tekrar deneyin.", e);
         }
 
         return new ByteArrayInputStream(out.toByteArray());
@@ -245,5 +280,80 @@ public class MonthlyReportService {
         cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
         cell.setPadding(5);
         return cell;
+    }
+
+    private BufferedImage createBarChart(String title, Map<String, BigDecimal> data) {
+        int width = 600;
+        int height = 300;
+        int barAreaLeft = 120;
+        int barAreaRight = width - 30;
+        int barAreaTop = 40;
+        int barAreaBottom = height - 50;
+
+        BufferedImage img = new BufferedImage(width, height, BufferedImage.TYPE_INT_ARGB);
+        Graphics2D g = img.createGraphics();
+        g.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+
+        g.setColor(Color.WHITE);
+        g.fillRect(0, 0, width, height);
+
+        g.setColor(Color.DARK_GRAY);
+        g.setFont(new java.awt.Font("SansSerif", java.awt.Font.BOLD, 12));
+        g.drawString(title, 15, 20);
+
+        java.util.List<String> keys = new java.util.ArrayList<>(data.keySet());
+        java.util.List<BigDecimal> values = new java.util.ArrayList<>();
+        BigDecimal max = BigDecimal.ZERO;
+        for (String k : keys) {
+            BigDecimal v = data.get(k);
+            values.add(v);
+            if (v.compareTo(max) > 0) max = v;
+        }
+        if (max.compareTo(BigDecimal.ZERO) == 0) max = BigDecimal.ONE;
+
+        int barAreaWidth = barAreaRight - barAreaLeft;
+        int barCount = keys.size();
+        int barWidth = Math.max(15, Math.min(60, (barAreaWidth - 20) / Math.max(1, barCount)));
+        int gap = (barAreaWidth - (barWidth * barCount)) / Math.max(1, barCount + 1);
+
+        g.setColor(Color.LIGHT_GRAY);
+        g.drawLine(barAreaLeft, barAreaBottom, barAreaRight, barAreaBottom);
+        g.drawLine(barAreaLeft, barAreaTop, barAreaLeft, barAreaBottom);
+
+        g.setFont(new java.awt.Font("SansSerif", java.awt.Font.PLAIN, 9));
+        for (int tick = 0; tick <= 4; tick++) {
+            int y = barAreaBottom - (int)((barAreaBottom - barAreaTop) * tick / 4.0);
+            g.setColor(Color.LIGHT_GRAY);
+            g.drawLine(barAreaLeft, y, barAreaRight, y);
+            g.setColor(Color.GRAY);
+            BigDecimal tickVal = max.multiply(BigDecimal.valueOf(tick)).divide(BigDecimal.valueOf(4), 2, RoundingMode.HALF_UP);
+            g.drawString(tickVal.longValue() + "", barAreaLeft - 50, y + 3);
+        }
+
+        Color[] colors = {new Color(33, 150, 243), new Color(76, 175, 80), new Color(255, 152, 0),
+                          new Color(156, 39, 176), new Color(233, 30, 99), new Color(0, 188, 212),
+                          new Color(255, 193, 7), new Color(121, 85, 72), new Color(63, 81, 181)};
+
+        g.setFont(new java.awt.Font("SansSerif", java.awt.Font.PLAIN, 8));
+        for (int i = 0; i < barCount; i++) {
+            int x = barAreaLeft + gap + i * (barWidth + gap);
+            int barHeight = (int)((barAreaBottom - barAreaTop) * values.get(i).doubleValue() / max.doubleValue());
+            int barY = barAreaBottom - barHeight;
+
+            g.setColor(colors[i % colors.length]);
+            g.fillRect(x, barY, barWidth, barHeight);
+            g.setColor(Color.DARK_GRAY);
+            g.drawRect(x, barY, barWidth, barHeight);
+
+            String label = keys.get(i);
+            if (label.length() > 10) label = label.substring(0, 9) + ".";
+            g.drawString(label, x - 2, barAreaBottom + 14);
+
+            String valStr = formatTL(values.get(i));
+            g.drawString(valStr, x - 2, barY - 3);
+        }
+
+        g.dispose();
+        return img;
     }
 }

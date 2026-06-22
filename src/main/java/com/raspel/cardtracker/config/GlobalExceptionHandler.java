@@ -6,6 +6,7 @@ import com.vaadin.flow.server.ErrorEvent;
 import com.vaadin.flow.server.ErrorHandler;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Component;
 
 @Component
@@ -14,8 +15,21 @@ public class GlobalExceptionHandler implements ErrorHandler {
 
     @Override
     public void error(ErrorEvent event) {
-        log.error("Unhandled exception", event.getThrowable());
-        if (event.getThrowable() != null) {
+        Throwable throwable = event.getThrowable();
+        if (throwable == null) {
+            Notification.show("Bir hata oluştu. Lütfen daha sonra tekrar deneyin.",
+                5000, Notification.Position.MIDDLE)
+                .addThemeVariants(NotificationVariant.LUMO_ERROR);
+            return;
+        }
+
+        log.error("Unhandled exception", throwable);
+
+        if (throwable instanceof AccessDeniedException) {
+            Notification.show("Bu sayfaya erişim yetkiniz bulunmamaktadır.",
+                5000, Notification.Position.MIDDLE)
+                .addThemeVariants(NotificationVariant.LUMO_ERROR);
+        } else {
             Notification.show("Bir hata oluştu. Lütfen daha sonra tekrar deneyin.",
                 5000, Notification.Position.MIDDLE)
                 .addThemeVariants(NotificationVariant.LUMO_ERROR);

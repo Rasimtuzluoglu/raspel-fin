@@ -4,7 +4,6 @@ import com.raspel.cardtracker.domain.cheque.Cheque;
 import org.apache.poi.ss.usermodel.*;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -12,7 +11,6 @@ import java.io.IOException;
 import java.util.List;
 
 @Service
-@Transactional(readOnly = true)
 public class ExcelExportService {
 
     public ByteArrayInputStream exportInstallments(List<InstallmentEntry> entries) {
@@ -134,7 +132,7 @@ public class ExcelExportService {
             workbook.write(out);
             return new ByteArrayInputStream(out.toByteArray());
         } catch (IOException e) {
-            throw new RuntimeException("Excel dışa aktarımında hata oluştu: " + e.getMessage(), e);
+            throw new RuntimeException("Excel dışa aktarımında hata oluştu, lütfen daha sonra tekrar deneyin.", e);
         }
     }
 
@@ -188,7 +186,7 @@ public class ExcelExportService {
             workbook.write(out);
             return new ByteArrayInputStream(out.toByteArray());
         } catch (IOException e) {
-            throw new RuntimeException("Excel şablon oluşturmada hata: " + e.getMessage(), e);
+            throw new RuntimeException("Excel şablon oluşturmada hata oluştu, lütfen daha sonra tekrar deneyin.", e);
         }
     }
 
@@ -277,7 +275,7 @@ public class ExcelExportService {
             workbook.write(out);
             return new ByteArrayInputStream(out.toByteArray());
         } catch (IOException e) {
-            throw new RuntimeException("Çek Excel dışa aktarımında hata oluştu: " + e.getMessage(), e);
+            throw new RuntimeException("Çek Excel dışa aktarımında hata oluştu, lütfen daha sonra tekrar deneyin.", e);
         }
     }
 }

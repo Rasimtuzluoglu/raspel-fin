@@ -624,6 +624,18 @@ public class MainLayout extends AppLayout {
             userService.recordSuccessfulLogin(auth.getName());
         }
 
+        getUI().ifPresent(ui -> {
+            if (ui.getPollInterval() < 0) {
+                ui.setPollInterval(60000);
+                ui.addPollListener(e -> {
+                    try {
+                        checkNoteReminders();
+                        checkBudgetWarnings();
+                    } catch (Exception ignored) {}
+                });
+            }
+        });
+
         Boolean sessionDarkInitialized = (Boolean) com.vaadin.flow.server.VaadinSession.getCurrent().getAttribute("darkModeInitialized");
         if (sessionDarkInitialized == null || !sessionDarkInitialized) {
             com.vaadin.flow.server.VaadinSession.getCurrent().setAttribute("darkModeInitialized", true);
@@ -710,12 +722,46 @@ public class MainLayout extends AppLayout {
             List<Note> dueReminders = noteService.getDueReminders(username);
             if (!dueReminders.isEmpty()) {
                 for (Note note : dueReminders) {
-                    Notification noteNotif = Notification.show(
-                        "Hatırlatma: " + note.getTitle(),
-                        4000, Notification.Position.MIDDLE);
-                    noteNotif.addThemeVariants(NotificationVariant.LUMO_PRIMARY);
-                    noteNotif.getElement().getStyle().set("animation", "none").set("transition", "none");
-                    noteService.markReminded(note.getId());
+                    Dialog notifDialog = new Dialog();
+                    notifDialog.setHeaderTitle("Hatırlatma");
+                    notifDialog.setWidth("420px");
+                    notifDialog.setCloseOnOutsideClick(false);
+                    notifDialog.setCloseOnEsc(false);
+
+                    VerticalLayout content = new VerticalLayout();
+                    content.setPadding(false);
+                    content.setSpacing(true);
+
+                    Span titleSpan = new Span(note.getTitle());
+                    titleSpan.getStyle()
+                            .set("font-weight", "700")
+                            .set("font-size", "1.1em")
+                            .set("color", "var(--lumo-primary-text-color)")
+                            .set("display", "block");
+
+                    Span contentSpan = new Span(note.getContent() != null && !note.getContent().isEmpty()
+                            ? note.getContent()
+                            : "(İçerik yok)");
+                    contentSpan.getStyle()
+                            .set("font-size", "0.95em")
+                            .set("color", "var(--lumo-body-text-color)")
+                            .set("display", "block")
+                            .set("white-space", "pre-wrap")
+                            .set("max-height", "200px")
+                            .set("overflow-y", "auto");
+
+                    content.add(titleSpan, contentSpan);
+
+                    Button okunduBtn = new Button("Okundu", e -> {
+                        noteService.markReminded(note.getId());
+                        notifDialog.close();
+                    });
+                    okunduBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+                    okunduBtn.setWidthFull();
+
+                    notifDialog.add(content);
+                    notifDialog.getFooter().add(okunduBtn);
+                    notifDialog.open();
                 }
             }
         } catch (Exception ignored) {
@@ -736,10 +782,15 @@ public class MainLayout extends AppLayout {
                 if (limit != null && limit.compareTo(BigDecimal.ZERO) > 0) {
                     double pct = unpaid.divide(limit, 4, RoundingMode.HALF_UP).doubleValue() * 100;
                     if (pct >= 90.0) {
-                        Notification.show(
+                        Notification warn = new Notification(
                             card.getName() + " kart limiti %" + (int) pct + " dolu!",
-                            5000, Notification.Position.MIDDLE)
-                            .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                            0, Notification.Position.MIDDLE);
+                        warn.addThemeVariants(NotificationVariant.LUMO_ERROR);
+                        warn.getElement().getStyle().set("animation", "none").set("transition", "none");
+                        Button closeBtn = new Button("Kapat", ev -> warn.close());
+                        closeBtn.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
+                        warn.add(closeBtn);
+                        warn.open();
                     }
                 }
             }
@@ -752,10 +803,15 @@ public class MainLayout extends AppLayout {
                 if (budgetLimit != null && budgetLimit.compareTo(BigDecimal.ZERO) > 0) {
                     double pct = spent.divide(budgetLimit, 4, RoundingMode.HALF_UP).doubleValue() * 100;
                     if (pct >= 80.0) {
-                        Notification.show(
+                        Notification warn = new Notification(
                             deptName + " bütçesi %" + (int) pct + " kullanıldı!",
-                            5000, Notification.Position.MIDDLE)
-                            .addThemeVariants(NotificationVariant.LUMO_WARNING);
+                            0, Notification.Position.MIDDLE);
+                        warn.addThemeVariants(NotificationVariant.LUMO_WARNING);
+                        warn.getElement().getStyle().set("animation", "none").set("transition", "none");
+                        Button closeBtn = new Button("Kapat", ev -> warn.close());
+                        closeBtn.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
+                        warn.add(closeBtn);
+                        warn.open();
                     }
                 }
             }

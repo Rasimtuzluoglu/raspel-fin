@@ -1,4 +1,4 @@
-CREATE TABLE expense_archive (
+CREATE TABLE IF NOT EXISTS expense_archive (
     id BIGINT NOT NULL,
     card_id BIGINT,
     contact_id BIGINT,
@@ -19,7 +19,7 @@ CREATE TABLE expense_archive (
     PRIMARY KEY (id)
 );
 
-CREATE TABLE installment_entry_archive (
+CREATE TABLE IF NOT EXISTS installment_entry_archive (
     id BIGINT NOT NULL,
     expense_id BIGINT NOT NULL,
     due_year INT NOT NULL,

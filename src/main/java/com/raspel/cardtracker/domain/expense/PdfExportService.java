@@ -5,7 +5,6 @@ import com.lowagie.text.pdf.*;
 import com.raspel.cardtracker.domain.cheque.Cheque;
 import com.raspel.cardtracker.domain.cheque.ChequeType;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -16,7 +15,6 @@ import java.util.List;
 import java.util.Locale;
 
 @Service
-@Transactional(readOnly = true)
 public class PdfExportService {
 
     private String formatTL(BigDecimal amount) {
@@ -108,7 +106,7 @@ public class PdfExportService {
 
             document.close();
         } catch (Exception e) {
-            throw new RuntimeException("PDF oluşturulamadı: " + e.getMessage(), e);
+            throw new RuntimeException("PDF oluşturulamadı, lütfen daha sonra tekrar deneyin.", e);
         }
 
         return new ByteArrayInputStream(out.toByteArray());
@@ -176,7 +174,7 @@ public class PdfExportService {
 
             document.close();
         } catch (Exception e) {
-            throw new RuntimeException("PDF oluşturulamadı: " + e.getMessage(), e);
+            throw new RuntimeException("PDF oluşturulamadı, lütfen daha sonra tekrar deneyin.", e);
         }
 
         return new ByteArrayInputStream(out.toByteArray());

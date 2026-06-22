@@ -95,13 +95,14 @@ public class ExcelImportService {
                     successCount++;
 
                 } catch (Exception e) {
-                    errors.add("Satır " + (i + 1) + ": " + e.getMessage());
+                    log.warn("Satır {} içe aktarma hatası", i + 1, e);
+                    errors.add("Satır " + (i + 1) + ": İçe aktarma sırasında bir hata oluştu");
                     errorCount++;
                 }
             }
         } catch (Exception e) {
             log.error("Excel import hatası", e);
-            errors.add("Dosya okuma hatası: " + e.getMessage());
+            errors.add("Dosya okunamadı, lütfen dosya formatını kontrol edin.");
         }
 
         log.info("Excel import tamamlandı. Başarılı: {}, Hatalı: {}", successCount, errorCount);

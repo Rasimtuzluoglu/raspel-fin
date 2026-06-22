@@ -13,10 +13,11 @@ import java.util.List;
 @Repository
 public interface InstallmentEntryRepository extends JpaRepository<InstallmentEntry, Long> {
 
-    @Query("SELECT ie FROM InstallmentEntry ie LEFT JOIN FETCH ie.expense WHERE ie.dueYear = :dueYear AND ie.dueMonth = :dueMonth")
+    @Query("SELECT ie FROM InstallmentEntry ie JOIN FETCH ie.expense e JOIN FETCH e.card LEFT JOIN FETCH e.contact WHERE ie.dueYear = :dueYear AND ie.dueMonth = :dueMonth")
     List<InstallmentEntry> findByDueYearAndDueMonth(@Param("dueYear") Integer dueYear, @Param("dueMonth") Integer dueMonth);
 
-    List<InstallmentEntry> findByExpenseId(Long expenseId);
+    @Query("SELECT ie FROM InstallmentEntry ie JOIN FETCH ie.expense WHERE ie.expense.id = :expenseId")
+    List<InstallmentEntry> findByExpenseId(@Param("expenseId") Long expenseId);
 
     @Modifying
     @Query("DELETE FROM InstallmentEntry ie WHERE ie.expense.id = :expenseId")

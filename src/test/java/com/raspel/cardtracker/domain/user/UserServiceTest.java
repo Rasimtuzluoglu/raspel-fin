@@ -133,7 +133,7 @@ class UserServiceTest {
 
         assertThatThrownBy(() -> userService.loadUserByUsername("unknown"))
                 .isInstanceOf(UsernameNotFoundException.class)
-                .hasMessageContaining("Kullanıcı bulunamadı");
+                .hasMessageContaining("Geçersiz kullanıcı adı veya şifre");
     }
 
     @Test

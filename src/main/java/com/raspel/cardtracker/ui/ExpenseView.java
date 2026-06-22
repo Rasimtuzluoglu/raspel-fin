@@ -580,7 +580,6 @@ public class ExpenseView extends VerticalLayout {
 
             dialog.close();
             refreshGrid();
-            getUI().ifPresent(ui -> ui.access(() -> ui.navigate("expenses")));
         });
         saveBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
         saveBtn.addClickShortcut(com.vaadin.flow.component.Key.ENTER);

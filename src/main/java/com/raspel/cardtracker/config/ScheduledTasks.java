@@ -29,12 +29,14 @@ public class ScheduledTasks {
     public void generateMonthlyReport() {
         try {
             LocalDate lastMonth = LocalDate.now().minusMonths(1);
-            String companySlug = appSettingsService.getCompanyName().replaceAll("[^a-zA-Z0-9ğüşıöçĞÜŞİÖÇ]", "_");
+            String companyName = appSettingsService.getCompanyName();
+            if (companyName == null) companyName = "Firma";
+            String companySlug = companyName.replaceAll("[^a-zA-Z0-9ğüşıöçĞÜŞİÖÇ]", "_");
             String fileName = String.format("%s_Aylik_Rapor_%s.pdf",
                     companySlug,
                     lastMonth.format(DateTimeFormatter.ofPattern("yyyy_MM")));
 
-            Path reportDir = Paths.get("reports");
+            Path reportDir = Paths.get(System.getProperty("user.home"), "cardtracker", "reports");
             if (!Files.exists(reportDir)) {
                 Files.createDirectories(reportDir);
             }
@@ -46,7 +48,6 @@ public class ScheduledTasks {
             }
 
             log.info("Aylık rapor oluşturuldu: {}", targetPath.toAbsolutePath());
-            log.info("Monthly report cleanup check completed");
         } catch (Exception e) {
             log.error("Aylık rapor oluşturulamadı", e);
         }

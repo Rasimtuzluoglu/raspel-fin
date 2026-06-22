@@ -52,6 +52,7 @@ public class CardListView extends VerticalLayout {
     private final Div emptyState = new Div();
     private final ProgressBar loadingBar = new ProgressBar();
     private boolean isAdmin;
+    private java.util.Map<Long, BigDecimal> unpaidBalanceCache = new java.util.HashMap<>();
 
     public CardListView(CardService cardService, com.raspel.cardtracker.domain.expense.ExpenseService expenseService, DepartmentService departmentService) {
         this.cardService = cardService;
@@ -138,7 +139,7 @@ public class CardListView extends VerticalLayout {
         grid.addColumn(card -> FormatUtils.formatNumber(card.getCardLimit()) + " TL").setHeader("Limit").setSortable(true).setAutoWidth(true);
 
         grid.addComponentColumn(card -> {
-            BigDecimal unpaid = expenseService.getUnpaidBalance(card.getId());
+            BigDecimal unpaid = unpaidBalanceCache.getOrDefault(card.getId(), BigDecimal.ZERO);
             BigDecimal limit = card.getCardLimit();
             double pct = 0;
             if (limit != null && limit.compareTo(BigDecimal.ZERO) > 0) {
@@ -413,7 +414,6 @@ public class CardListView extends VerticalLayout {
                     .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
             dialog.close();
             refreshGrid();
-            getUI().ifPresent(ui -> ui.access(() -> ui.navigate("cards")));
         });
         saveBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
         saveBtn.addClickShortcut(com.vaadin.flow.component.Key.ENTER);
@@ -487,6 +487,7 @@ public class CardListView extends VerticalLayout {
 
     private void refreshGrid() {
         loadingBar.setVisible(true);
+        unpaidBalanceCache = expenseService.getUnpaidBalancesGroupedByCard();
         List<Card> allCards = showInactive.getValue() ? cardService.findAll() : cardService.findAllActive();
         String term = searchField.getValue() != null ? searchField.getValue().trim().toLowerCase() : "";
 

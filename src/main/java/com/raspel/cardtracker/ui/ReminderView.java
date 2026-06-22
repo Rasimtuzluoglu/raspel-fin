@@ -377,7 +377,20 @@ public class ReminderView extends VerticalLayout {
 
         installmentGrid.setItems(combined);
 
-        layout.add(sectionTitle, installmentGrid);
+        Span emptyState = new Span("Yaklaşan veya geciken taksit bulunmuyor. Harika!");
+        emptyState.getStyle()
+                .set("color", "var(--lumo-secondary-text-color)")
+                .set("font-size", "1.1em")
+                .set("display", "flex")
+                .set("align-items", "center")
+                .set("justify-content", "center")
+                .set("width", "100%")
+                .set("padding", "3em 0")
+                .set("margin", "auto");
+        emptyState.setVisible(combined.isEmpty());
+        installmentGrid.setVisible(!combined.isEmpty());
+
+        layout.add(sectionTitle, installmentGrid, emptyState);
         contentDiv.add(layout);
     }
 
@@ -400,7 +413,20 @@ public class ReminderView extends VerticalLayout {
 
         chequeGrid.setItems(combined);
 
-        layout.add(sectionTitle, chequeGrid);
+        Span emptyState = new Span("Yaklaşan veya geciken çek bulunmuyor. Harika!");
+        emptyState.getStyle()
+                .set("color", "var(--lumo-secondary-text-color)")
+                .set("font-size", "1.1em")
+                .set("display", "flex")
+                .set("align-items", "center")
+                .set("justify-content", "center")
+                .set("width", "100%")
+                .set("padding", "3em 0")
+                .set("margin", "auto");
+        emptyState.setVisible(combined.isEmpty());
+        chequeGrid.setVisible(!combined.isEmpty());
+
+        layout.add(sectionTitle, chequeGrid, emptyState);
         contentDiv.add(layout);
     }
 

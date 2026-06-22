@@ -19,5 +19,6 @@ public interface ChequeRepository extends JpaRepository<Cheque, Long> {
            "ORDER BY c.maturityDate ASC")
     List<Cheque> searchByTerm(@Param("term") String term);
 
-    Optional<Cheque> findByChequeNumber(String chequeNumber);
+    @Query("SELECT c FROM Cheque c LEFT JOIN FETCH c.contact WHERE c.chequeNumber = :chequeNumber")
+    Optional<Cheque> findByChequeNumber(@Param("chequeNumber") String chequeNumber);
 }

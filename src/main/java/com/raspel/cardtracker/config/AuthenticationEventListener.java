@@ -20,7 +20,11 @@ public class AuthenticationEventListener {
         String username = event.getAuthentication().getName();
         if (username != null && !username.isBlank()) {
             log.warn("Başarısız giriş denemesi: {}", username);
-            userService.recordFailedLogin(username);
+            try {
+                userService.recordFailedLogin(username);
+            } catch (Exception e) {
+                log.error("Başarısız giriş kaydı yapılamadı: {}", username, e);
+            }
         }
     }
 
@@ -29,7 +33,11 @@ public class AuthenticationEventListener {
         String username = event.getAuthentication().getName();
         if (username != null && !username.isBlank()) {
             log.info("Başarılı giriş: {}", username);
-            userService.recordSuccessfulLogin(username);
+            try {
+                userService.recordSuccessfulLogin(username);
+            } catch (Exception e) {
+                log.error("Başarılı giriş kaydı yapılamadı: {}", username, e);
+            }
         }
     }
 }

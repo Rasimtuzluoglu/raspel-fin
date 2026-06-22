@@ -335,10 +335,13 @@ public class ExpenseService {
      * Belirli bir departmanın belirli bir ay/yıldaki toplam harcama tutarını hesaplar.
      */
     public BigDecimal getDepartmentSpentForMonth(String department, int year, int month) {
+        if (department == null) return BigDecimal.ZERO;
         List<InstallmentEntry> entries = getInstallmentsForMonth(year, month);
         return entries.stream()
                 .filter(entry -> {
-                    String cardDept = entry.getExpense().getCard().getDepartment() != null ? entry.getExpense().getCard().getDepartment().getName() : null;
+                    if (entry.getExpense() == null || entry.getExpense().getCard() == null) return false;
+                    String cardDept = entry.getExpense().getCard().getDepartment() != null
+                            ? entry.getExpense().getCard().getDepartment().getName() : null;
                     return cardDept != null && cardDept.trim().equalsIgnoreCase(department.trim());
                 })
                 .map(InstallmentEntry::getAmount)
@@ -364,5 +367,13 @@ public class ExpenseService {
             }
         }
         return null;
+    }
+
+    public long countByCreatedBy(String createdBy) {
+        return expenseRepository.countByCreatedBy(createdBy);
+    }
+
+    public List<Expense> findRecentByCreatedBy(String createdBy, int limit) {
+        return expenseRepository.findRecentByCreatedBy(createdBy, org.springframework.data.domain.PageRequest.of(0, limit));
     }
 }

@@ -112,10 +112,35 @@ public class PaymentReminderService {
      * Hatırlatıcı özeti döner (Badge sayıları için).
      */
     public ReminderSummary getReminderSummary() {
-        List<InstallmentEntry> overdueInstallments = getOverdueInstallments();
-        List<InstallmentEntry> upcomingInstallments = getUpcomingInstallments(7); // 7 günlük yaklaşanlar
-        List<Cheque> overdueCheques = getOverdueCheques();
-        List<Cheque> upcomingCheques = getUpcomingCheques(7);
+        List<InstallmentEntry> allUnpaid = installmentEntryRepository.findAllUnpaidWithDetails();
+        LocalDate today = LocalDate.now();
+        LocalDate limitDate = today.plusDays(7);
+
+        List<InstallmentEntry> overdueInstallments = allUnpaid.stream()
+                .filter(entry -> !entry.getIsPaid())
+                .filter(entry -> calculateDueDate(entry).isBefore(today))
+                .sorted((a, b) -> calculateDueDate(a).compareTo(calculateDueDate(b)))
+                .collect(Collectors.toList());
+
+        List<InstallmentEntry> upcomingInstallments = allUnpaid.stream()
+                .filter(entry -> !entry.getIsPaid())
+                .filter(entry -> {
+                    LocalDate dueDate = calculateDueDate(entry);
+                    return (dueDate.isEqual(today) || dueDate.isAfter(today)) && dueDate.isBefore(limitDate);
+                })
+                .sorted((a, b) -> calculateDueDate(a).compareTo(calculateDueDate(b)))
+                .collect(Collectors.toList());
+
+        List<Cheque> activeCheques = getActiveCheques();
+        List<Cheque> overdueCheques = activeCheques.stream()
+                .filter(c -> c.getMaturityDate().isBefore(today))
+                .collect(Collectors.toList());
+        List<Cheque> upcomingCheques = activeCheques.stream()
+                .filter(c -> {
+                    LocalDate maturity = c.getMaturityDate();
+                    return (maturity.isEqual(today) || maturity.isAfter(today)) && maturity.isBefore(limitDate);
+                })
+                .collect(Collectors.toList());
 
         BigDecimal overdueInstallmentTotal = overdueInstallments.stream()
                 .map(InstallmentEntry::getAmount)
