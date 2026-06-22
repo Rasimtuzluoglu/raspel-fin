@@ -34,18 +34,20 @@ public class DepartmentBudgetService {
             throw new IllegalArgumentException("Bütçe limiti negatif olamaz");
         }
         DepartmentBudget saved = repository.save(budget);
+        String deptName = saved.getDepartment() != null ? saved.getDepartment().getName() : "Bilinmeyen Departman";
         auditLogService.log(
                 isNew ? AuditAction.CREATE : AuditAction.UPDATE,
                 "Bütçe",
                 saved.getId(),
-                (isNew ? "Yeni bütçe oluşturuldu: " : "Bütçe güncellendi: ") + saved.getDepartment().getName()
+                (isNew ? "Yeni bütçe oluşturuldu: " : "Bütçe güncellendi: ") + deptName
         );
         return saved;
     }
 
     public void delete(Long id) {
         repository.findById(id).ifPresent(budget -> {
-            auditLogService.log(AuditAction.DELETE, "Bütçe", id, "Bütçe silindi: " + budget.getDepartment().getName());
+            String deptName = budget.getDepartment() != null ? budget.getDepartment().getName() : "Bilinmeyen Departman";
+            auditLogService.log(AuditAction.DELETE, "Bütçe", id, "Bütçe silindi: " + deptName);
         });
         repository.deleteById(id);
     }

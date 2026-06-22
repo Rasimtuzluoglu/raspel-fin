@@ -714,6 +714,7 @@ public class MainLayout extends AppLayout {
                         "Hatırlatma: " + note.getTitle(),
                         4000, Notification.Position.MIDDLE);
                     noteNotif.addThemeVariants(NotificationVariant.LUMO_PRIMARY);
+                    noteNotif.getElement().getStyle().set("animation", "none").set("transition", "none");
                     noteService.markReminded(note.getId());
                 }
             }

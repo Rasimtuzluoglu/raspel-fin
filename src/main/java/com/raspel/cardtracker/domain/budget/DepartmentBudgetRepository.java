@@ -7,9 +7,15 @@ import java.util.Optional;
 import java.util.List;
 
 public interface DepartmentBudgetRepository extends JpaRepository<DepartmentBudget, Long> {
-    Optional<DepartmentBudget> findByDepartmentIdAndBudgetYearAndBudgetMonth(Long departmentId, Integer year, Integer month);
+    @Query("SELECT db FROM DepartmentBudget db JOIN FETCH db.department WHERE db.department.id = :deptId AND db.budgetYear = :year AND db.budgetMonth = :month")
+    Optional<DepartmentBudget> findByDepartmentIdAndBudgetYearAndBudgetMonth(@Param("deptId") Long departmentId, @Param("year") Integer year, @Param("month") Integer month);
 
     @Query("SELECT db FROM DepartmentBudget db JOIN FETCH db.department WHERE db.budgetYear = :year AND db.budgetMonth = :month")
     List<DepartmentBudget> findByBudgetYearAndBudgetMonth(@Param("year") Integer year, @Param("month") Integer month);
-    List<DepartmentBudget> findByDepartmentIdOrderByBudgetYearDescBudgetMonthDesc(Long departmentId);
+
+    @Query("SELECT db FROM DepartmentBudget db JOIN FETCH db.department ORDER BY db.budgetYear DESC, db.budgetMonth DESC")
+    List<DepartmentBudget> findAll();
+
+    @Query("SELECT db FROM DepartmentBudget db JOIN FETCH db.department WHERE db.department.id = :deptId ORDER BY db.budgetYear DESC, db.budgetMonth DESC")
+    List<DepartmentBudget> findByDepartmentIdOrderByBudgetYearDescBudgetMonthDesc(@Param("deptId") Long departmentId);
 }

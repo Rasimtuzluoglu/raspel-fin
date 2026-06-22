@@ -97,7 +97,7 @@ public class BudgetView extends VerticalLayout {
             }
             Department dept = Department.builder().name(name.trim()).isActive(true).build();
             departmentService.save(dept);
-            Notification.show("Departman eklendi: " + name.trim(), 3000, Notification.Position.BOTTOM_END)
+            Notification.show("Departman eklendi: " + name.trim(), 3000, Notification.Position.MIDDLE)
                     .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
             deptNameField.clear();
             deptSelect.setItems(departmentService.findAllActive());
@@ -124,7 +124,33 @@ public class BudgetView extends VerticalLayout {
         HorizontalLayout section = new HorizontalLayout(deptNameField, addBtn, deptSelect, deleteBtn);
         section.setAlignItems(Alignment.END);
         section.setSpacing(true);
-        return section;
+        section.setWidthFull();
+        section.getStyle().set("flex-wrap", "wrap");
+
+        VerticalLayout deptListSection = new VerticalLayout();
+        deptListSection.setPadding(false);
+        deptListSection.setSpacing(false);
+        Span deptListTitle = new Span("Mevcut Departmanlar:");
+        deptListTitle.getStyle().set("font-weight", "600").set("font-size", "0.9em").set("color", "var(--lumo-secondary-text-color)");
+        deptListSection.add(deptListTitle);
+        List<Department> departments = departmentService.findAllActive();
+        if (departments.isEmpty()) {
+            deptListSection.add(new Span("Henüz departman eklenmemiş."));
+        } else {
+            for (Department d : departments) {
+                Span deptSpan = new Span("• " + d.getName());
+                deptSpan.getStyle().set("font-size", "0.85em").set("padding", "0.2em 0");
+                deptListSection.add(deptSpan);
+            }
+        }
+
+        VerticalLayout wrapper = new VerticalLayout(section, deptListSection);
+        wrapper.setPadding(false);
+        wrapper.setSpacing(true);
+
+        HorizontalLayout result = new HorizontalLayout(wrapper);
+        result.setWidthFull();
+        return result;
     }
 
     private HorizontalLayout createToolbar() {
@@ -145,7 +171,7 @@ public class BudgetView extends VerticalLayout {
         grid.addThemeVariants(GridVariant.LUMO_ROW_STRIPES, GridVariant.LUMO_WRAP_CELL_CONTENT);
         grid.setSizeFull();
 
-        grid.addColumn(b -> b.getDepartment().getName()).setHeader("Departman").setSortable(true).setAutoWidth(true);
+        grid.addColumn(b -> b.getDepartment() != null ? b.getDepartment().getName() : "-").setHeader("Departman").setSortable(true).setAutoWidth(true);
         grid.addColumn(DepartmentBudget::getBudgetYear).setHeader("Yıl").setSortable(true).setAutoWidth(true);
         grid.addColumn(b -> {
             String[] months = {"", "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
@@ -283,7 +309,7 @@ public class BudgetView extends VerticalLayout {
 
             try {
                 budgetService.save(budget);
-                Notification.show("Bütçe kaydedildi.", 3000, Notification.Position.BOTTOM_END)
+                Notification.show("Bütçe kaydedildi.", 3000, Notification.Position.MIDDLE)
                         .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
                 dialog.close();
                 refreshGrid();

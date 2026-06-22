@@ -70,7 +70,7 @@ public class PdfExportService {
             for (InstallmentEntry entry : entries) {
                 Expense exp = entry.getExpense();
 
-                table.addCell(createCell(exp.getCard().getName(), cellFont));
+                table.addCell(createCell(exp.getCard() != null ? exp.getCard().getName() : "-", cellFont));
                 table.addCell(createCell(exp.getDescription(), cellFont));
 
                 // Taksit Tutarı

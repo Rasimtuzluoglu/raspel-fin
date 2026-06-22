@@ -46,34 +46,33 @@ public class FormatUtils {
         }
         String cleaned = input.trim();
 
-        // Handle mixed cases of dots and commas
         if (cleaned.contains(".") && cleaned.contains(",")) {
             int dotIndex = cleaned.indexOf(".");
             int commaIndex = cleaned.indexOf(",");
             if (dotIndex < commaIndex) {
-                // Turkish: dots are thousands, comma is decimal (e.g., 10.000,50)
                 cleaned = cleaned.replace(".", "").replace(",", ".");
             } else {
-                // English: commas are thousands, dot is decimal (e.g., 10,000.50)
-                cleaned = cleaned.replace(",", "").replace(".", ".");
+                cleaned = cleaned.replace(",", "");
             }
         } else if (cleaned.contains(",")) {
-            // e.g. "10000,50" -> comma is decimal in Turkish
-            cleaned = cleaned.replace(",", ".");
+            int commaIdx = cleaned.lastIndexOf(",");
+            int afterComma = cleaned.length() - commaIdx - 1;
+            if (afterComma <= 2) {
+                cleaned = cleaned.replace(",", ".");
+            } else {
+                cleaned = cleaned.replace(",", "");
+            }
         } else if (cleaned.contains(".")) {
-            // e.g. "10.000" or "10000.50"
             int lastDot = cleaned.lastIndexOf(".");
             int lengthAfterDot = cleaned.length() - lastDot - 1;
-            if (lengthAfterDot == 3) {
-                // "10.000" -> thousand separator, remove it
+            if (lengthAfterDot >= 3) {
                 cleaned = cleaned.replace(".", "");
             }
-            // else "10000.50" or "10.5" -> keep the dot as decimal separator
         }
 
-        // Keep only digits and dot
         cleaned = cleaned.replaceAll("[^0-9.]", "");
-        if (cleaned.isEmpty()) {
+        cleaned = cleaned.replaceAll("\\.+$", "");
+        if (cleaned.isEmpty() || cleaned.equals(".")) {
             return BigDecimal.ZERO;
         }
 

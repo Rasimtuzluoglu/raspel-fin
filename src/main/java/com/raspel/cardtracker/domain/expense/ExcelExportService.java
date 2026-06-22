@@ -64,20 +64,21 @@ public class ExcelExportService {
             for (InstallmentEntry entry : entries) {
                 Row row = sheet.createRow(rowIdx++);
                 Expense expense = entry.getExpense();
+                boolean hasCard = expense.getCard() != null;
                 
                 // Kart adı
                 Cell cell0 = row.createCell(0);
-                cell0.setCellValue(expense.getCard().getName());
+                cell0.setCellValue(hasCard ? expense.getCard().getName() : "-");
                 cell0.setCellStyle(dataStyle);
 
                 // Departman
                 Cell cell1 = row.createCell(1);
-                cell1.setCellValue(expense.getCard().getDepartment() != null ? expense.getCard().getDepartment().getName() : "-");
+                cell1.setCellValue(hasCard && expense.getCard().getDepartment() != null ? expense.getCard().getDepartment().getName() : "-");
                 cell1.setCellStyle(dataStyle);
 
                 // Kart Sahibi
                 Cell cell2 = row.createCell(2);
-                cell2.setCellValue(expense.getCard().getHolderName() != null ? expense.getCard().getHolderName() : "-");
+                cell2.setCellValue(hasCard && expense.getCard().getHolderName() != null ? expense.getCard().getHolderName() : "-");
                 cell2.setCellStyle(dataStyle);
 
                 // Açıklama

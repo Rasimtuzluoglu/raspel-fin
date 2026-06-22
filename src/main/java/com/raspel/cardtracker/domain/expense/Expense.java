@@ -29,7 +29,7 @@ public class Expense {
     private Integer version;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "card_id", nullable = false)
+    @JoinColumn(name = "card_id")
     private Card card;
 
     @ManyToOne(fetch = FetchType.LAZY)

@@ -109,12 +109,15 @@ public class AverageMaturityView extends VerticalLayout {
         List<Transaction> transactions = new ArrayList<>();
         byte[] bytes = is.readAllBytes();
 
-        String content = new String(bytes, StandardCharsets.UTF_8);
-        if (content.startsWith("\uFEFF")) content = content.substring(1);
+        byte[] trimmedBytes = bytes;
+        if (bytes.length >= 3 && bytes[0] == (byte)0xEF && bytes[1] == (byte)0xBB && bytes[2] == (byte)0xBF) {
+            trimmedBytes = java.util.Arrays.copyOfRange(bytes, 3, bytes.length);
+        }
+
+        String content = new String(trimmedBytes, StandardCharsets.UTF_8);
 
         if (content.contains("\uFFFD")) {
-            content = new String(bytes, java.nio.charset.Charset.forName("Windows-1254"));
-            if (content.startsWith("\uFEFF")) content = content.substring(1);
+            content = new String(trimmedBytes, java.nio.charset.Charset.forName("Windows-1254"));
         }
 
         String[] lines = content.split("\\r?\\n");

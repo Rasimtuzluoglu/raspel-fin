@@ -15,6 +15,8 @@ import com.vaadin.flow.component.progressbar.ProgressBar;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.router.RouteAlias;
+import com.vaadin.flow.router.BeforeEnterEvent;
+import com.vaadin.flow.router.BeforeEnterObserver;
 import com.raspel.cardtracker.domain.card.Card;
 import com.raspel.cardtracker.domain.card.CardService;
 import com.raspel.cardtracker.domain.expense.ExpenseService;
@@ -62,7 +64,7 @@ import com.vaadin.flow.component.orderedlayout.FlexComponent;
 @RouteAlias(value = "dashboard", layout = MainLayout.class)
 @PageTitle("Ana Sayfa")
 @PermitAll
-public class DashboardView extends VerticalLayout {
+public class DashboardView extends VerticalLayout implements BeforeEnterObserver {
 
     private final ExpenseService expenseService;
     private final CardService cardService;
@@ -108,11 +110,20 @@ public class DashboardView extends VerticalLayout {
 
         loadConfigAndRender();
     }
+
+    @Override
+    public void beforeEnter(BeforeEnterEvent event) {
+        loadConfigAndRender();
+    }
     
     private void loadConfigAndRender() {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         String username = auth != null ? auth.getName() : "system";
         currentConfig = userService.getDashboardConfig(username);
+        
+        getUI().ifPresent(ui -> ui.getPage().executeJs(
+            "window._dashScrollY = window.scrollY || window.pageYOffset; return window._dashScrollY;"
+        ));
         
         dashboardContent.removeAll();
 
@@ -131,7 +142,13 @@ public class DashboardView extends VerticalLayout {
             }
         }
 
-        getElement().executeJs("var el=document.getElementById('dashboard-loading');if(el)el.style.display='none';");
+        getElement().executeJs(
+            "var el=document.getElementById('dashboard-loading');if(el)el.style.display='none';" +
+            "if(window._dashScrollY !== undefined){" +
+            "  window.scrollTo(0, window._dashScrollY);" +
+            "  delete window._dashScrollY;" +
+            "}"
+        );
     }
 
     private Div createWelcomeSection(String username) {
@@ -1086,8 +1103,27 @@ public class DashboardView extends VerticalLayout {
                 .set("width", "100%")
                 .set("box-sizing", "border-box");
 
-        H3 titleEl = new H3("Ödeme Hatırlatıcıları (Yaklaşan / Geciken)");
-        titleEl.getStyle().set("margin", "0 0 1em 0").set("font-size", "1.1em");
+        H3 titleEl = new H3("⚠️ Ödeme Hatırlatıcıları (Yaklaşan / Geciken)");
+        titleEl.getStyle()
+                .set("margin", "0")
+                .set("font-size", "1.2em")
+                .set("font-weight", "700")
+                .set("color", "var(--lumo-error-color)")
+                .set("padding", "0.4em 0")
+                .set("border-bottom", "3px solid var(--lumo-error-color)")
+                .set("display", "inline-block")
+                .set("margin-bottom", "1em");
+
+        Span countBadge = new Span("0");
+        countBadge.getStyle()
+                .set("background", "var(--lumo-error-color)")
+                .set("color", "white")
+                .set("padding", "2px 10px")
+                .set("border-radius", "12px")
+                .set("font-size", "0.85em")
+                .set("font-weight", "700")
+                .set("margin-left", "0.5em");
+        countBadge.setVisible(false);
 
         VerticalLayout list = new VerticalLayout();
         list.setPadding(false);
@@ -1105,6 +1141,7 @@ public class DashboardView extends VerticalLayout {
         List<Cheque> upcomingCheques = reminderService.getUpcomingCheques(7);
 
         int count = 0;
+        int isTodayCount = 0;
         
         // Geciken taksitler
         for (InstallmentEntry entry : overdue) {
@@ -1122,13 +1159,16 @@ public class DashboardView extends VerticalLayout {
         
         // Yaklaşan taksitler
         for (InstallmentEntry entry : upcoming) {
+            LocalDate due = reminderService.calculateDueDate(entry);
+            if (due.isEqual(LocalDate.now())) isTodayCount++;
             list.add(createReminderItemRow(entry.getExpense().getCard().getName() + " - " + entry.getExpense().getDescription(), 
-                    entry.getAmount(), reminderService.calculateDueDate(entry), false, "Taksit"));
+                    entry.getAmount(), due, false, "Taksit"));
             count++;
         }
 
         // Yaklaşan çekler
         for (Cheque c : upcomingCheques) {
+            if (c.getMaturityDate().isEqual(LocalDate.now())) isTodayCount++;
             list.add(createReminderItemRow(c.getBank() + " (Çek No: " + c.getChequeNumber() + ")", 
                     c.getAmount(), c.getMaturityDate(), false, "Çek"));
             count++;
@@ -1143,9 +1183,19 @@ public class DashboardView extends VerticalLayout {
         Button viewAllBtn = new Button("Tüm Hatırlatıcıları Gör", new Icon(VaadinIcon.ARROW_RIGHT), 
                 e -> getUI().ifPresent(ui -> ui.navigate(ReminderView.class)));
         viewAllBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
-        viewAllBtn.getStyle().set("margin-top", "1em");
+        viewAllBtn.getStyle().set("margin-top", "1em").set("transition", "none");
 
-        container.add(titleEl, scroller, viewAllBtn);
+        if (count > 0) {
+            countBadge.setText(String.valueOf(count));
+            countBadge.setVisible(true);
+            if (overdue.size() + overdueCheques.size() > 0) {
+                countBadge.getStyle().set("background", "var(--lumo-error-color)");
+            } else if (isTodayCount > 0) {
+                countBadge.getStyle().set("background", "#F57C00");
+            }
+        }
+
+        container.add(titleEl, countBadge, scroller, viewAllBtn);
         return container;
     }
 
@@ -1154,43 +1204,101 @@ public class DashboardView extends VerticalLayout {
         row.setWidthFull();
         row.setAlignItems(FlexComponent.Alignment.CENTER);
         row.getStyle()
-                .set("border-bottom", "1px solid var(--lumo-contrast-10pct)")
-                .set("padding-bottom", "0.5em")
-                .set("margin-bottom", "0.2em");
+                .set("padding", "0.6em 0.8em")
+                .set("margin-bottom", "0.3em")
+                .set("border-radius", "8px");
+
+        LocalDate today = LocalDate.now();
+        long daysRemaining = java.time.temporal.ChronoUnit.DAYS.between(today, dueDate);
+        boolean isToday = dueDate.isEqual(today);
+        boolean isUrgent = isOverdue || isToday || (daysRemaining > 0 && daysRemaining <= 3);
+
+        String icon;
+        if (isOverdue) {
+            icon = "\uD83D\uDD34";
+            row.getStyle()
+                    .set("background-color", "#FFEBEE")
+                    .set("border", "2px solid #EF9A9A")
+                    .set("font-weight", "700")
+                    .set("animation", "pulse 1.5s infinite");
+            row.getElement().executeJs(
+                "var style=document.createElement('style');" +
+                "style.textContent='@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.7}}';" +
+                "if(!document.getElementById('pulse-style')){style.id='pulse-style';document.head.appendChild(style);}"
+            );
+        } else if (isToday) {
+            icon = "\uD83D\uDFE1";
+            row.getStyle()
+                    .set("background-color", "#FFF8E1")
+                    .set("border", "2px solid #FFE082")
+                    .set("font-weight", "700");
+        } else if (daysRemaining <= 3) {
+            icon = "\uD83D\uDFE0";
+            row.getStyle()
+                    .set("background-color", "#FFF3E0")
+                    .set("border", "2px solid #FFCC80")
+                    .set("font-weight", "600");
+        } else {
+            icon = "\uD83D\uDD35";
+            row.getStyle()
+                    .set("background-color", "var(--lumo-contrast-5pct)")
+                    .set("border-bottom", "1px solid var(--lumo-contrast-10pct)");
+        }
+
+        Span iconSpan = new Span(icon);
+        iconSpan.getStyle().set("font-size", "1.3em").set("flex-shrink", "0").set("margin-right", "0.4em");
 
         Span typeBadge = new Span(type);
-        typeBadge.getElement().getThemeList().add("badge");
-        typeBadge.getStyle().set("font-size", "0.75em").set("padding", "0.1em 0.4em").set("flex-shrink", "0");
+        typeBadge.getStyle()
+                .set("font-size", "0.7em")
+                .set("padding", "0.2em 0.5em")
+                .set("border-radius", "4px")
+                .set("flex-shrink", "0")
+                .set("margin-right", "0.6em")
+                .set("font-weight", "600");
         if ("Çek".equals(type)) {
-            typeBadge.getStyle().set("background-color", "#E8F5E9").set("color", "#2E7D32");
+            typeBadge.getStyle().set("background-color", "#C8E6C9").set("color", "#2E7D32");
         } else {
-            typeBadge.getStyle().set("background-color", "#E3F2FD").set("color", "#1565C0");
+            typeBadge.getStyle().set("background-color", "#BBDEFB").set("color", "#1565C0");
         }
 
         Span titleSpan = new Span(title);
         titleSpan.getStyle()
-                .set("font-weight", "500")
-                .set("font-size", "0.95em")
+                .set("font-weight", isUrgent ? "700" : "500")
+                .set("font-size", isUrgent ? "1em" : "0.9em")
                 .set("text-overflow", "ellipsis")
                 .set("overflow", "hidden")
                 .set("white-space", "nowrap")
                 .set("min-width", "0");
 
         Span amountSpan = new Span(currencyFormat.format(amount));
-        amountSpan.getStyle().set("font-weight", "600").set("flex-shrink", "0");
+        amountSpan.getStyle()
+                .set("font-weight", "700")
+                .set("flex-shrink", "0")
+                .set("margin-left", "0.5em")
+                .set("font-size", isUrgent ? "1.05em" : "0.95em")
+                .set("color", isOverdue ? "var(--lumo-error-color)" : "var(--lumo-body-text-color)");
 
         Span dateSpan = new Span(dueDate.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")));
-        dateSpan.getStyle().set("font-size", "0.85em").set("color", "var(--lumo-secondary-text-color)").set("flex-shrink", "0");
+        dateSpan.getStyle()
+                .set("font-size", "0.8em")
+                .set("color", isOverdue ? "var(--lumo-error-color)" : "var(--lumo-secondary-text-color)")
+                .set("flex-shrink", "0")
+                .set("margin-left", "0.5em")
+                .set("font-weight", isOverdue ? "700" : "400");
 
-        boolean isToday = dueDate.isEqual(LocalDate.now());
-        String badgeText = isOverdue ? "Gecikti" : (isToday ? "Bugün" : "Yaklaşıyor");
+        String badgeText = isOverdue ? "GECİKTİ" : (isToday ? "BUGÜN!" : (daysRemaining <= 3 ? daysRemaining + " gün" : "Yakında"));
         String badgeTheme = isOverdue ? "error" : (isToday ? "warning" : "contrast");
         
         Span statusBadge = new Span(badgeText);
         statusBadge.getElement().getThemeList().add("badge " + badgeTheme);
-        statusBadge.getStyle().set("flex-shrink", "0");
+        statusBadge.getStyle()
+                .set("flex-shrink", "0")
+                .set("margin-left", "0.5em")
+                .set("font-size", isUrgent ? "0.85em" : "0.75em")
+                .set("font-weight", "700");
 
-        row.add(typeBadge, titleSpan, amountSpan, dateSpan, statusBadge);
+        row.add(iconSpan, typeBadge, titleSpan, amountSpan, dateSpan, statusBadge);
         row.expand(titleSpan);
         return row;
     }

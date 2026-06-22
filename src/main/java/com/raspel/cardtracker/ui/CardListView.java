@@ -21,6 +21,7 @@ import com.vaadin.flow.component.progressbar.ProgressBar;
 import com.vaadin.flow.component.textfield.IntegerField;
 import com.vaadin.flow.component.textfield.TextField;
 import com.raspel.cardtracker.ui.utils.FormatUtils;
+import com.raspel.cardtracker.ui.utils.HolidayUtils;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.raspel.cardtracker.domain.card.Card;
@@ -160,11 +161,12 @@ public class CardListView extends VerticalLayout {
             int daysInMonth = ym.lengthOfMonth();
             int rawClosing = Math.min(closingDay, daysInMonth);
             java.time.LocalDate statementDate = java.time.LocalDate.of(ym.getYear(), ym.getMonthValue(), rawClosing);
-            if (today.isAfter(statementDate)) {
+            if (!today.isBefore(statementDate)) {
                 statementDate = statementDate.plusMonths(1);
             }
-            java.time.LocalDate dueDate = statementDate.plusDays(dueDay);
-            return dueDate.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"));
+            java.time.LocalDate originalDueDate = statementDate.plusDays(dueDay);
+            java.time.LocalDate actualDueDate = HolidayUtils.getNextBusinessDay(originalDueDate);
+            return actualDueDate.format(java.time.format.DateTimeFormatter.ofPattern("dd.MM.yyyy"));
         }).setHeader("Son Ödeme Tarihi").setSortable(true).setAutoWidth(true);
 
         grid.addComponentColumn(card -> {
@@ -425,9 +427,19 @@ public class CardListView extends VerticalLayout {
     }
 
     private void deleteCard(Card card) {
+        List<Expense> expenses = expenseService.findByCardId(card.getId());
+        int expenseCount = expenses != null ? expenses.size() : 0;
+
         Dialog confirmDialog = new Dialog();
         confirmDialog.setHeaderTitle("Kart Silme Onayı");
-        confirmDialog.add(new Span("\"" + card.getName() + "\" kartını silmek istediğinize emin misiniz?"));
+
+        if (expenseCount > 0) {
+            confirmDialog.add(new Span("\"" + card.getName() + "\" kartına ait " + expenseCount +
+                    " harcama bulunuyor. Kartı silerseniz harcamalar sahipsiz kalacaktır."));
+            confirmDialog.add(new Span("Tüm harcamalarıyla birlikte silmek için pasif duruma geldiğinde \"Tamamen Sil\" seçeneğini kullanabilirsiniz."));
+        } else {
+            confirmDialog.add(new Span("\"" + card.getName() + "\" kartını silmek istediğinize emin misiniz?"));
+        }
 
         Button confirmBtn = new Button("Sil", e -> {
             cardService.delete(card.getId());

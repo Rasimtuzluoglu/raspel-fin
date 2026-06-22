@@ -691,6 +691,11 @@ public class ExpenseView extends VerticalLayout {
                         .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
             }
         });
+
+        getElement().executeJs(
+            "setTimeout(function() { $0.close(); }, 3000);",
+            ocrDialog.getElement()
+        );
     }
 
     private void openReceiptPreview(String receiptPath) {

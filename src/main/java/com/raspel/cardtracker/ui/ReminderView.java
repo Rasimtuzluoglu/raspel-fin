@@ -2,6 +2,8 @@ package com.raspel.cardtracker.ui;
 
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.dialog.Dialog;
+import com.vaadin.flow.component.formlayout.FormLayout;
 import com.vaadin.flow.component.grid.Grid;
 import com.vaadin.flow.component.grid.GridVariant;
 import com.vaadin.flow.component.html.Div;
@@ -16,6 +18,7 @@ import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.progressbar.ProgressBar;
 import com.vaadin.flow.component.tabs.Tab;
 import com.vaadin.flow.component.tabs.Tabs;
+import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.raspel.cardtracker.domain.cheque.Cheque;
@@ -158,12 +161,17 @@ public class ReminderView extends VerticalLayout {
                 summary.getUpcomingChequeCount() + " Adet (" + currencyFormat.format(summary.getUpcomingChequeTotal()) + ")", 
                 "📅", "#2196F3");
 
-        summaryLayout = new HorizontalLayout(overdueCard, upcomingCard, overdueChequeCard, upcomingChequeCard);
-        summaryLayout.addClassName("summary-cards");
-        summaryLayout.setWidthFull();
-        summaryLayout.setSpacing(true);
-        summaryLayout.getStyle().set("flex-wrap", "wrap");
-        add(summaryLayout);
+        if (summaryLayout == null) {
+            summaryLayout = new HorizontalLayout(overdueCard, upcomingCard, overdueChequeCard, upcomingChequeCard);
+            summaryLayout.addClassName("summary-cards");
+            summaryLayout.setWidthFull();
+            summaryLayout.setSpacing(true);
+            summaryLayout.getStyle().set("flex-wrap", "wrap");
+            add(summaryLayout);
+        } else {
+            summaryLayout.removeAll();
+            summaryLayout.add(overdueCard, upcomingCard, overdueChequeCard, upcomingChequeCard);
+        }
     }
 
     private Div createStatCard(String title, String value, String icon, String color) {
@@ -295,6 +303,58 @@ public class ReminderView extends VerticalLayout {
             clearBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_SMALL);
             return clearBtn;
         }).setHeader("İşlem").setAutoWidth(true);
+
+        chequeGrid.addItemClickListener(event -> showChequeDetailDialog(event.getItem()));
+    }
+
+    private void showChequeDetailDialog(Cheque cheque) {
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle("Çek Detayı: " + cheque.getChequeNumber());
+        dialog.setWidth("450px");
+
+        FormLayout form = new FormLayout();
+        form.setResponsiveSteps(new FormLayout.ResponsiveStep("0", 1));
+
+        TextField chequeNoField = new TextField("Çek No");
+        chequeNoField.setValue(cheque.getChequeNumber() != null ? cheque.getChequeNumber() : "-");
+        chequeNoField.setReadOnly(true);
+
+        TextField bankField = new TextField("Banka");
+        bankField.setValue(cheque.getBank() != null ? cheque.getBank() : "-");
+        bankField.setReadOnly(true);
+
+        TextField maturityField = new TextField("Vade Tarihi");
+        maturityField.setValue(cheque.getMaturityDate() != null ? cheque.getMaturityDate().format(dateFormatter) : "-");
+        maturityField.setReadOnly(true);
+
+        TextField amountField = new TextField("Tutar");
+        amountField.setValue(currencyFormat.format(cheque.getAmount()));
+        amountField.setReadOnly(true);
+
+        TextField partyField = new TextField("Cari / Karşı Taraf");
+        partyField.setValue(cheque.getParty() != null ? cheque.getParty() : "-");
+        partyField.setReadOnly(true);
+
+        TextField descField = new TextField("Açıklama");
+        descField.setValue(cheque.getDescription() != null ? cheque.getDescription() : "-");
+        descField.setReadOnly(true);
+
+        TextField typeField = new TextField("Tip");
+        typeField.setValue(cheque.getType() != null ? cheque.getType().getLabel() : "-");
+        typeField.setReadOnly(true);
+
+        TextField statusField = new TextField("Durum");
+        statusField.setValue(cheque.getStatus() != null ? cheque.getStatus().getLabel() : "-");
+        statusField.setReadOnly(true);
+
+        form.add(chequeNoField, bankField, typeField, maturityField, amountField, partyField, statusField, descField);
+
+        Button closeBtn = new Button("Kapat", e -> dialog.close());
+        closeBtn.addClickShortcut(com.vaadin.flow.component.Key.ESCAPE);
+
+        dialog.add(form);
+        dialog.getFooter().add(closeBtn);
+        dialog.open();
     }
 
     private void showInstallmentsContent() {
@@ -346,9 +406,6 @@ public class ReminderView extends VerticalLayout {
 
     private void refreshData() {
         loadingBar.setVisible(true);
-        if (summaryLayout != null) {
-            remove(summaryLayout);
-        }
         createSummaryCards();
         if (tabs.getSelectedTab() == null || tabs.getSelectedTab().equals(installmentTab)) {
             showInstallmentsContent();

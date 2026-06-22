@@ -11,6 +11,7 @@ import com.raspel.cardtracker.domain.cheque.ChequeService;
 import com.raspel.cardtracker.domain.cheque.ChequeType;
 import com.raspel.cardtracker.domain.expense.ExpenseService;
 import com.raspel.cardtracker.domain.expense.InstallmentEntry;
+import com.raspel.cardtracker.domain.settings.AppSettingsService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -36,6 +37,7 @@ public class MonthlyReportService {
     private final CardService cardService;
     private final ChequeService chequeService;
     private final DepartmentBudgetService budgetService;
+    private final AppSettingsService appSettingsService;
 
     private String formatTL(BigDecimal amount) {
         if (amount == null) {
@@ -65,7 +67,7 @@ public class MonthlyReportService {
 
             // Başlık
             String monthName = java.time.Month.of(month).getDisplayName(TextStyle.FULL, Locale.of("tr", "TR"));
-            Paragraph title = new Paragraph("Bozkir Agac Urunleri", titleFont);
+            Paragraph title = new Paragraph(appSettingsService.getCompanyName(), titleFont);
             title.setAlignment(Element.ALIGN_CENTER);
             document.add(title);
 
