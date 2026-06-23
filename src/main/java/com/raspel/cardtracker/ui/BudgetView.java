@@ -379,6 +379,7 @@ public class BudgetView extends VerticalLayout {
 
         dialog.add(form);
         dialog.open();
+        dialog.getElement().getStyle().set("overflow", "hidden");
     }
 
     private void deleteBudget(DepartmentBudget budget) {
@@ -439,6 +440,7 @@ public class BudgetView extends VerticalLayout {
         TextArea descField = new TextArea("Açıklama");
         descField.setPlaceholder("Harcama açıklaması...");
         descField.setWidthFull();
+        descField.getStyle().set("min-height", "60px").set("max-height", "80px");
 
         TextField amountField = new TextField("Tutar (TL)");
         amountField.setValue("0,00");
@@ -489,5 +491,6 @@ public class BudgetView extends VerticalLayout {
         dialog.getFooter().add(cancelBtn, saveBtn);
         dialog.add(form);
         dialog.open();
+        dialog.getElement().getStyle().set("overflow", "hidden");
     }
 }

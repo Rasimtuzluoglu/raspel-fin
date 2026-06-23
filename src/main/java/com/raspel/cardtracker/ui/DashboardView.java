@@ -173,7 +173,7 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
                 .set("width", "100%")
                 .set("box-sizing", "border-box");
 
-        Span greeting = new Span("Hoş geldin, " + displayName);
+        Span greeting = new Span("Hoş geldin, Sistem Yöneticisi");
         greeting.getStyle()
                 .set("font-size", "2em")
                 .set("font-weight", "700")
@@ -182,7 +182,7 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
                 .set("margin-bottom", "0.3em");
 
         LocalDate today = LocalDate.now();
-        DateTimeFormatter trDateFormatter = DateTimeFormatter.ofPattern("dd MMMM yyyy EEEE", Locale.of("tr"));
+        DateTimeFormatter trDateFormatter = DateTimeFormatter.ofPattern("dd MMMM yyyy", Locale.of("tr"));
         Span dateSpan = new Span(today.format(trDateFormatter));
         dateSpan.getStyle()
                 .set("font-size", "0.95em")
@@ -198,7 +198,7 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
                 .filter(t -> t.getStatus() != TaskStatus.COMPLETED)
                 .count();
 
-        Span summary = new Span("Bugün " + unpaidPayments + " adet ödemeniz var, " + pendingTasks + " adet görev bekliyor");
+        Span summary = new Span("Bugün sistemde " + (unpaidPayments + pendingTasks) + " adet kritik uyarı bulunuyor.");
         summary.getStyle()
                 .set("font-size", "0.9em")
                 .set("color", "var(--lumo-body-text-color)")
@@ -362,7 +362,7 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
             comparisonStr += " " + arrow + " %" + Math.abs(Math.round(pctChange));
         }
 
-        Div totalCard = createStatCard("Bu Ay Toplam", comparisonStr, "💰", "#4CAF50");
+        Div totalCard = createStatCard("Bu Ay Toplam Harcama", comparisonStr, "💰", "#4CAF50");
         totalCard.getStyle().set("cursor", "pointer");
         totalCard.addClickListener(e -> totalCard.getUI().ifPresent(ui -> ui.navigate(ExpenseView.class)));
         
@@ -379,7 +379,7 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
         activeCardsCard.getStyle().set("cursor", "pointer");
         activeCardsCard.addClickListener(e -> activeCardsCard.getUI().ifPresent(ui -> ui.navigate(CardListView.class)));
 
-        Div installmentCard = createStatCard("Bu Ay Taksitler", String.valueOf(installmentCount), "📋", "#FF9800");
+        Div installmentCard = createStatCard("Bu Ay Taksit Sayısı", String.valueOf(installmentCount), "📋", "#FF9800");
         installmentCard.getStyle().set("cursor", "pointer");
         installmentCard.addClickListener(e -> installmentCard.getUI().ifPresent(ui -> ui.navigate(ExpenseView.class)));
 
@@ -454,6 +454,21 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
 
         Div deptChartContainer = createChartContainer("Departman Harcama Dağılımı", createDeptChart());
         Div categoryPieContainer = createChartContainer("Kategori Dağılımı (Bu Ay)", createCategoryPieChart());
+
+        for (Div c : new Div[]{deptChartContainer, categoryPieContainer}) {
+            Span emptyHint = new Span("Bu ay için henüz harcama kaydı bulunmuyor.");
+            emptyHint.getStyle()
+                    .set("display", "none")
+                    .set("text-align", "center")
+                    .set("padding", "2em")
+                    .set("color", "var(--lumo-secondary-text-color)")
+                    .set("font-size", "0.85em")
+                    .set("border", "1px dashed var(--lumo-contrast-20pct)")
+                    .set("border-radius", "8px")
+                    .set("margin-top", "1em");
+            emptyHint.setId("empty-chart-hint");
+            c.add(emptyHint);
+        }
         Div scheduleContainer = createPaymentScheduleContainer();
 
         deptChartContainer.getStyle().set("flex", "1").set("min-width", "0");
@@ -1103,7 +1118,7 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
                 .set("width", "100%")
                 .set("box-sizing", "border-box");
 
-        H3 titleEl = new H3("⚠️ Ödeme Hatırlatıcıları (Yaklaşan / Geciken)");
+        H3 titleEl = new H3("Geciken Ödemeler");
         titleEl.getStyle()
                 .set("margin", "0")
                 .set("font-size", "1.2em")
@@ -1175,12 +1190,12 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
         }
 
         if (count == 0) {
-            Span noReminders = new Span("Yaklaşan veya geciken herhangi bir ödeme bulunmuyor. Harika! 🎉");
+            Span noReminders = new Span("Herhangi bir geciken ödemeniz bulunmuyor.");
             noReminders.getStyle().set("color", "var(--lumo-success-text-color)").set("font-weight", "600");
             list.add(noReminders);
         }
 
-        Button viewAllBtn = new Button("Tüm Hatırlatıcıları Gör", new Icon(VaadinIcon.ARROW_RIGHT), 
+        Button viewAllBtn = new Button("→ Tümünü Gör", new Icon(VaadinIcon.ARROW_RIGHT), 
                 e -> getUI().ifPresent(ui -> ui.navigate(ReminderView.class)));
         viewAllBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         viewAllBtn.getStyle().set("margin-top", "1em").set("transition", "none");

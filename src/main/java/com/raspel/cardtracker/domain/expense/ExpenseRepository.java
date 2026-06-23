@@ -7,6 +7,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 
@@ -46,4 +47,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
 
     @Query("SELECT e FROM Expense e JOIN FETCH e.card LEFT JOIN FETCH e.contact WHERE e.createdBy = :createdBy ORDER BY e.createdAt DESC")
     List<Expense> findRecentByCreatedBy(@Param("createdBy") String createdBy, org.springframework.data.domain.Pageable pageable);
+
+    @Query(value = "SELECT COALESCE(SUM(e.total_amount), 0) FROM expense e WHERE EXTRACT(YEAR FROM e.expense_date) = :year AND EXTRACT(MONTH FROM e.expense_date) = :month", nativeQuery = true)
+    BigDecimal sumAmountByExpenseYearAndMonth(@Param("year") Integer year, @Param("month") Integer month);
 }

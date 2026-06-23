@@ -36,6 +36,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
@@ -63,8 +64,8 @@ public class ProfileView extends VerticalLayout {
 
         setSizeFull();
         setPadding(true);
-        setSpacing(true);
-        getStyle().set("padding-top", "48px");
+        setSpacing(false);
+        getStyle().set("padding-top", "48px").set("gap", "20px");
 
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         String username = auth != null ? auth.getName() : "";
@@ -76,22 +77,29 @@ public class ProfileView extends VerticalLayout {
         }
 
         AppUser user = userOpt.get();
+        boolean isAdmin = auth != null && auth.getAuthorities().stream()
+                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
 
-        H3 title = new H3("Profilim");
-        title.getStyle().set("margin-top", "0");
-        add(title);
+        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm", Locale.of("tr"));
+        long activeCards = cardService.findAllActive().size();
+        long totalExpenses = expenseService.countByCreatedBy(username);
+        String createdDate = user.getCreatedAt() != null ? user.getCreatedAt().format(dtf) : "-";
+        String lastLogin = user.getLastLoginAt() != null ? user.getLastLoginAt().format(dtf) : "İlk giriş";
 
-        // Ust satir: form + istatistikler yan yana
-        HorizontalLayout topRow = new HorizontalLayout();
-        topRow.setWidthFull();
-        topRow.setSpacing(true);
-        topRow.getStyle().set("flex-wrap", "wrap");
+        Div grid = new Div();
+        grid.getStyle()
+                .set("display", "grid")
+                .set("grid-template-columns", "1fr 1fr 1fr")
+                .set("gap", "16px")
+                .set("width", "100%");
 
-        Div formCard = createCard("Profil Bilgileri");
+        // 1. SOL ÜST: Profil Bilgileri
+        Div profileCard = buildCard("Profil Bilgileri");
         FormLayout form = new FormLayout();
         form.setResponsiveSteps(new FormLayout.ResponsiveStep("0", 1));
+        form.addClassName("profile-form");
 
-        TextField usernameField = new TextField("Kullanici Adi");
+        TextField usernameField = new TextField("Kullanıcı Adı");
         usernameField.setValue(user.getUsername());
         usernameField.setReadOnly(true);
         usernameField.setWidthFull();
@@ -105,61 +113,66 @@ public class ProfileView extends VerticalLayout {
         roleField.setReadOnly(true);
         roleField.setWidthFull();
 
-        form.add(usernameField, fullNameField, roleField);
-
-        Button saveBtn = new Button("Kaydet", new Icon(VaadinIcon.CHECK), e -> {
+        Button saveProfileBtn = new Button("Kaydet", new Icon(VaadinIcon.CHECK), e -> {
             user.setFullName(fullNameField.getValue().trim());
             userService.save(user);
-            Notification.show("Profil guncellendi.", 3000, Notification.Position.BOTTOM_CENTER)
+            Notification.show("Profil güncellendi.", 3000, Notification.Position.BOTTOM_CENTER)
                     .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
         });
-        saveBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-        saveBtn.addClickShortcut(com.vaadin.flow.component.Key.ENTER);
+        saveProfileBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        saveProfileBtn.getStyle().set("align-self", "flex-end");
 
-        HorizontalLayout saveRow = new HorizontalLayout();
-        saveRow.setWidthFull();
-        saveRow.setJustifyContentMode(FlexComponent.JustifyContentMode.END);
-        saveRow.add(saveBtn);
+        form.add(usernameField, fullNameField, roleField, saveProfileBtn);
+        profileCard.add(form);
+        grid.add(profileCard);
 
-        formCard.add(form, saveRow);
+        // 2. SAĞ ÜST: Hesap Özeti
+        Div statsCard = buildCard("Hesap Özeti");
+        Div statsGrid = new Div();
+        statsGrid.getStyle()
+                .set("display", "grid")
+                .set("grid-template-columns", "1fr 1fr")
+                .set("gap", "8px");
+        statsGrid.add(
+            buildStatItem("Aktif Kart", String.valueOf(activeCards), "#2196F3"),
+            buildStatItem("Toplam Harcama", totalExpenses + " işlem", "#4CAF50"),
+            buildStatItem("Üyelik", createdDate, "#FF9800"),
+            buildStatItem("Son Giriş", lastLogin, "#9C27B0")
+        );
+        statsCard.add(statsGrid);
+        grid.add(statsCard);
 
-        // Istatistikler karti
-        Div statsCard = createCard("Hesap Ozeti");
-        long activeCards = cardService.findAllActive().size();
-        long totalExpenses = expenseService.countByCreatedBy(username);
-        DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm", Locale.of("tr"));
-        String createdDate = user.getCreatedAt() != null ? user.getCreatedAt().format(dtf) : "-";
-        String lastLogin = user.getLastLoginAt() != null ? user.getLastLoginAt().format(dtf) : "Ilk giris";
+        // 3. ORTA ÜST: Son İşlemler
+        Div recentCard = buildCard("Son İşlemler");
+        VerticalLayout recentList = new VerticalLayout();
+        recentList.setPadding(false);
+        recentList.setSpacing(false);
 
-        HorizontalLayout statsRow1 = new HorizontalLayout();
-        statsRow1.setWidthFull();
-        statsRow1.setSpacing(true);
-        statsRow1.add(createMiniStat("Aktif Kartlar", String.valueOf(activeCards), "#2196F3"),
-                       createMiniStat("Toplam Harcama", String.valueOf(totalExpenses), "#4CAF50"));
+        List<Expense> recentExpenses = expenseService.findRecentByCreatedBy(username, 3);
+        List<Cheque> recentCheques = chequeService.findAll().stream()
+                .sorted(Comparator.comparing(c -> c.getMaturityDate(), Comparator.reverseOrder()))
+                .limit(2).collect(Collectors.toList());
 
-        HorizontalLayout statsRow2 = new HorizontalLayout();
-        statsRow2.setWidthFull();
-        statsRow2.setSpacing(true);
-        statsRow2.getStyle().set("margin-top", "0.8em");
-        statsRow2.add(createMiniStat("Uyelik", createdDate, "#FF9800"),
-                       createMiniStat("Son Giris", lastLogin, "#9C27B0"));
+        for (Expense e : recentExpenses) {
+            String date = e.getExpenseDate() != null ? e.getExpenseDate().format(DateTimeFormatter.ofPattern("dd.MM")) : "-";
+            String desc = e.getDescription() != null ? e.getDescription() : "";
+            if (desc.length() > 30) desc = desc.substring(0, 30) + "...";
+            recentList.add(createRecentItem("Harcama", date, desc, FormatUtils.formatNumber(e.getTotalAmount()) + " ₺", "#4CAF50"));
+        }
+        for (Cheque c : recentCheques) {
+            String date = c.getMaturityDate() != null ? c.getMaturityDate().format(DateTimeFormatter.ofPattern("dd.MM")) : "-";
+            String desc = c.getChequeNumber() + " - " + (c.getBank() != null ? c.getBank() : "");
+            recentList.add(createRecentItem("Çek", date, desc, FormatUtils.formatNumber(c.getAmount()) + " ₺", "#2196F3"));
+        }
+        if (recentExpenses.isEmpty() && recentCheques.isEmpty()) {
+            recentList.add(new Span("Henüz işlem bulunmuyor."));
+        }
+        recentCard.add(recentList);
+        grid.add(recentCard);
 
-        statsCard.add(statsRow1, statsRow2);
-
-        formCard.getStyle().set("flex", "1").set("min-width", "320px");
-        statsCard.getStyle().set("flex", "1").set("min-width", "320px");
-        topRow.add(formCard, statsCard);
-        add(topRow);
-
-        boolean isAdmin = auth != null && auth.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        // SOL ALT: Firma Adı (admin)
         if (isAdmin) {
-            Div companyCard = createCard("Firma Adı Değiştir");
-            HorizontalLayout companyRow = new HorizontalLayout();
-            companyRow.setWidthFull();
-            companyRow.setAlignItems(FlexComponent.Alignment.END);
-            companyRow.setSpacing(true);
-
+            Div companyCard = buildCard("Firma Adı Değiştir");
             TextField companyField = new TextField("Firma Adı");
             companyField.setValue(appSettingsService.getCompanyName());
             companyField.setWidthFull();
@@ -176,111 +189,136 @@ public class ProfileView extends VerticalLayout {
                         .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
             });
             saveCompanyBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-            saveCompanyBtn.addClickShortcut(com.vaadin.flow.component.Key.ENTER);
 
-            companyRow.add(companyField, saveCompanyBtn);
+            HorizontalLayout companyRow = new HorizontalLayout(companyField, saveCompanyBtn);
+            companyRow.setWidthFull();
+            companyRow.setAlignItems(FlexComponent.Alignment.END);
             companyRow.expand(companyField);
             companyCard.add(companyRow);
-            companyCard.getStyle().set("margin-bottom", "1em");
-            add(companyCard);
+            grid.add(companyCard);
         }
 
-        // Alt satir: son islemler + grafik yan yana
-        HorizontalLayout bottomRow = new HorizontalLayout();
-        bottomRow.setWidthFull();
-        bottomRow.setSpacing(true);
-        bottomRow.getStyle().set("flex-wrap", "wrap");
+        // SAĞ ALT: Aylık Harcama (grafik)
+        Div chartCard = buildCard("Aylık Harcama Projeksiyonu");
+        Map<String, BigDecimal> projection = expenseService.getMonthlyProjection(6);
 
-        Div recentCard = createCard("Son Islemler");
-        VerticalLayout recentList = new VerticalLayout();
-        recentList.setPadding(false);
-        recentList.setSpacing(false);
-
-        List<Expense> recentExpenses = expenseService.findRecentByCreatedBy(username, 3);
-        List<Cheque> recentCheques = chequeService.findAll().stream()
-                .sorted(Comparator.comparing(c -> c.getMaturityDate(), Comparator.reverseOrder()))
-                .limit(2).collect(Collectors.toList());
-
-        for (Expense e : recentExpenses) {
-            String date = e.getExpenseDate() != null ? e.getExpenseDate().format(DateTimeFormatter.ofPattern("dd.MM")) : "-";
-            String desc = e.getDescription() != null ? e.getDescription() : "";
-            if (desc.length() > 30) desc = desc.substring(0, 30) + "...";
-            recentList.add(createRecentItem("Harcama", date, desc, FormatUtils.formatNumber(e.getTotalAmount()) + " TL", "#4CAF50"));
-        }
-        for (Cheque c : recentCheques) {
-            String date = c.getMaturityDate() != null ? c.getMaturityDate().format(DateTimeFormatter.ofPattern("dd.MM")) : "-";
-            String desc = c.getChequeNumber() + " - " + (c.getBank() != null ? c.getBank() : "");
-            recentList.add(createRecentItem("Cek", date, desc, FormatUtils.formatNumber(c.getAmount()) + " TL", "#2196F3"));
-        }
-        if (recentExpenses.isEmpty() && recentCheques.isEmpty()) {
-            recentList.add(new Span("Henuz islem bulunmuyor."));
-        }
-        recentCard.add(recentList);
-
-        Div chartCard = createCard("Aylik Harcama");
-        Map<String, BigDecimal> projection = expenseService.getMonthlyProjection(4);
-        java.util.List<String> categories = new ArrayList<>();
-        java.util.List<Double> data = new ArrayList<>();
         YearMonth current = YearMonth.now().minusMonths(1);
-        for (int i = 0; i < 4; i++) {
-            YearMonth ym = current.plusMonths(i);
-            categories.add(ym.getMonth().getDisplayName(java.time.format.TextStyle.SHORT, Locale.of("tr")));
-            String key = ym.getYear() + "-" + String.format("%02d", ym.getMonthValue());
-            BigDecimal val = projection.getOrDefault(key, BigDecimal.ZERO);
-            data.add(val.doubleValue());
+        String[] monthNames = new String[6];
+        for (int i = 0; i < 6; i++) {
+            monthNames[i] = current.plusMonths(i).getMonth().getDisplayName(java.time.format.TextStyle.SHORT, Locale.of("tr"));
         }
+
         ApexCharts miniChart = ApexChartsBuilder.get()
-                .withChart(ChartBuilder.get().withType(Type.BAR).withHeight("180px").build())
-                .withXaxis(XAxisBuilder.get().withCategories(categories).build())
-                .withSeries(new Series<>("Harcama", data.toArray(new Double[0])))
+                .withChart(ChartBuilder.get().withType(Type.BAR).withHeight("200px").build())
+                .withXaxis(XAxisBuilder.get().withCategories(java.util.Arrays.asList(monthNames)).build())
+                .withSeries(new Series<>("TL", projection.values().stream().map(BigDecimal::doubleValue).toArray(Double[]::new)))
                 .withColors("#2196F3")
                 .build();
         miniChart.setWidth("100%");
         chartCard.add(miniChart);
+        grid.add(chartCard);
 
-        recentCard.getStyle().set("flex", "1").set("min-width", "320px");
-        chartCard.getStyle().set("flex", "1").set("min-width", "320px");
-        bottomRow.add(recentCard, chartCard);
-        add(bottomRow);
+        // SAĞ ALT 3. KOLON: Son 12 Ay (geçmiş aylar)
+        Div forecastCard = buildCard("Son 12 Ay");
+        VerticalLayout monthList = new VerticalLayout();
+        monthList.setPadding(false);
+        monthList.setSpacing(false);
+        monthList.getStyle().set("gap", "3px");
+
+        BigDecimal maxVal = BigDecimal.ZERO;
+        BigDecimal[] vals = new BigDecimal[12];
+        String[] labels = new String[12];
+        for (int i = 0; i < 12; i++) {
+            YearMonth ym = current.minusMonths(11 - i);
+            labels[i] = ym.getMonth().getDisplayName(java.time.format.TextStyle.SHORT, Locale.of("tr"));
+            vals[i] = expenseService.getTotalExpenseForMonth(ym.getYear(), ym.getMonthValue());
+            if (vals[i].compareTo(maxVal) > 0) maxVal = vals[i];
+        }
+        if (maxVal.compareTo(BigDecimal.ZERO) == 0) maxVal = BigDecimal.ONE;
+
+        for (int i = 0; i < 12; i++) {
+            BigDecimal val = vals[i];
+            int barPct = val.multiply(BigDecimal.valueOf(100)).divide(maxVal, 0, RoundingMode.HALF_UP).intValue();
+
+            HorizontalLayout row = new HorizontalLayout();
+            row.setWidthFull();
+            row.setAlignItems(FlexComponent.Alignment.CENTER);
+            row.setPadding(false);
+            row.getStyle().set("gap", "10px").set("padding", "2px 0");
+
+            Span lbl = new Span(labels[i]);
+            lbl.getStyle().set("font-size", "0.7em").set("font-weight", "600")
+                    .set("color", "var(--lumo-secondary-text-color)").set("width", "26px").set("flex-shrink", "0");
+
+            Div barBg = new Div();
+            barBg.getStyle().set("flex", "1").set("height", "12px")
+                    .set("border-radius", "6px").set("background", "var(--lumo-contrast-10pct)")
+                    .set("overflow", "hidden");
+            if (barPct > 0) {
+                Div barFill = new Div();
+                barFill.getStyle().set("height", "100%").set("width", barPct + "%")
+                        .set("background", "#2196F3")
+                        .set("border-radius", "6px").set("transition", "width 0.4s ease");
+                barBg.add(barFill);
+            }
+
+            Span amt = new Span(val.compareTo(BigDecimal.ZERO) > 0 ? FormatUtils.formatNumber(val) + " ₺" : "—");
+            amt.getStyle().set("font-size", "0.7em").set("font-weight", "700")
+                    .set("color", val.compareTo(BigDecimal.ZERO) > 0 ? "var(--lumo-body-text-color)" : "var(--lumo-tertiary-text-color)")
+                    .set("min-width", "64px").set("text-align", "right").set("flex-shrink", "0");
+
+            row.add(lbl, barBg, amt);
+            monthList.add(row);
+        }
+        forecastCard.add(monthList);
+        grid.add(forecastCard);
+
+        add(grid);
     }
 
-    private Div createCard(String title) {
+    private Div buildCard(String title) {
         Div card = new Div();
         card.getStyle()
                 .set("background", "var(--lumo-base-color)")
-                .set("border-radius", "16px")
-                .set("padding", "1.5em")
-                .set("box-shadow", "0 2px 12px rgba(0,0,0,0.08)")
-                .set("margin-bottom", "1em");
-
+                .set("border-radius", "12px")
+                .set("padding", "20px")
+                .set("box-shadow", "0 1px 6px rgba(0,0,0,0.08)")
+                .set("border", "1px solid var(--lumo-contrast-10pct)");
         H4 cardTitle = new H4(title);
-        cardTitle.getStyle().set("margin-top", "0").set("margin-bottom", "1em");
+        cardTitle.getStyle()
+                .set("margin", "0 0 16px 0")
+                .set("font-size", "1em")
+                .set("font-weight", "700")
+                .set("color", "#6b7280");
         card.add(cardTitle);
         return card;
     }
 
-    private Div createMiniStat(String label, String value, String color) {
-        Div mini = new Div();
-        mini.getStyle()
-                .set("flex", "1")
-                .set("text-align", "center")
-                .set("padding", "0.8em")
+    private Div buildStatItem(String label, String value, String color) {
+        Div item = new Div();
+        item.getStyle()
+                .set("padding", "12px")
                 .set("border-radius", "8px")
                 .set("background", "var(--lumo-contrast-5pct)")
                 .set("border-left", "3px solid " + color);
-
         Span val = new Span(value);
         val.getStyle()
-                .set("font-size", "1em").set("font-weight", "700").set("color", color)
-                .set("display", "block").set("overflow", "hidden").set("text-overflow", "ellipsis");
-
+                .set("font-size", "0.9em").set("font-weight", "700").set("color", "var(--lumo-body-text-color)")
+                .set("display", "block");
         Span lbl = new Span(label);
         lbl.getStyle()
-                .set("font-size", "0.7em").set("color", "var(--lumo-secondary-text-color)")
-                .set("display", "block").set("margin-top", "0.2em");
+                .set("font-size", "0.7em").set("color", "#6b7280")
+                .set("display", "block").set("margin-top", "2px");
+        item.add(val, lbl);
+        return item;
+    }
 
-        mini.add(val, lbl);
-        return mini;
+    private Div createMiniStat(String label, String value, String color) {
+        return buildStatItem(label, value, color);
+    }
+
+    private Div createCard(String title) {
+        return buildCard(title);
     }
 
     private HorizontalLayout createRecentItem(String type, String date, String desc, String amount, String color) {

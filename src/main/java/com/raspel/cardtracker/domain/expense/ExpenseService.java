@@ -373,6 +373,11 @@ public class ExpenseService {
         return expenseRepository.countByCreatedBy(createdBy);
     }
 
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
+    public BigDecimal getTotalExpenseForMonth(int year, int month) {
+        return expenseRepository.sumAmountByExpenseYearAndMonth(year, month);
+    }
+
     public List<Expense> findRecentByCreatedBy(String createdBy, int limit) {
         return expenseRepository.findRecentByCreatedBy(createdBy, org.springframework.data.domain.PageRequest.of(0, limit));
     }

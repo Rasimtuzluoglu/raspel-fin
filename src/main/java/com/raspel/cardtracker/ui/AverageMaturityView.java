@@ -1,21 +1,17 @@
 package com.raspel.cardtracker.ui;
 
-import com.vaadin.flow.component.button.Button;
-import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.grid.Grid;
-import com.vaadin.flow.component.grid.GridVariant;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.H4;
 import com.vaadin.flow.component.html.Span;
-import com.vaadin.flow.component.icon.Icon;
-import com.vaadin.flow.component.icon.VaadinIcon;
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.upload.Upload;
 import com.vaadin.flow.component.upload.receivers.MemoryBuffer;
+import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.raspel.cardtracker.ui.utils.FormatUtils;
@@ -35,27 +31,53 @@ import java.util.*;
 @PermitAll
 public class AverageMaturityView extends VerticalLayout {
 
+    private static final String DARK = "var(--lumo-body-text-color)";
+    private static final String BLUE = "#3498db";
+    private static final String LIGHT_BG = "var(--lumo-contrast-5pct)";
+
     private final Grid<TxnRow> txnGrid = new Grid<>(TxnRow.class, false);
     private final Div resultBox = new Div();
-    private final VerticalLayout txnList = new VerticalLayout();
+    private final Upload upload;
 
     public AverageMaturityView() {
         setSizeFull();
-        setPadding(true);
-        setSpacing(true);
-        getStyle().set("padding-top", "48px");
+        setPadding(false);
+        setSpacing(false);
+        getStyle().set("overflow-y", "auto");
+
+        Div container = new Div();
+        container.getStyle()
+                .set("max-width", "1200px")
+                .set("margin", "0 auto")
+                .set("padding", "48px 24px 24px 24px")
+                .set("width", "100%");
 
         H3 title = new H3("Ortalama Vade Hesaplama");
-        title.getStyle().set("margin-top", "0");
+        title.getStyle()
+                .set("margin", "0 0 8px 0")
+                .set("font-size", "24px")
+                .set("font-weight", "700")
+                .set("color", DARK);
 
         Span info = new Span("CSV veya Excel dosyası yükleyin. F sütunu = Toplam Tutar, G sütunu = Taksit Sayısı");
-        info.getStyle().set("color", "var(--lumo-secondary-text-color)").set("font-size", "0.9em");
+        info.getStyle()
+                .set("color", "#7f8c8d")
+                .set("font-size", "14px")
+                .set("display", "block")
+                .set("margin-bottom", "20px");
 
         MemoryBuffer buffer = new MemoryBuffer();
-        Upload upload = new Upload(buffer);
+        upload = new Upload(buffer);
         upload.setAcceptedFileTypes(".csv", ".xlsx", ".xls");
         upload.setMaxFiles(1);
-        upload.setDropLabel(new Span("Dosyayı buraya sürükleyin (CSV veya Excel)"));
+        upload.setDropLabel(new Span("Dosyayı buraya sürükleyin veya seçin"));
+        upload.getStyle()
+                .set("border", "2px dashed " + BLUE)
+                .set("border-radius", "12px")
+                .set("padding", "24px")
+                .set("background", LIGHT_BG)
+                .set("width", "100%")
+                .set("box-sizing", "border-box");
 
         upload.addSucceededListener(event -> {
             try (InputStream is = buffer.getInputStream()) {
@@ -82,27 +104,63 @@ public class AverageMaturityView extends VerticalLayout {
             }
         });
 
-        resultBox.getStyle()
-                .set("background", "var(--lumo-primary-color-10pct)")
-                .set("padding", "1.5em 2em")
-                .set("border-radius", "12px")
-                .set("margin-top", "1em");
+        configureGrid();
+
         resultBox.setVisible(false);
-
-        txnList.setPadding(false);
-        txnList.setSpacing(false);
-        txnList.setVisible(false);
-
-        txnGrid.addThemeVariants(GridVariant.LUMO_ROW_STRIPES);
-        txnGrid.setWidthFull();
-        txnGrid.setPageSize(100);
-        txnGrid.addColumn(TxnRow::getRow).setHeader("#").setWidth("50px").setFlexGrow(0);
-        txnGrid.addColumn(r -> FormatUtils.formatNumber(r.getAmount()) + " ₺").setHeader("Tutar").setAutoWidth(true);
-        txnGrid.addColumn(TxnRow::getInstallments).setHeader("Taksit").setWidth("70px").setFlexGrow(0);
-        txnGrid.addColumn(TxnRow::getDesc).setHeader("Açıklama").setAutoWidth(true).setFlexGrow(1);
         txnGrid.setVisible(false);
 
-        add(title, info, upload, resultBox, txnGrid);
+        container.add(title, info, upload, resultBox, txnGrid);
+        add(container);
+    }
+
+    private void configureGrid() {
+        txnGrid.setWidthFull();
+        txnGrid.getStyle().set("max-height", "280px").set("margin-top", "20px");
+        txnGrid.setColumnReorderingAllowed(true);
+
+        txnGrid.addColumn(TxnRow::getRow).setHeader("#")
+                .setWidth("60px").setFlexGrow(0)
+                .setClassNameGenerator(col -> "col-center");
+
+        txnGrid.addColumn(r -> FormatUtils.formatNumber(r.getAmount()) + " ₺").setHeader("Tutar")
+                .setAutoWidth(true)
+                .setClassNameGenerator(col -> "col-right");
+
+        txnGrid.addColumn(new ComponentRenderer<>(txn -> {
+            int ins = txn.getInstallments();
+            Span badge = new Span(ins == 0 ? "0" : String.valueOf(ins));
+            badge.getStyle()
+                    .set("display", "inline-block")
+                    .set("padding", "2px 8px")
+                    .set("border-radius", "10px")
+                    .set("font-size", "12px")
+                    .set("font-weight", "600");
+            if (ins == 0) {
+                badge.getStyle()
+                        .set("background", "#fdecea")
+                        .set("color", "#d32f2f");
+            } else {
+                badge.getStyle()
+                        .set("background", "var(--lumo-contrast-10pct)")
+                        .set("color", DARK);
+            }
+            return badge;
+        })).setHeader("Taksit").setWidth("80px").setFlexGrow(0)
+                .setClassNameGenerator(col -> "col-center");
+
+        txnGrid.addColumn(TxnRow::getDesc).setHeader("Açıklama")
+                .setAutoWidth(true).setFlexGrow(1);
+
+        txnGrid.addClassName("vade-grid");
+
+        txnGrid.getElement().executeJs(
+            "var existing=document.getElementById('vade-grid-style');if(existing)existing.remove();" +
+            "var style=document.createElement('style');style.id='vade-grid-style';" +
+            "style.textContent='vaadin-grid.vade-grid::part(row):nth-child(even) { background: var(--lumo-contrast-5pct); }" +
+            "vaadin-grid.vade-grid::part(header-cell) { background: #2c3e50; color: #fff; font-weight: 600; font-size: 13px; }" +
+            ".col-right { text-align: right !important; }" +
+            ".col-center { text-align: center !important; }';" +
+            "document.head.appendChild(style);");
     }
 
     private List<Transaction> parseCSV(InputStream is) throws Exception {
@@ -150,7 +208,7 @@ public class AverageMaturityView extends VerticalLayout {
             try {
                 double amount = parseNumber(cols[amountCol]);
                 int installments = parseInt(cols[installmentCol]);
-                if (amount <= 0 || installments <= 0) continue;
+                if (amount <= 0) continue;
 
                 String desc = cols.length > 7 ? cols[7] : "";
                 transactions.add(new Transaction(BigDecimal.valueOf(amount), installments, desc));
@@ -175,15 +233,14 @@ public class AverageMaturityView extends VerticalLayout {
             if (row == null) continue;
 
             try {
-                double amount = getCellNumeric(row.getCell(5));  // F
-                int installments = getCellInt(row.getCell(6));    // G
+                double amount = getCellNumeric(row.getCell(5));
+                int installments = getCellInt(row.getCell(6));
 
-                if (amount <= 0 || installments <= 0) continue;
+                if (amount <= 0) continue;
 
                 String desc = row.getCell(7) != null ? row.getCell(7).toString() : "";
                 transactions.add(new Transaction(BigDecimal.valueOf(amount), installments, desc));
             } catch (Exception ignored) {
-                // Expected: unparseable row, skip silently
             }
         }
         workbook.close();
@@ -196,9 +253,7 @@ public class AverageMaturityView extends VerticalLayout {
             return cell.getNumericCellValue();
         }
         if (cell.getCellType() == org.apache.poi.ss.usermodel.CellType.FORMULA) {
-            try { return cell.getNumericCellValue(); } catch (Exception e) {
-                // Expected: FORMULA cell may not be numeric
-            }
+            try { return cell.getNumericCellValue(); } catch (Exception e) {}
         }
         return parseNumber(cell.toString().trim());
     }
@@ -243,61 +298,141 @@ public class AverageMaturityView extends VerticalLayout {
         try { return val.isEmpty() ? 0 : Integer.parseInt(val); } catch (Exception e) { return 0; }
     }
 
+    private int getVadeDays(int taksit) {
+        return Math.max(1, taksit) * 30;
+    }
+
     private void showResult(List<Transaction> transactions) {
         BigDecimal grandTotal = BigDecimal.ZERO;
-        BigDecimal weightedDaySum = BigDecimal.ZERO;
-        int totalInstallmentCount = 0;
-        LocalDate today = LocalDate.now();
+        BigDecimal tutarliVadeSum = BigDecimal.ZERO;
+        long islemVadeSum = 0;
+        int txnCount = transactions.size();
         List<TxnRow> rows = new ArrayList<>();
 
         for (int i = 0; i < transactions.size(); i++) {
             Transaction t = transactions.get(i);
             grandTotal = grandTotal.add(t.amount);
-            totalInstallmentCount += t.installments;
-
-            BigDecimal perIns = t.amount.divide(BigDecimal.valueOf(t.installments), 2, RoundingMode.HALF_UP);
-            LocalDate firstDue = today.plusMonths(1).withDayOfMonth(1);
-
-            for (int j = 0; j < t.installments; j++) {
-                BigDecimal insAmt = (j == t.installments - 1)
-                        ? t.amount.subtract(perIns.multiply(BigDecimal.valueOf(t.installments - 1)))
-                        : perIns;
-                LocalDate due = firstDue.plusMonths(j);
-                long days = Math.max(1, ChronoUnit.DAYS.between(today, due));
-                weightedDaySum = weightedDaySum.add(insAmt.multiply(BigDecimal.valueOf(days)));
-            }
-
+            int vadeDays = getVadeDays(t.installments);
+            islemVadeSum += vadeDays;
+            tutarliVadeSum = tutarliVadeSum.add(t.amount.multiply(BigDecimal.valueOf(vadeDays)));
             String desc = t.desc.length() > 40 ? t.desc.substring(0, 40) + "..." : t.desc;
             rows.add(new TxnRow(i + 1, t.amount, t.installments, desc));
         }
 
-        txnGrid.setItems(rows);
-        txnGrid.setVisible(true);
+        BigDecimal islemGun = txnCount > 0
+                ? BigDecimal.valueOf(islemVadeSum).divide(BigDecimal.valueOf(txnCount), 0, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+        BigDecimal tutarGun = grandTotal.compareTo(BigDecimal.ZERO) > 0
+                ? tutarliVadeSum.divide(grandTotal, 0, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+        BigDecimal islemAy = islemGun.divide(BigDecimal.valueOf(30), 1, RoundingMode.HALF_UP);
+        BigDecimal tutarAy = tutarGun.divide(BigDecimal.valueOf(30), 1, RoundingMode.HALF_UP);
+        long maxGun = Math.max(islemGun.longValue(), tutarGun.longValue());
+        if (maxGun == 0) maxGun = 1;
 
-        BigDecimal avgDays = weightedDaySum.divide(grandTotal, 4, RoundingMode.HALF_UP);
-        BigDecimal avgMonths = avgDays.divide(BigDecimal.valueOf(30.4375), 2, RoundingMode.HALF_UP);
-        LocalDate avgDate = today.plusDays(avgDays.longValue());
+        upload.setVisible(false);
 
         resultBox.removeAll();
+        resultBox.getStyle().clear();
         resultBox.setVisible(true);
+        resultBox.getStyle()
+                .set("background", "var(--lumo-base-color)")
+                .set("border", "1px solid var(--lumo-contrast-10pct)")
+                .set("border-radius", "16px")
+                .set("padding", "24px")
+                .set("box-shadow", "0 2px 12px rgba(0,0,0,0.06)")
+                .set("margin-bottom", "20px");
 
-        Span label = new Span("Ortalama Vade Sonucu");
-        label.getStyle().set("font-size", "0.85em").set("color", "var(--lumo-secondary-text-color)");
+        HorizontalLayout cardsRow = new HorizontalLayout();
+        cardsRow.setWidthFull();
+        cardsRow.setSpacing(true);
+        cardsRow.getStyle().set("gap", "20px");
 
-        Span value = new Span(avgMonths + " ay (" + avgDays.longValue() + " gün)");
-        value.getStyle().set("font-size", "1.5em").set("font-weight", "700").set("display", "block").set("margin-top", "0.3em");
+        cardsRow.add(buildCard("İşlem Bazlı Vade",
+                "Her işlem eşit ağırlıkta değerlendirilir. Müşterilerin\nortalama kaç gün vadeli alışveriş yaptığını gösterir.",
+                islemGun, islemAy, maxGun, BLUE));
+        cardsRow.add(buildCard("Tutar Bazlı Tahsilat Vadesi",
+                "Yüksek tutarlı işlemler daha fazla ağırlığa sahiptir.\nParanın ortalama kaç günde tahsil edildiğini gösterir.",
+                tutarGun, tutarAy, maxGun, "#27ae60"));
 
-        Span dateSpan = new Span("Tahmini ortalama vade tarihi: " +
-                avgDate.format(DateTimeFormatter.ofPattern("dd MMMM yyyy", Locale.of("tr"))));
-        dateSpan.getStyle().set("font-size", "1em").set("color", "var(--lumo-primary-text-color)")
-                .set("display", "block").set("margin-top", "0.3em");
+        Span summary = new Span(String.format("%s ₺ toplam tutar  ·  %d işlem  ·  vade aralığı %s - %s gün",
+                FormatUtils.formatNumber(grandTotal), txnCount, islemGun.toPlainString(), tutarGun.toPlainString()));
+        summary.getStyle()
+                .set("font-size", "13px")
+                .set("color", "#7f8c8d")
+                .set("display", "block")
+                .set("text-align", "center")
+                .set("margin-top", "16px");
 
-        Span stats = new Span(String.format("Toplam Tutar: %s ₺  |  İşlem Sayısı: %d  |  Toplam Taksit: %d",
-                FormatUtils.formatNumber(grandTotal), transactions.size(), totalInstallmentCount));
-        stats.getStyle().set("font-size", "0.9em").set("color", "var(--lumo-body-text-color)")
-                .set("display", "block").set("margin-top", "0.8em");
+        resultBox.add(cardsRow, summary);
 
-        resultBox.add(label, value, dateSpan, stats);
+        txnGrid.setItems(rows);
+        txnGrid.setVisible(true);
+    }
+
+    private Div buildCard(String title, String desc, BigDecimal gun, BigDecimal ay, long maxGun, String color) {
+        Div card = new Div();
+        card.getStyle()
+                .set("flex", "1")
+                .set("padding", "20px")
+                .set("border-radius", "12px")
+                .set("background", "var(--lumo-base-color)")
+                .set("box-shadow", "0 1px 6px rgba(0,0,0,0.08)")
+                .set("border", "1px solid var(--lumo-contrast-10pct)")
+                .set("min-width", "0");
+
+        Span titleSpan = new Span(title);
+        titleSpan.getStyle()
+                .set("font-weight", "700")
+                .set("font-size", "14px")
+                .set("color", DARK)
+                .set("display", "block");
+
+        Span descSpan = new Span(desc);
+        descSpan.getStyle()
+                .set("font-size", "12px")
+                .set("color", "var(--lumo-secondary-text-color)")
+                .set("display", "block")
+                .set("margin-top", "4px")
+                .set("white-space", "pre-line")
+                .set("line-height", "1.4");
+
+        HorizontalLayout valLine = new HorizontalLayout();
+        valLine.setSpacing(false);
+        valLine.setAlignItems(com.vaadin.flow.component.orderedlayout.FlexComponent.Alignment.BASELINE);
+        valLine.getStyle().set("margin-top", "12px");
+
+        Span bigNum = new Span(gun.toPlainString());
+        bigNum.getStyle().set("font-size", "28px").set("font-weight", "800").set("color", color).set("line-height", "1");
+
+        Span gunLabel = new Span(" gün");
+        gunLabel.getStyle().set("font-size", "13px").set("color", "var(--lumo-secondary-text-color)").set("margin-left", "4px");
+
+        valLine.add(bigNum, gunLabel);
+
+        Span ayLabel = new Span(ay.stripTrailingZeros().toPlainString() + " ay");
+        ayLabel.getStyle().set("font-size", "12px").set("color", "var(--lumo-tertiary-text-color)").set("display", "block").set("margin-top", "4px");
+
+        Div bar = new Div();
+        bar.getStyle()
+                .set("height", "6px")
+                .set("border-radius", "3px")
+                .set("background", "var(--lumo-contrast-10pct)")
+                .set("margin-top", "12px")
+                .set("overflow", "hidden");
+
+        int pct = (int) Math.min(100, gun.longValue() * 100 / maxGun);
+        Div fill = new Div();
+        fill.getStyle()
+                .set("height", "100%")
+                .set("width", pct + "%")
+                .set("background", color)
+                .set("border-radius", "3px")
+                .set("transition", "width 0.5s ease");
+
+        bar.add(fill);
+        card.add(titleSpan, descSpan, valLine, ayLabel, bar);
+        return card;
     }
 
     public static class TxnRow {
