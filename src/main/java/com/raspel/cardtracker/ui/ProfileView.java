@@ -89,7 +89,7 @@ public class ProfileView extends VerticalLayout {
         Div grid = new Div();
         grid.getStyle()
                 .set("display", "grid")
-                .set("grid-template-columns", "1fr 1fr 1fr")
+                .set("grid-template-columns", "1fr 1fr")
                 .set("gap", "16px")
                 .set("width", "100%");
 
@@ -217,61 +217,6 @@ public class ProfileView extends VerticalLayout {
         miniChart.setWidth("100%");
         chartCard.add(miniChart);
         grid.add(chartCard);
-
-        // SAĞ ALT 3. KOLON: Son 12 Ay (geçmiş aylar)
-        Div forecastCard = buildCard("Son 12 Ay");
-        VerticalLayout monthList = new VerticalLayout();
-        monthList.setPadding(false);
-        monthList.setSpacing(false);
-        monthList.getStyle().set("gap", "3px");
-
-        BigDecimal maxVal = BigDecimal.ZERO;
-        BigDecimal[] vals = new BigDecimal[12];
-        String[] labels = new String[12];
-        for (int i = 0; i < 12; i++) {
-            YearMonth ym = current.minusMonths(11 - i);
-            labels[i] = ym.getMonth().getDisplayName(java.time.format.TextStyle.SHORT, Locale.of("tr"));
-            vals[i] = expenseService.getTotalExpenseForMonth(ym.getYear(), ym.getMonthValue());
-            if (vals[i].compareTo(maxVal) > 0) maxVal = vals[i];
-        }
-        if (maxVal.compareTo(BigDecimal.ZERO) == 0) maxVal = BigDecimal.ONE;
-
-        for (int i = 0; i < 12; i++) {
-            BigDecimal val = vals[i];
-            int barPct = val.multiply(BigDecimal.valueOf(100)).divide(maxVal, 0, RoundingMode.HALF_UP).intValue();
-
-            HorizontalLayout row = new HorizontalLayout();
-            row.setWidthFull();
-            row.setAlignItems(FlexComponent.Alignment.CENTER);
-            row.setPadding(false);
-            row.getStyle().set("gap", "10px").set("padding", "2px 0");
-
-            Span lbl = new Span(labels[i]);
-            lbl.getStyle().set("font-size", "0.7em").set("font-weight", "600")
-                    .set("color", "var(--lumo-secondary-text-color)").set("width", "26px").set("flex-shrink", "0");
-
-            Div barBg = new Div();
-            barBg.getStyle().set("flex", "1").set("height", "12px")
-                    .set("border-radius", "6px").set("background", "var(--lumo-contrast-10pct)")
-                    .set("overflow", "hidden");
-            if (barPct > 0) {
-                Div barFill = new Div();
-                barFill.getStyle().set("height", "100%").set("width", barPct + "%")
-                        .set("background", "#2196F3")
-                        .set("border-radius", "6px").set("transition", "width 0.4s ease");
-                barBg.add(barFill);
-            }
-
-            Span amt = new Span(FormatUtils.formatNumber(val) + " ₺");
-            amt.getStyle().set("font-size", "0.75em").set("font-weight", "700")
-                    .set("color", val.compareTo(BigDecimal.ZERO) > 0 ? "var(--lumo-body-text-color)" : "var(--lumo-tertiary-text-color)")
-                    .set("min-width", "70px").set("text-align", "right").set("flex-shrink", "0");
-
-            row.add(lbl, barBg, amt);
-            monthList.add(row);
-        }
-        forecastCard.add(monthList);
-        grid.add(forecastCard);
 
         add(grid);
     }
