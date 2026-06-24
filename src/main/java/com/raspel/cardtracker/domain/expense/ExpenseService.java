@@ -374,7 +374,9 @@ public class ExpenseService {
     }
 
     public BigDecimal getTotalExpenseForMonth(int year, int month) {
-        return expenseRepository.sumAmountByExpenseYearAndMonth(year, month);
+        LocalDate start = LocalDate.of(year, month, 1);
+        LocalDate end = start.plusMonths(1);
+        return expenseRepository.sumAmountByExpenseYearAndMonth(start, end);
     }
 
     public List<Expense> findRecentByCreatedBy(String createdBy, int limit) {
