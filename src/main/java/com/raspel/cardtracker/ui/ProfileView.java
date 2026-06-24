@@ -30,6 +30,7 @@ import com.raspel.cardtracker.domain.cheque.ChequeService;
 import com.raspel.cardtracker.domain.user.AppUser;
 import com.raspel.cardtracker.domain.user.UserService;
 import com.raspel.cardtracker.domain.settings.AppSettingsService;
+import com.raspel.cardtracker.domain.backup.BackupRestoreService;
 import com.raspel.cardtracker.ui.utils.FormatUtils;
 import jakarta.annotation.security.PermitAll;
 import org.springframework.security.core.Authentication;
@@ -52,15 +53,18 @@ public class ProfileView extends VerticalLayout {
     private final ExpenseService expenseService;
     private final ChequeService chequeService;
     private final AppSettingsService appSettingsService;
+    private final BackupRestoreService backupService;
 
     public ProfileView(UserService userService, CardService cardService,
                        ExpenseService expenseService, ChequeService chequeService,
-                       AppSettingsService appSettingsService) {
+                       AppSettingsService appSettingsService,
+                       BackupRestoreService backupService) {
         this.userService = userService;
         this.cardService = cardService;
         this.expenseService = expenseService;
         this.chequeService = chequeService;
         this.appSettingsService = appSettingsService;
+        this.backupService = backupService;
 
         setSizeFull();
         setPadding(true);
@@ -196,6 +200,41 @@ public class ProfileView extends VerticalLayout {
             companyRow.expand(companyField);
             companyCard.add(companyRow);
             grid.add(companyCard);
+
+            // Yedekleme kartı (admin only)
+            Div backupCard = buildCard("Veritabanı Yedekleme");
+            HorizontalLayout backupRow = new HorizontalLayout();
+            backupRow.setWidthFull();
+            backupRow.setSpacing(true);
+
+            Button backupBtn = new Button("Yedek Al", new Icon(VaadinIcon.DOWNLOAD), ev -> {
+                try {
+                    java.io.File f = backupService.createBackup();
+                    com.vaadin.flow.server.StreamResource res = new com.vaadin.flow.server.StreamResource(
+                        f.getName(), () -> {
+                            try { return new java.io.FileInputStream(f); } catch (Exception ex) { return null; }
+                        });
+                    res.setContentType("application/sql");
+                    com.vaadin.flow.component.html.Anchor anchor = new com.vaadin.flow.component.html.Anchor(res, "");
+                    anchor.getElement().setAttribute("download", f.getName());
+                    anchor.getElement().getStyle().set("display", "none");
+                    add(anchor);
+                    anchor.getElement().executeJs("this.click()");
+                    getUI().ifPresent(ui -> ui.getPage().executeJs("setTimeout(function(){arguments[0].remove()},1000)", anchor.getElement()));
+                } catch (Exception ex) {
+                    Notification.show("Yedek alınamadı: " + ex.getMessage(), 5000, Notification.Position.MIDDLE)
+                            .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                }
+            });
+            backupBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+
+            Span hint = new Span("Tek tıkla tam veritabanı yedeği indir.");
+            hint.getStyle().set("font-size", "0.75em").set("color", "var(--lumo-secondary-text-color)");
+
+            backupRow.add(backupBtn, hint);
+            backupRow.expand(hint);
+            backupCard.add(backupRow);
+            grid.add(backupCard);
         }
 
         // SAĞ ALT: Aylık Harcama (grafik)
