@@ -203,9 +203,10 @@ public class ProfileView extends VerticalLayout {
 
             // Yedekleme kartı (admin only)
             Div backupCard = buildCard("Veritabanı Yedekleme");
-            HorizontalLayout backupRow = new HorizontalLayout();
-            backupRow.setWidthFull();
-            backupRow.setSpacing(true);
+
+            HorizontalLayout backupRow1 = new HorizontalLayout();
+            backupRow1.setWidthFull();
+            backupRow1.setSpacing(true);
 
             Button backupBtn = new Button("Yedek Al", new Icon(VaadinIcon.DOWNLOAD), ev -> {
                 try {
@@ -228,12 +229,53 @@ public class ProfileView extends VerticalLayout {
             });
             backupBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
-            Span hint = new Span("Tek tıkla tam veritabanı yedeği indir.");
+            Span hint = new Span("Yedek al ve bilgisayara indir.");
             hint.getStyle().set("font-size", "0.75em").set("color", "var(--lumo-secondary-text-color)");
 
-            backupRow.add(backupBtn, hint);
-            backupRow.expand(hint);
-            backupCard.add(backupRow);
+            backupRow1.add(backupBtn, hint);
+            backupRow1.expand(hint);
+
+            HorizontalLayout backupRow2 = new HorizontalLayout();
+            backupRow2.setWidthFull();
+            backupRow2.setSpacing(true);
+            backupRow2.getStyle().set("margin-top", "12px").set("padding-top", "12px").set("border-top", "1px solid var(--lumo-contrast-10pct)");
+
+            com.vaadin.flow.component.upload.Upload restoreUpload = new com.vaadin.flow.component.upload.Upload(
+                new com.vaadin.flow.component.upload.receivers.MemoryBuffer());
+            restoreUpload.setAcceptedFileTypes(".sql");
+            restoreUpload.setMaxFiles(1);
+            restoreUpload.setDropLabel(new Span("Yedek .sql dosyası seç"));
+
+            restoreUpload.addSucceededListener(ev -> {
+                com.vaadin.flow.component.dialog.Dialog confirm = new com.vaadin.flow.component.dialog.Dialog();
+                confirm.setHeaderTitle("Geri Yükleme Onayı");
+                confirm.add(new Span("Veritabanı geri yüklenecek. Mevcut tüm veriler silinip yedekteki veriler gelecek. Emin misiniz?"));
+                Button yesBtn = new Button("Evet, Geri Yükle", e -> {
+                    try {
+                        backupService.restoreFromFile(((com.vaadin.flow.component.upload.receivers.MemoryBuffer)restoreUpload.getReceiver()).getInputStream());
+                        Notification.show("Veritabanı geri yüklendi.", 4000, Notification.Position.MIDDLE)
+                                .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                    } catch (Exception ex) {
+                        Notification.show("Geri yükleme başarısız: " + ex.getMessage(), 6000, Notification.Position.MIDDLE)
+                                .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                    }
+                    confirm.close();
+                });
+                yesBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_ERROR);
+                Button noBtn = new Button("Vazgeç", ev2 -> confirm.close());
+                confirm.getFooter().add(noBtn, yesBtn);
+                confirm.open();
+            });
+
+            restoreUpload.getStyle().set("flex-shrink", "0").set("width", "200px");
+
+            Span restoreHint = new Span("Yedek dosyası yükle ve geri yükle.");
+            restoreHint.getStyle().set("font-size", "0.75em").set("color", "var(--lumo-secondary-text-color)");
+
+            backupRow2.add(restoreUpload, restoreHint);
+            backupRow2.expand(restoreHint);
+
+            backupCard.add(backupRow1, backupRow2);
             grid.add(backupCard);
         }
 
