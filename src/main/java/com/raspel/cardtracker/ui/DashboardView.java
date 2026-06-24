@@ -173,7 +173,7 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
                 .set("width", "100%")
                 .set("box-sizing", "border-box");
 
-        Span greeting = new Span("Hoş geldin, Sistem Yöneticisi");
+        Span greeting = new Span("Hoş geldin, " + displayName);
         greeting.getStyle()
                 .set("font-size", "2em")
                 .set("font-weight", "700")
@@ -1195,7 +1195,7 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
             list.add(noReminders);
         }
 
-        Button viewAllBtn = new Button("→ Tümünü Gör", new Icon(VaadinIcon.ARROW_RIGHT), 
+        Button viewAllBtn = new Button("Tümünü Gör", new Icon(VaadinIcon.ARROW_RIGHT), 
                 e -> getUI().ifPresent(ui -> ui.navigate(ReminderView.class)));
         viewAllBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
         viewAllBtn.getStyle().set("margin-top", "1em").set("transition", "none");

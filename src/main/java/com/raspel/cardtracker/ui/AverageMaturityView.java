@@ -211,7 +211,11 @@ public class AverageMaturityView extends VerticalLayout {
                 if (amount <= 0) continue;
 
                 String desc = cols.length > 7 ? cols[7] : "";
-                transactions.add(new Transaction(BigDecimal.valueOf(amount), installments, desc));
+                LocalDate payDate = null;
+                if (cols.length > 9 && !cols[9].trim().isEmpty()) {
+                    try { payDate = LocalDate.parse(cols[9].trim()); } catch (Exception ignored) {}
+                }
+                transactions.add(new Transaction(BigDecimal.valueOf(amount), installments, desc, payDate));
             } catch (Exception ignored) {
             }
         }
@@ -239,7 +243,18 @@ public class AverageMaturityView extends VerticalLayout {
                 if (amount <= 0) continue;
 
                 String desc = row.getCell(7) != null ? row.getCell(7).toString() : "";
-                transactions.add(new Transaction(BigDecimal.valueOf(amount), installments, desc));
+                LocalDate payDate = null;
+                if (row.getCell(9) != null) {
+                    try {
+                        org.apache.poi.ss.usermodel.Cell dateCell = row.getCell(9);
+                        if (dateCell.getCellType() == org.apache.poi.ss.usermodel.CellType.NUMERIC && org.apache.poi.ss.usermodel.DateUtil.isCellDateFormatted(dateCell)) {
+                            payDate = dateCell.getDateCellValue().toInstant().atZone(java.time.ZoneId.systemDefault()).toLocalDate();
+                        } else {
+                            try { payDate = LocalDate.parse(dateCell.toString().trim()); } catch (Exception ignored) {}
+                        }
+                    } catch (Exception ignored) {}
+                }
+                transactions.add(new Transaction(BigDecimal.valueOf(amount), installments, desc, payDate));
             } catch (Exception ignored) {
             }
         }
@@ -298,8 +313,11 @@ public class AverageMaturityView extends VerticalLayout {
         try { return val.isEmpty() ? 0 : Integer.parseInt(val); } catch (Exception e) { return 0; }
     }
 
-    private int getVadeDays(int taksit) {
-        return Math.max(1, taksit) * 30;
+    private int getVadeDays(Transaction t) {
+        if (t.paymentDate != null) {
+            return (int) Math.max(1, ChronoUnit.DAYS.between(LocalDate.now(), t.paymentDate));
+        }
+        return Math.max(1, t.installments) * 30;
     }
 
     private void showResult(List<Transaction> transactions) {
@@ -312,11 +330,11 @@ public class AverageMaturityView extends VerticalLayout {
         for (int i = 0; i < transactions.size(); i++) {
             Transaction t = transactions.get(i);
             grandTotal = grandTotal.add(t.amount);
-            int vadeDays = getVadeDays(t.installments);
+            int vadeDays = getVadeDays(t);
             islemVadeSum += vadeDays;
             tutarliVadeSum = tutarliVadeSum.add(t.amount.multiply(BigDecimal.valueOf(vadeDays)));
             String desc = t.desc.length() > 40 ? t.desc.substring(0, 40) + "..." : t.desc;
-            rows.add(new TxnRow(i + 1, t.amount, t.installments, desc));
+            rows.add(new TxnRow(i + 1, t.amount, t.installments, desc, t.paymentDate));
         }
 
         BigDecimal islemGun = txnCount > 0
@@ -440,24 +458,28 @@ public class AverageMaturityView extends VerticalLayout {
         private final BigDecimal amount;
         private final int installments;
         private final String desc;
-        public TxnRow(int row, BigDecimal amount, int installments, String desc) {
-            this.row = row; this.amount = amount; this.installments = installments; this.desc = desc;
+        private final LocalDate paymentDate;
+        public TxnRow(int row, BigDecimal amount, int installments, String desc, LocalDate paymentDate) {
+            this.row = row; this.amount = amount; this.installments = installments; this.desc = desc; this.paymentDate = paymentDate;
         }
         public int getRow() { return row; }
         public BigDecimal getAmount() { return amount; }
         public int getInstallments() { return installments; }
         public String getDesc() { return desc; }
+        public LocalDate getPaymentDate() { return paymentDate; }
     }
 
     private static class Transaction {
         final BigDecimal amount;
         final int installments;
         final String desc;
+        final LocalDate paymentDate;
 
-        Transaction(BigDecimal amount, int installments, String desc) {
+        Transaction(BigDecimal amount, int installments, String desc, LocalDate paymentDate) {
             this.amount = amount;
             this.installments = installments;
             this.desc = desc;
+            this.paymentDate = paymentDate;
         }
     }
 }

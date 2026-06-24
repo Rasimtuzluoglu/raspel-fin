@@ -484,9 +484,6 @@ public class ExpenseView extends VerticalLayout {
                 uploadedPath[0] = targetPath.toAbsolutePath().toString();
                 uploadedContentType[0] = event.getMIMEType();
 
-                // Mock OCR özelliğini tetikle
-                runMockOcr(originalFileName, descField, amountField, categoryField, currencyField);
-
             } catch (Exception ex) {
                 Notification.show("Bir hata oluştu, lütfen tekrar deneyin.", 3000, Notification.Position.BOTTOM_CENTER)
                         .addThemeVariants(NotificationVariant.LUMO_ERROR);
@@ -592,110 +589,6 @@ public class ExpenseView extends VerticalLayout {
         dialog.open();
     }
 
-    /**
-     * Akıllı OCR tarama simülasyonu
-     */
-    private void runMockOcr(String filename, TextField descField, TextField amountField, 
-                            ComboBox<String> categoryField, ComboBox<String> currencyField) {
-        Dialog ocrDialog = new Dialog();
-        ocrDialog.setHeaderTitle("Akıllı OCR Fatura Analizi");
-        ocrDialog.setWidth("380px");
-
-        VerticalLayout layout = new VerticalLayout();
-        layout.setPadding(true);
-        layout.setAlignItems(Alignment.CENTER);
-
-        Span status = new Span("Belge taranıyor ve analiz ediliyor...");
-        status.getStyle().set("font-weight", "bold").set("font-size", "0.95em");
-
-        Div progressContainer = new Div();
-        progressContainer.setWidth("100%");
-        progressContainer.getStyle().set("background-color", "var(--lumo-contrast-10pct)")
-                .set("border-radius", "4px")
-                .set("height", "8px")
-                .set("overflow", "hidden")
-                .set("margin-top", "1em");
-
-        Div progressBar = new Div();
-        progressBar.setHeight("100%");
-        progressBar.setWidth("0%");
-        progressBar.getStyle().set("background-color", "var(--lumo-primary-color)");
-        progressContainer.add(progressBar);
-
-        layout.add(status, progressContainer);
-        ocrDialog.add(layout);
-        ocrDialog.open();
-
-        // Dosya adına göre mock bilgileri çıkar
-        String nameLower = filename.toLowerCase();
-        String mockDesc = "Fatura Harcaması";
-        double mockAmount = 250.00;
-        String mockCategory = "Genel";
-        String mockCurrency = "TRY";
-
-        if (nameLower.contains("aws") || nameLower.contains("amazon") || nameLower.contains("cloud") || nameLower.contains("server")) {
-            mockDesc = "Amazon Web Services (AWS) Cloud Hosting";
-            mockAmount = 89.99;
-            mockCategory = "IT";
-            mockCurrency = "USD";
-        } else if (nameLower.contains("yakit") || nameLower.contains("benzin") || nameLower.contains("shell") || nameLower.contains("petrol") || nameLower.contains("opet")) {
-            mockDesc = "Shell Taşıt Tanıma Yakıt Alımı";
-            mockAmount = 1450.00;
-            mockCategory = "Yakıt";
-            mockCurrency = "TRY";
-        } else if (nameLower.contains("otel") || nameLower.contains("flight") || nameLower.contains("thy") || nameLower.contains("booking") || nameLower.contains("bilet")) {
-            mockDesc = "THY Yurtdışı İş Seyahati Uçak Bileti";
-            mockAmount = 350.00;
-            mockCategory = "Seyahat";
-            mockCurrency = "EUR";
-        } else if (nameLower.contains("ofis") || nameLower.contains("kagit") || nameLower.contains("migros") || nameLower.contains("mutfak")) {
-            mockDesc = "Migros Ofis Mutfak & Kırtasiye Alışverişi";
-            mockAmount = 480.50;
-            mockCategory = "Ofis Giderleri";
-            mockCurrency = "TRY";
-        } else if (nameLower.contains("reklam") || nameLower.contains("google") || nameLower.contains("ads") || nameLower.contains("facebook")) {
-            mockDesc = "Google Ads Reklam Hizmeti";
-            mockAmount = 500.00;
-            mockCategory = "Pazarlama";
-            mockCurrency = "USD";
-        }
-
-        final String finalDesc = mockDesc;
-        final double finalAmount = mockAmount;
-        final String finalCategory = mockCategory;
-        final String finalCurrency = mockCurrency;
-
-        // İlerleme çubuğunu JS ile canlandır ve 1.5 sn sonra kapat
-        getElement().executeJs(
-            "var p = $0; var d = $1; var i = 0;" +
-            "var timer = setInterval(function() {" +
-            "  i += 10;" +
-            "  p.style.width = i + '%';" +
-            "  if(i >= 100) {" +
-            "    clearInterval(timer);" +
-            "    d.close();" +
-            "  }" +
-            "}, 120);", progressBar.getElement(), ocrDialog.getElement()
-        );
-
-        // Değerleri form alanlarına ata
-        descField.setValue(finalDesc);
-        amountField.setValue(FormatUtils.formatTurkishCurrency(BigDecimal.valueOf(finalAmount)));
-        categoryField.setValue(finalCategory);
-        currencyField.setValue(finalCurrency);
-
-        ocrDialog.addOpenedChangeListener(event -> {
-            if (!event.isOpened()) {
-                Notification.show("Akıllı OCR: Belge başarıyla taranarak alanlar dolduruldu!", 3000, Notification.Position.BOTTOM_CENTER)
-                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-            }
-        });
-
-        getElement().executeJs(
-            "setTimeout(function() { $0.close(); }, 3000);",
-            ocrDialog.getElement()
-        );
-    }
 
     private void openReceiptPreview(String receiptPath) {
         Dialog dialog = new Dialog();
