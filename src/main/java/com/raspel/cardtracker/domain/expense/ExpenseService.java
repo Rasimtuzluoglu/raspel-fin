@@ -373,7 +373,6 @@ public class ExpenseService {
         return expenseRepository.countByCreatedBy(createdBy);
     }
 
-    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public BigDecimal getTotalExpenseForMonth(int year, int month) {
         return expenseRepository.sumAmountByExpenseYearAndMonth(year, month);
     }

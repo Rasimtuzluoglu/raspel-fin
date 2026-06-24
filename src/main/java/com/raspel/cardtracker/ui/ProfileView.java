@@ -262,10 +262,10 @@ public class ProfileView extends VerticalLayout {
                 barBg.add(barFill);
             }
 
-            Span amt = new Span(val.compareTo(BigDecimal.ZERO) > 0 ? FormatUtils.formatNumber(val) + " ₺" : "—");
-            amt.getStyle().set("font-size", "0.7em").set("font-weight", "700")
+            Span amt = new Span(FormatUtils.formatNumber(val) + " ₺");
+            amt.getStyle().set("font-size", "0.75em").set("font-weight", "700")
                     .set("color", val.compareTo(BigDecimal.ZERO) > 0 ? "var(--lumo-body-text-color)" : "var(--lumo-tertiary-text-color)")
-                    .set("min-width", "64px").set("text-align", "right").set("flex-shrink", "0");
+                    .set("min-width", "70px").set("text-align", "right").set("flex-shrink", "0");
 
             row.add(lbl, barBg, amt);
             monthList.add(row);
