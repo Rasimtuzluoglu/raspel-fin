@@ -74,8 +74,7 @@ public class BackupRestoreService {
             "-h", host,
             "-p", String.valueOf(port),
             "-U", dbUser,
-            "-d", dbName,
-            "-v", "ON_ERROR_STOP=1"
+            "-d", dbName
         );
         pb.environment().put("PGPASSWORD", dbPass);
 

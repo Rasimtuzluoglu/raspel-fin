@@ -204,9 +204,28 @@ public class ProfileView extends VerticalLayout {
             // Yedekleme kartı (admin only)
             Div backupCard = buildCard("Veritabanı Yedekleme");
 
-            HorizontalLayout backupRow1 = new HorizontalLayout();
-            backupRow1.setWidthFull();
-            backupRow1.setSpacing(true);
+            HorizontalLayout backupMain = new HorizontalLayout();
+            backupMain.setWidthFull();
+            backupMain.setSpacing(true);
+            backupMain.getStyle().set("gap", "20px");
+
+            // SOL: Yedek Al
+            Div backupLeft = new Div();
+            backupLeft.getStyle()
+                    .set("flex", "1")
+                    .set("padding", "16px")
+                    .set("border-radius", "10px")
+                    .set("background", "var(--lumo-contrast-5pct)")
+                    .set("text-align", "center");
+
+            Span backupIcon = new Span("\uD83D\uDCBE");
+            backupIcon.getStyle().set("font-size", "24px").set("display", "block").set("margin-bottom", "8px");
+
+            Span backupLabel = new Span("Yedek Al");
+            backupLabel.getStyle().set("font-weight", "600").set("font-size", "0.85em").set("display", "block");
+
+            Span backupDesc = new Span("Tüm veritabanını .sql dosyası olarak bilgisayara indirir.");
+            backupDesc.getStyle().set("font-size", "0.7em").set("color", "var(--lumo-secondary-text-color)").set("display", "block").set("margin-top", "4px");
 
             Button backupBtn = new Button("Yedek Al", new Icon(VaadinIcon.DOWNLOAD), ev -> {
                 try {
@@ -228,32 +247,45 @@ public class ProfileView extends VerticalLayout {
                 }
             });
             backupBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+            backupBtn.getStyle().set("margin-top", "12px");
 
-            Span hint = new Span("Yedek al ve bilgisayara indir.");
-            hint.getStyle().set("font-size", "0.75em").set("color", "var(--lumo-secondary-text-color)");
+            backupLeft.add(backupIcon, backupLabel, backupDesc, backupBtn);
 
-            backupRow1.add(backupBtn, hint);
-            backupRow1.expand(hint);
+            // SAĞ: Geri Yükle
+            Div backupRight = new Div();
+            backupRight.getStyle()
+                    .set("flex", "1")
+                    .set("padding", "16px")
+                    .set("border-radius", "10px")
+                    .set("background", "var(--lumo-contrast-5pct)")
+                    .set("text-align", "center");
 
-            HorizontalLayout backupRow2 = new HorizontalLayout();
-            backupRow2.setWidthFull();
-            backupRow2.setSpacing(true);
-            backupRow2.getStyle().set("margin-top", "12px").set("padding-top", "12px").set("border-top", "1px solid var(--lumo-contrast-10pct)");
+            Span restoreIcon = new Span("\uD83D\uDCC2");
+            restoreIcon.getStyle().set("font-size", "24px").set("display", "block").set("margin-bottom", "8px");
+
+            Span restoreLabel = new Span("Geri Yükle");
+            restoreLabel.getStyle().set("font-weight", "600").set("font-size", "0.85em").set("display", "block");
+
+            Span restoreDesc = new Span("Daha önce aldığınız .sql yedek dosyasını seçerek veritabanını eski haline getirir.");
+            restoreDesc.getStyle().set("font-size", "0.7em").set("color", "var(--lumo-secondary-text-color)").set("display", "block").set("margin-top", "4px");
 
             com.vaadin.flow.component.upload.Upload restoreUpload = new com.vaadin.flow.component.upload.Upload(
                 new com.vaadin.flow.component.upload.receivers.MemoryBuffer());
             restoreUpload.setAcceptedFileTypes(".sql");
             restoreUpload.setMaxFiles(1);
-            restoreUpload.setDropLabel(new Span("Yedek .sql dosyası seç"));
+            restoreUpload.setDropLabel(new Span("SQL dosyası seç"));
+            restoreUpload.getStyle().set("margin-top", "12px");
 
             restoreUpload.addSucceededListener(ev -> {
                 com.vaadin.flow.component.dialog.Dialog confirm = new com.vaadin.flow.component.dialog.Dialog();
-                confirm.setHeaderTitle("Geri Yükleme Onayı");
-                confirm.add(new Span("Veritabanı geri yüklenecek. Mevcut tüm veriler silinip yedekteki veriler gelecek. Emin misiniz?"));
+                confirm.setHeaderTitle("\u26A0\uFE0F Geri Yükleme Onayı");
+                Span warn = new Span("Veritabanı geri yüklenecek. Mevcut tüm veriler silinip yedekteki veriler gelecek. Bu işlem geri alınamaz!");
+                warn.getStyle().set("color", "var(--lumo-error-color)").set("font-weight", "600");
+                confirm.add(warn);
                 Button yesBtn = new Button("Evet, Geri Yükle", e -> {
                     try {
                         backupService.restoreFromFile(((com.vaadin.flow.component.upload.receivers.MemoryBuffer)restoreUpload.getReceiver()).getInputStream());
-                        Notification.show("Veritabanı geri yüklendi.", 4000, Notification.Position.MIDDLE)
+                        Notification.show("Veritabanı başarıyla geri yüklendi.", 4000, Notification.Position.MIDDLE)
                                 .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
                     } catch (Exception ex) {
                         Notification.show("Geri yükleme başarısız: " + ex.getMessage(), 6000, Notification.Position.MIDDLE)
@@ -267,15 +299,10 @@ public class ProfileView extends VerticalLayout {
                 confirm.open();
             });
 
-            restoreUpload.getStyle().set("flex-shrink", "0").set("width", "200px");
+            backupRight.add(restoreIcon, restoreLabel, restoreDesc, restoreUpload);
 
-            Span restoreHint = new Span("Yedek dosyası yükle ve geri yükle.");
-            restoreHint.getStyle().set("font-size", "0.75em").set("color", "var(--lumo-secondary-text-color)");
-
-            backupRow2.add(restoreUpload, restoreHint);
-            backupRow2.expand(restoreHint);
-
-            backupCard.add(backupRow1, backupRow2);
+            backupMain.add(backupLeft, backupRight);
+            backupCard.add(backupMain);
             grid.add(backupCard);
         }
 
