@@ -626,7 +626,7 @@ public class MainLayout extends AppLayout {
 
         getUI().ifPresent(ui -> {
             if (ui.getPollInterval() < 0) {
-                ui.setPollInterval(60000);
+                ui.setPollInterval(10000);
                 ui.addPollListener(e -> {
                     try {
                         checkNoteReminders();
@@ -635,6 +635,13 @@ public class MainLayout extends AppLayout {
                 });
             }
         });
+
+        getElement().executeJs(
+            "if(!window.__reminderPoll){" +
+            "window.__reminderPoll=setInterval(function(){" +
+            "  fetch('/actuator/health').catch(function(){})" +
+            "},10000);" +
+            "}");
 
         Boolean sessionDarkInitialized = (Boolean) com.vaadin.flow.server.VaadinSession.getCurrent().getAttribute("darkModeInitialized");
         if (sessionDarkInitialized == null || !sessionDarkInitialized) {
