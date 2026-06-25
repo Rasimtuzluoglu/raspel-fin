@@ -477,8 +477,13 @@ public class BudgetView extends VerticalLayout {
             }
 
             try {
+                Card selectedCard = cardField.getValue();
+                if (selectedCard.getDepartment() == null || !selectedCard.getDepartment().getId().equals(budget.getDepartment().getId())) {
+                    selectedCard.setDepartment(budget.getDepartment());
+                    cardService.save(selectedCard);
+                }
                 Expense expense = Expense.builder()
-                        .card(cardField.getValue())
+                        .card(selectedCard)
                         .description(descField.getValue() != null ? descField.getValue() : deptName + " bütçe harcaması")
                         .totalAmount(amt)
                         .originalAmount(amt)
