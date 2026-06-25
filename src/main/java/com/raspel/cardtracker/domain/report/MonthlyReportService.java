@@ -283,8 +283,8 @@ public class MonthlyReportService {
     }
 
     private BufferedImage createBarChart(String title, Map<String, BigDecimal> data) {
-        int width = 600;
-        int height = 300;
+        int width = 1200;
+        int height = 600;
         int barAreaLeft = 120;
         int barAreaRight = width - 30;
         int barAreaTop = 40;

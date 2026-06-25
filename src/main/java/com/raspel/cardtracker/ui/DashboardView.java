@@ -147,6 +147,19 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
             "if(window._dashScrollY !== undefined){" +
             "  window.scrollTo(0, window._dashScrollY);" +
             "  delete window._dashScrollY;" +
+            "}" +
+            // Tum ApexCharts tooltip'lerine TL formati ekle
+            "if(!window.__tooltipPatched){" +
+            "window.__tooltipPatched=true;" +
+            "setTimeout(function(){" +
+            "  var fmt=new Intl.NumberFormat('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2});" +
+            "  document.querySelectorAll('.apexcharts-tooltip').forEach(function(t){" +
+            "    t.querySelectorAll('.apexcharts-tooltip-text-y-value').forEach(function(v){" +
+            "      var num=parseFloat(v.textContent.replace(/[^0-9.-]/g,''));" +
+            "      if(!isNaN(num)){v.textContent=fmt.format(num)+' ₺';}" +
+            "    });" +
+            "  });" +
+            "},200);" +
             "}"
         );
     }
@@ -246,8 +259,9 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
         warningsLayout.setSpacing(true);
 
         List<Card> activeCards = cardService.findAllActive();
+        Map<Long, BigDecimal> unpaidMap = expenseService.getUnpaidBalancesGroupedByCard();
         for (Card card : activeCards) {
-            BigDecimal unpaid = expenseService.getUnpaidBalance(card.getId());
+            BigDecimal unpaid = unpaidMap.getOrDefault(card.getId(), BigDecimal.ZERO);
             BigDecimal limit = card.getCardLimit();
             
             if (limit != null && limit.compareTo(BigDecimal.ZERO) > 0) {
