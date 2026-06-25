@@ -50,4 +50,7 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
 
     @Query("SELECT COALESCE(SUM(e.totalAmount), 0) FROM Expense e WHERE e.expenseDate >= :startDate AND e.expenseDate < :endDate")
     BigDecimal sumAmountByExpenseYearAndMonth(@Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
+
+    @Query("SELECT COALESCE(SUM(e.totalAmount), 0) FROM Expense e JOIN e.card c JOIN c.department d WHERE d.name = :deptName AND e.expenseDate >= :startDate AND e.expenseDate < :endDate")
+    BigDecimal sumAmountByDeptAndMonth(@Param("deptName") String deptName, @Param("startDate") LocalDate startDate, @Param("endDate") LocalDate endDate);
 }

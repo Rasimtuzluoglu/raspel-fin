@@ -336,16 +336,9 @@ public class ExpenseService {
      */
     public BigDecimal getDepartmentSpentForMonth(String department, int year, int month) {
         if (department == null) return BigDecimal.ZERO;
-        List<InstallmentEntry> entries = getInstallmentsForMonth(year, month);
-        return entries.stream()
-                .filter(entry -> {
-                    if (entry.getExpense() == null || entry.getExpense().getCard() == null) return false;
-                    String cardDept = entry.getExpense().getCard().getDepartment() != null
-                            ? entry.getExpense().getCard().getDepartment().getName() : null;
-                    return cardDept != null && cardDept.trim().equalsIgnoreCase(department.trim());
-                })
-                .map(InstallmentEntry::getAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        LocalDate start = LocalDate.of(year, month, 1);
+        LocalDate end = start.plusMonths(1);
+        return expenseRepository.sumAmountByDeptAndMonth(department, start, end);
     }
 
     /**
