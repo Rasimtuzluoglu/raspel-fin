@@ -127,13 +127,23 @@ public class BudgetView extends VerticalLayout {
                         .addThemeVariants(NotificationVariant.LUMO_ERROR);
                 return;
             }
-            departmentService.delete(selected.getId());
-            Notification.show("Departman silindi: " + selected.getName(), 3000, Notification.Position.MIDDLE)
-                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-            deptSelect.setItems(departmentService.findAllActive());
-            deptSelect.clear();
-            refreshDeptList();
-            refreshGrid();
+            Dialog confirm = new Dialog();
+            confirm.setHeaderTitle("Departman Sil");
+            confirm.add(new Span("\"" + selected.getName() + "\" departmanı ve varsa bu departmana ait tüm bütçe kayıtları silinecektir. Kartların departman bağlantısı kaldırılacaktır."));
+            Button yesBtn = new Button("Evet, Sil", ev -> {
+                departmentService.delete(selected.getId());
+                Notification.show("Departman silindi: " + selected.getName(), 3000, Notification.Position.MIDDLE)
+                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                deptSelect.setItems(departmentService.findAllActive());
+                deptSelect.clear();
+                refreshDeptList();
+                refreshGrid();
+                confirm.close();
+            });
+            yesBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_ERROR);
+            Button noBtn = new Button("Vazgeç", ev -> confirm.close());
+            confirm.getFooter().add(noBtn, yesBtn);
+            confirm.open();
         });
         deleteBtn.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_SMALL);
 
@@ -430,9 +440,10 @@ public class BudgetView extends VerticalLayout {
                 .set("text-align", "center");
 
         ComboBox<Card> cardField = new ComboBox<>("Kart Seçin");
-        List<Card> cards = cardService.findAllActive().stream()
+        List<Card> deptCards = cardService.findAllActive().stream()
                 .filter(c -> c.getDepartment() != null && c.getDepartment().getId().equals(budget.getDepartment().getId()))
                 .collect(java.util.stream.Collectors.toList());
+        List<Card> cards = deptCards.isEmpty() ? cardService.findAllActive() : deptCards;
         cardField.setItems(cards);
         cardField.setItemLabelGenerator(c -> c.getName() + " (" + c.getBank() + ")");
         cardField.setWidthFull();

@@ -2,6 +2,7 @@ package com.raspel.cardtracker.domain.department;
 
 import com.raspel.cardtracker.domain.audit.AuditAction;
 import com.raspel.cardtracker.domain.audit.AuditLogService;
+import com.raspel.cardtracker.domain.budget.DepartmentBudgetRepository;
 import com.raspel.cardtracker.domain.card.Card;
 import com.raspel.cardtracker.domain.card.CardRepository;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,7 @@ public class DepartmentService {
 
     private final DepartmentRepository departmentRepository;
     private final CardRepository cardRepository;
+    private final DepartmentBudgetRepository budgetRepository;
     private final AuditLogService auditLogService;
 
     public List<Department> findAllActive() {
@@ -53,6 +55,7 @@ public class DepartmentService {
                 card.setDepartment(null);
                 cardRepository.save(card);
             }
+            budgetRepository.deleteAll(budgetRepository.findByDepartmentIdOrderByBudgetYearDescBudgetMonthDesc(id));
             dept.setIsActive(false);
             departmentRepository.save(dept);
             auditLogService.log(AuditAction.DELETE, "Departman", id, "Departman silindi: " + dept.getName());
