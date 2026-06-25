@@ -37,6 +37,7 @@ import com.raspel.cardtracker.domain.user.UserService;
 import com.raspel.cardtracker.domain.note.NoteService;
 import com.raspel.cardtracker.domain.note.Note;
 import com.raspel.cardtracker.domain.settings.AppSettingsService;
+import com.raspel.cardtracker.ui.utils.FormatUtils;
 import java.time.LocalDate;
 import jakarta.annotation.security.PermitAll;
 import org.springframework.security.core.Authentication;
@@ -801,8 +802,10 @@ public class MainLayout extends AppLayout {
                     double pct = unpaid.divide(limit, 4, RoundingMode.HALF_UP).doubleValue() * 100;
                     String key = "card_" + card.getId();
                     if (pct >= 90.0 && warnedKeys.add(key)) {
+                        BigDecimal kalan = limit.subtract(unpaid);
+                        if (kalan.compareTo(BigDecimal.ZERO) < 0) kalan = BigDecimal.ZERO;
                         Notification warn = new Notification(
-                            card.getName() + " kart limiti %" + (int) pct + " dolu!",
+                            card.getName() + " · Kalan limit: " + FormatUtils.formatNumber(kalan) + " ₺ (%" + (int) pct + " dolu)",
                             0, Notification.Position.MIDDLE);
                         warn.addThemeVariants(NotificationVariant.LUMO_ERROR);
                         warn.getElement().getStyle().set("animation", "none").set("transition", "none");
@@ -823,8 +826,10 @@ public class MainLayout extends AppLayout {
                     double pct = spent.divide(budgetLimit, 4, RoundingMode.HALF_UP).doubleValue() * 100;
                     String key = "budget_" + budget.getId();
                     if (pct >= 80.0 && warnedKeys.add(key)) {
+                        BigDecimal kalan = budgetLimit.subtract(spent);
+                        if (kalan.compareTo(BigDecimal.ZERO) < 0) kalan = BigDecimal.ZERO;
                         Notification warn = new Notification(
-                            deptName + " bütçesi %" + (int) pct + " kullanıldı!",
+                            deptName + " bütçesi · Kalan: " + FormatUtils.formatNumber(kalan) + " ₺ / " + FormatUtils.formatNumber(budgetLimit) + " ₺ (%" + (int) pct + " kullanıldı)",
                             0, Notification.Position.MIDDLE);
                         warn.addThemeVariants(NotificationVariant.LUMO_WARNING);
                         warn.getElement().getStyle().set("animation", "none").set("transition", "none");
