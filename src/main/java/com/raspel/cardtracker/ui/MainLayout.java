@@ -761,6 +761,9 @@ public class MainLayout extends AppLayout {
 
                     Button okunduBtn = new Button("Okundu", e -> {
                         noteService.markReminded(note.getId());
+                        Integer rc = (Integer) com.vaadin.flow.server.VaadinSession.getCurrent().getAttribute("notificationsReadCount");
+                        com.vaadin.flow.server.VaadinSession.getCurrent().setAttribute("notificationsReadCount", (rc == null ? 0 : rc) + 1);
+                        updateBellBadge();
                         notifDialog.close();
                     });
                     okunduBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
@@ -778,6 +781,14 @@ public class MainLayout extends AppLayout {
 
     private void checkBudgetWarnings() {
         try {
+            com.vaadin.flow.server.VaadinSession session = com.vaadin.flow.server.VaadinSession.getCurrent();
+            @SuppressWarnings("unchecked")
+            java.util.Set<String> warnedKeys = (java.util.Set<String>) session.getAttribute("warnedBudgetKeys");
+            if (warnedKeys == null) {
+                warnedKeys = new java.util.HashSet<>();
+                session.setAttribute("warnedBudgetKeys", warnedKeys);
+            }
+
             LocalDate now = LocalDate.now();
             int year = now.getYear();
             int month = now.getMonthValue();
@@ -788,7 +799,8 @@ public class MainLayout extends AppLayout {
                 BigDecimal limit = card.getCardLimit();
                 if (limit != null && limit.compareTo(BigDecimal.ZERO) > 0) {
                     double pct = unpaid.divide(limit, 4, RoundingMode.HALF_UP).doubleValue() * 100;
-                    if (pct >= 90.0) {
+                    String key = "card_" + card.getId();
+                    if (pct >= 90.0 && warnedKeys.add(key)) {
                         Notification warn = new Notification(
                             card.getName() + " kart limiti %" + (int) pct + " dolu!",
                             0, Notification.Position.MIDDLE);
@@ -809,7 +821,8 @@ public class MainLayout extends AppLayout {
                 BigDecimal budgetLimit = budget.getBudgetLimit();
                 if (budgetLimit != null && budgetLimit.compareTo(BigDecimal.ZERO) > 0) {
                     double pct = spent.divide(budgetLimit, 4, RoundingMode.HALF_UP).doubleValue() * 100;
-                    if (pct >= 80.0) {
+                    String key = "budget_" + budget.getId();
+                    if (pct >= 80.0 && warnedKeys.add(key)) {
                         Notification warn = new Notification(
                             deptName + " bütçesi %" + (int) pct + " kullanıldı!",
                             0, Notification.Position.MIDDLE);
@@ -835,5 +848,11 @@ public class MainLayout extends AppLayout {
             return pageTitle + " | " + company;
         }
         return pageTitle;
+    }
+
+    private void updateBellBadge() {
+        getUI().ifPresent(ui -> ui.access(() -> {
+            // Bu metot header'daki bell badge'i guncellemek icin placeholder
+        }));
     }
 }
