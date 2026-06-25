@@ -619,6 +619,7 @@ public class MainLayout extends AppLayout {
         injectFabButton();
         checkNoteReminders();
         checkBudgetWarnings();
+        updateBellBadge();
         updateCardDebtSection();
 
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
@@ -634,6 +635,7 @@ public class MainLayout extends AppLayout {
                     try {
                         checkNoteReminders();
                         checkBudgetWarnings();
+                        updateBellBadge();
                     } catch (Exception ignored) {}
                 });
             }
@@ -806,15 +808,16 @@ public class MainLayout extends AppLayout {
                     if (pct >= 90.0 && warnedKeys.add(key)) {
                         BigDecimal kalan = limit.subtract(unpaid);
                         if (kalan.compareTo(BigDecimal.ZERO) < 0) kalan = BigDecimal.ZERO;
-                        Notification warn = new Notification(
-                            card.getName() + " · Kalan limit: " + FormatUtils.formatNumber(kalan) + " ₺ (%" + (int) pct + " dolu)",
-                            0, Notification.Position.MIDDLE);
-                        warn.addThemeVariants(NotificationVariant.LUMO_ERROR);
-                        warn.getElement().getStyle().set("animation", "none").set("transition", "none");
-                        Button closeBtn = new Button("Kapat", ev -> warn.close());
-                        closeBtn.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
-                        warn.add(closeBtn);
-                        warn.open();
+                        Dialog warnDlg = new Dialog();
+                        warnDlg.setHeaderTitle("Limit Uyarısı");
+                        warnDlg.setWidth("380px");
+                        Span msg = new Span(card.getName() + " kartının limiti dolmak üzere.\nKalan: " + FormatUtils.formatNumber(kalan) + " ₺ / " + FormatUtils.formatNumber(limit) + " ₺ (%" + (int) pct + " dolu)");
+                        msg.getStyle().set("white-space", "pre-wrap");
+                        warnDlg.add(msg);
+                        Button closeBtn = new Button("Tamam", ev -> warnDlg.close());
+                        closeBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+                        warnDlg.getFooter().add(closeBtn);
+                        warnDlg.open();
                     }
                 }
             }
@@ -830,15 +833,16 @@ public class MainLayout extends AppLayout {
                     if (pct >= 80.0 && warnedKeys.add(key)) {
                         BigDecimal kalan = budgetLimit.subtract(spent);
                         if (kalan.compareTo(BigDecimal.ZERO) < 0) kalan = BigDecimal.ZERO;
-                        Notification warn = new Notification(
-                            deptName + " bütçesi · Kalan: " + FormatUtils.formatNumber(kalan) + " ₺ / " + FormatUtils.formatNumber(budgetLimit) + " ₺ (%" + (int) pct + " kullanıldı)",
-                            0, Notification.Position.MIDDLE);
-                        warn.addThemeVariants(NotificationVariant.LUMO_WARNING);
-                        warn.getElement().getStyle().set("animation", "none").set("transition", "none");
-                        Button closeBtn = new Button("Kapat", ev -> warn.close());
-                        closeBtn.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
-                        warn.add(closeBtn);
-                        warn.open();
+                        Dialog warnDlg = new Dialog();
+                        warnDlg.setHeaderTitle("Bütçe Uyarısı");
+                        warnDlg.setWidth("380px");
+                        Span msg = new Span(deptName + " bütçesi dolmak üzere.\nKalan: " + FormatUtils.formatNumber(kalan) + " ₺ / " + FormatUtils.formatNumber(budgetLimit) + " ₺ (%" + (int) pct + " kullanıldı)");
+                        msg.getStyle().set("white-space", "pre-wrap");
+                        warnDlg.add(msg);
+                        Button closeBtn = new Button("Tamam", ev -> warnDlg.close());
+                        closeBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+                        warnDlg.getFooter().add(closeBtn);
+                        warnDlg.open();
                     }
                 }
             }
