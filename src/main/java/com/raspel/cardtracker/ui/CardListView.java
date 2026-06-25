@@ -226,6 +226,7 @@ public class CardListView extends VerticalLayout {
         dialog.getFooter().add(closeBtn);
         dialog.add(expenseGrid);
         dialog.open();
+        dialog.getElement().getStyle().set("overflow", "hidden");
     }
 
     private HorizontalLayout createToolbar() {
@@ -424,6 +425,7 @@ public class CardListView extends VerticalLayout {
         dialog.add(form);
         dialog.getFooter().add(cancelBtn, saveBtn);
         dialog.open();
+        dialog.getElement().getStyle().set("overflow", "hidden");
     }
 
     private void deleteCard(Card card) {

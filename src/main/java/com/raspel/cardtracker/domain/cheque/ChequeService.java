@@ -33,6 +33,7 @@ public class ChequeService {
     }
 
     public Cheque save(Cheque cheque) {
+        if (cheque == null) throw new IllegalArgumentException("Çek bilgisi zorunludur");
         boolean isNew = cheque.getId() == null;
         if (cheque.getAmount() == null || cheque.getAmount().compareTo(java.math.BigDecimal.ZERO) <= 0) {
             throw new IllegalArgumentException("Çek tutarı sıfırdan büyük olmalıdır");

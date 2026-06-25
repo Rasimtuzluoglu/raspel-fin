@@ -327,6 +327,7 @@ public class MainLayout extends AppLayout {
         dialog.add(list);
         dialog.getFooter().add(cancelBtn, saveBtn);
         dialog.open();
+        dialog.getElement().getStyle().set("overflow", "hidden");
     }
 
     private void openChangePasswordDialog() {
@@ -386,6 +387,7 @@ public class MainLayout extends AppLayout {
         dialog.add(form);
         dialog.getFooter().add(cancelBtn, saveBtn);
         dialog.open();
+        dialog.getElement().getStyle().set("overflow", "hidden");
     }
 
     private void openShortcutsDialog() {
@@ -426,6 +428,7 @@ public class MainLayout extends AppLayout {
         dialog.add(layout);
         dialog.getFooter().add(closeBtn);
         dialog.open();
+        dialog.getElement().getStyle().set("overflow", "hidden");
     }
 
     private void addDrawerContent() {

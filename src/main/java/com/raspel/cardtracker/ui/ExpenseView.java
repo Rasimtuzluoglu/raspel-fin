@@ -594,6 +594,7 @@ public class ExpenseView extends VerticalLayout {
         dialog.add(formContainer);
         dialog.getFooter().add(cancelBtn, saveBtn);
         dialog.open();
+        dialog.getElement().getStyle().set("overflow", "hidden");
     }
 
 
@@ -631,6 +632,7 @@ public class ExpenseView extends VerticalLayout {
         closeBtn.addClickShortcut(com.vaadin.flow.component.Key.ESCAPE);
         dialog.getFooter().add(closeBtn);
         dialog.open();
+        dialog.getElement().getStyle().set("overflow", "hidden");
     }
 
     private void openImportDialog() {
@@ -685,6 +687,7 @@ public class ExpenseView extends VerticalLayout {
         closeBtn.addClickShortcut(com.vaadin.flow.component.Key.ESCAPE);
         dialog.getFooter().add(closeBtn);
         dialog.open();
+        dialog.getElement().getStyle().set("overflow", "hidden");
     }
 
     private void refreshGrid() {

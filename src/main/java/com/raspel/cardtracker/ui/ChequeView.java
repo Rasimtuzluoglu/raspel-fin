@@ -487,6 +487,7 @@ public class ChequeView extends VerticalLayout {
         dialog.add(form);
         dialog.getFooter().add(cancelBtn, saveBtn);
         dialog.open();
+        dialog.getElement().getStyle().set("overflow", "hidden");
     }
 
     private void openQuickContactDialog(ComboBox<Contact> parentField) {
@@ -582,6 +583,7 @@ public class ChequeView extends VerticalLayout {
         dialog.add(timeline);
         dialog.getFooter().add(closeBtn);
         dialog.open();
+        dialog.getElement().getStyle().set("overflow", "hidden");
     }
 
     private void deleteCheque(Cheque cheque) {

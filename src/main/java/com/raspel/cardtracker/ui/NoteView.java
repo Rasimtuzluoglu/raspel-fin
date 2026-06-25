@@ -257,6 +257,7 @@ public class NoteView extends VerticalLayout {
         dialog.add(dialogContent);
         dialog.getFooter().add(cancelBtn, saveBtn);
         dialog.open();
+        dialog.getElement().getStyle().set("overflow", "hidden");
     }
 
     private Div createNoteCard(Note note) {

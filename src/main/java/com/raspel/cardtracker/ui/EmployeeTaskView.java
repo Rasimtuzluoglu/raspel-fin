@@ -356,6 +356,7 @@ public class EmployeeTaskView extends VerticalLayout {
         dialog.add(form);
         dialog.getFooter().add(cancelBtn, saveBtn);
         dialog.open();
+        dialog.getElement().getStyle().set("overflow", "hidden");
     }
 
     private void openTaskDialog(EmployeeTask task) {
@@ -433,6 +434,7 @@ public class EmployeeTaskView extends VerticalLayout {
         dialog.add(form);
         dialog.getFooter().add(cancelBtn, saveBtn);
         dialog.open();
+        dialog.getElement().getStyle().set("overflow", "hidden");
     }
 
     private void configureEmptyStates() {

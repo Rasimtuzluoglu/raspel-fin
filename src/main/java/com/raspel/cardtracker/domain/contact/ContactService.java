@@ -36,6 +36,7 @@ public class ContactService {
     }
 
     public Contact save(Contact contact) {
+        if (contact == null) throw new IllegalArgumentException("Cari bilgisi zorunludur");
         boolean isNew = contact.getId() == null;
         Contact saved = contactRepository.save(contact);
         auditLogService.log(

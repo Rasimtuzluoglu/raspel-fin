@@ -183,6 +183,7 @@ public class UserManagementView extends VerticalLayout {
         dialog.add(form);
         dialog.getFooter().add(cancelBtn, saveBtn);
         dialog.open();
+        dialog.getElement().getStyle().set("overflow", "hidden");
     }
 
     private void openPasswordResetDialog(AppUser user) {
@@ -237,6 +238,7 @@ public class UserManagementView extends VerticalLayout {
         dialog.add(form);
         dialog.getFooter().add(cancelBtn, saveBtn);
         dialog.open();
+        dialog.getElement().getStyle().set("overflow", "hidden");
     }
 
     private void configureEmptyState() {

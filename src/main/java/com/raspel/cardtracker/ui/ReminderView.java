@@ -355,6 +355,7 @@ public class ReminderView extends VerticalLayout {
         dialog.add(form);
         dialog.getFooter().add(closeBtn);
         dialog.open();
+        dialog.getElement().getStyle().set("overflow", "hidden");
     }
 
     private void showInstallmentsContent() {

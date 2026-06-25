@@ -33,6 +33,7 @@ public class DepartmentService {
     }
 
     public Department save(Department department) {
+        if (department == null) throw new IllegalArgumentException("Departman bilgisi zorunludur");
         boolean isNew = department.getId() == null;
         Department saved = departmentRepository.save(department);
         auditLogService.log(isNew ? AuditAction.CREATE : AuditAction.UPDATE, "Departman", saved.getId(),

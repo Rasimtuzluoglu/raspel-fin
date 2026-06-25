@@ -290,6 +290,7 @@ public class ContactView extends VerticalLayout {
 
         dialog.add(form);
         dialog.open();
+        dialog.getElement().getStyle().set("overflow", "hidden");
     }
 
     private void deleteContact(Contact contact) {

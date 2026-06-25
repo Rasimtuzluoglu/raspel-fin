@@ -34,6 +34,7 @@ public class CardService {
     }
 
     public Card save(Card card) {
+        if (card == null) throw new IllegalArgumentException("Kart bilgisi zorunludur");
         boolean isNew = card.getId() == null;
         Card saved = cardRepository.save(card);
         auditLogService.log(
