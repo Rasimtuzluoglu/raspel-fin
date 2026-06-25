@@ -63,6 +63,7 @@ public class MainLayout extends AppLayout {
     private H2 viewTitle;
     private VerticalLayout cardDebtList;
     private Span alertBadge;
+    private Icon bellIcon;
 
     public MainLayout(CardService cardService, ExpenseService expenseService, PaymentReminderService reminderService, UserService userService, NoteService noteService, DepartmentBudgetService departmentBudgetService, AppSettingsService appSettingsService) {
         this.cardService = cardService;
@@ -181,6 +182,7 @@ public class MainLayout extends AppLayout {
 
         // Zil bildirimi - her zaman header'da kalır, sayıya göre görünür/gizlenir
         Icon bellIcon = new Icon(VaadinIcon.BELL);
+        this.bellIcon = bellIcon;
         bellIcon.getStyle().set("color", "var(--lumo-tertiary-text-color)");
         
         Span alertBadge = new Span("0");
@@ -874,6 +876,9 @@ public class MainLayout extends AppLayout {
                 if (alertBadge != null) {
                     alertBadge.setText(String.valueOf(unread));
                     alertBadge.setVisible(unread > 0);
+                }
+                if (bellIcon != null) {
+                    bellIcon.getStyle().set("color", unread > 0 ? "var(--lumo-error-color)" : "var(--lumo-tertiary-text-color)");
                 }
             } catch (Exception ignored) {}
         }));
