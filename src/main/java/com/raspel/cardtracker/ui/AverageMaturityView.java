@@ -89,7 +89,7 @@ public class AverageMaturityView extends VerticalLayout {
                 Notification.show(currentRows.size() + " işlem okundu.", 3000, Notification.Position.BOTTOM_CENTER)
                         .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
             } catch (Exception ex) {
-                Notification.show("Dosya okunamadı: " + ex.getMessage(), 5000, Notification.Position.MIDDLE)
+                Notification.show("Dosya okunamadı, lütfen formatı kontrol edin.", 5000, Notification.Position.MIDDLE)
                         .addThemeVariants(NotificationVariant.LUMO_ERROR);
             }
         });

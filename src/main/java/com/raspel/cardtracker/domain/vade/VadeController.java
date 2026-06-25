@@ -37,7 +37,7 @@ public class VadeController {
                     "islemSayisi", items.size()
             ));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(java.util.Map.of("hata", e.getMessage()));
+            return ResponseEntity.badRequest().body(java.util.Map.of("hata", "Dosya işlenemedi, lütfen formatı kontrol edin."));
         }
     }
 }

@@ -242,7 +242,7 @@ public class ProfileView extends VerticalLayout {
                     anchor.getElement().executeJs("this.click()");
                     getUI().ifPresent(ui -> ui.getPage().executeJs("setTimeout(function(){arguments[0].remove()},1000)", anchor.getElement()));
                 } catch (Exception ex) {
-                    Notification.show("Yedek alınamadı: " + ex.getMessage(), 5000, Notification.Position.MIDDLE)
+                    Notification.show("Yedek alınamadı, lütfen daha sonra tekrar deneyin.", 5000, Notification.Position.MIDDLE)
                             .addThemeVariants(NotificationVariant.LUMO_ERROR);
                 }
             });
@@ -288,7 +288,7 @@ public class ProfileView extends VerticalLayout {
                         Notification.show("Veritabanı başarıyla geri yüklendi.", 4000, Notification.Position.MIDDLE)
                                 .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
                     } catch (Exception ex) {
-                        Notification.show("Geri yükleme başarısız: " + ex.getMessage(), 6000, Notification.Position.MIDDLE)
+                        Notification.show("Geri yükleme başarısız, lütfen daha sonra tekrar deneyin.", 6000, Notification.Position.MIDDLE)
                                 .addThemeVariants(NotificationVariant.LUMO_ERROR);
                     }
                     confirm.close();
