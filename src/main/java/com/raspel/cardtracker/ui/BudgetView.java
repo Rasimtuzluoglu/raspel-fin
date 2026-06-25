@@ -426,6 +426,7 @@ public class BudgetView extends VerticalLayout {
         dialog.setHeaderTitle(deptName + " - Bütçeden Harca");
         dialog.setWidth("480px");
         dialog.getElement().getStyle().set("overflow", "hidden").set("max-height", "90vh");
+        dialog.getElement().executeJs("this.$.overlay.style.overflow='hidden'");
 
         FormLayout form = new FormLayout();
 
@@ -452,7 +453,7 @@ public class BudgetView extends VerticalLayout {
         TextArea descField = new TextArea("Açıklama");
         descField.setPlaceholder("Harcama açıklaması...");
         descField.setWidthFull();
-        descField.getStyle().set("min-height", "60px").set("max-height", "80px");
+        descField.getStyle().set("min-height", "60px").set("max-height", "80px").set("overflow-x", "hidden");
 
         TextField amountField = new TextField("Tutar (TL)");
         amountField.setValue("0,00");
