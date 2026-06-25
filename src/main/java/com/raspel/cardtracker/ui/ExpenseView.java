@@ -38,6 +38,8 @@ import com.raspel.cardtracker.domain.expense.PdfExportService;
 import com.raspel.cardtracker.domain.expense.InstallmentEntry;
 import com.raspel.cardtracker.domain.contact.Contact;
 import com.raspel.cardtracker.domain.contact.ContactService;
+import com.raspel.cardtracker.domain.department.Department;
+import com.raspel.cardtracker.domain.department.DepartmentService;
 import com.vaadin.flow.component.html.Anchor;
 import com.vaadin.flow.server.StreamResource;
 import jakarta.annotation.security.PermitAll;
@@ -60,6 +62,7 @@ public class ExpenseView extends VerticalLayout {
     private final ExcelImportService excelImportService;
     private final ExcelExportService excelExportService;
     private final PdfExportService pdfExportService;
+    private final DepartmentService departmentService;
 
     private final Grid<InstallmentEntry> grid = new Grid<>(InstallmentEntry.class, false);
     private final ComboBox<Integer> yearFilter = new ComboBox<>("Yıl");
@@ -71,13 +74,14 @@ public class ExpenseView extends VerticalLayout {
 
     public ExpenseView(ExpenseService expenseService, CardService cardService, ContactService contactService,
                        ExcelImportService excelImportService, ExcelExportService excelExportService,
-                       PdfExportService pdfExportService) {
+                       PdfExportService pdfExportService, DepartmentService departmentService) {
         this.expenseService = expenseService;
         this.cardService = cardService;
         this.contactService = contactService;
         this.excelImportService = excelImportService;
         this.excelExportService = excelExportService;
         this.pdfExportService = pdfExportService;
+        this.departmentService = departmentService;
 
         addClassName("expense-view");
         setSizeFull();
@@ -436,10 +440,11 @@ public class ExpenseView extends VerticalLayout {
         turkishI18n.setFirstDayOfWeek(1); // Pazartesi
         dateField.setI18n(turkishI18n);
 
-        ComboBox<String> tagField = new ComboBox<>("Etiket");
-        tagField.setItems("Zorunlu", "İsteğe Bağlı", "Ertelenebilir");
-        tagField.setClearButtonVisible(true);
-        tagField.setWidthFull();
+        ComboBox<Department> deptField = new ComboBox<>("Departman");
+        deptField.setItems(departmentService.findAllActive());
+        deptField.setItemLabelGenerator(Department::getName);
+        deptField.setClearButtonVisible(true);
+        deptField.setWidthFull();
 
         // Fiş/Fatura Yükleme (Upload) Bölümü
         MemoryBuffer buffer = new MemoryBuffer();
@@ -500,13 +505,13 @@ public class ExpenseView extends VerticalLayout {
             installmentField.setValue(expenseToEdit.getInstallments() != null ? expenseToEdit.getInstallments() : 1);
             dateField.setValue(expenseToEdit.getExpenseDate() != null ? expenseToEdit.getExpenseDate() : LocalDate.now());
             categoryField.setValue(expenseToEdit.getCategory());
-            tagField.setValue(expenseToEdit.getTag());
+            deptField.setValue(expenseToEdit.getCard() != null ? expenseToEdit.getCard().getDepartment() : null);
             uploadedPath[0] = expenseToEdit.getReceiptPath();
             uploadedContentType[0] = expenseToEdit.getReceiptContentType();
         }
 
         // Form düzeni
-        form.add(cardField, contactField, descField, amountField, currencyField, installmentField, dateField, categoryField, tagField);
+        form.add(cardField, contactField, descField, amountField, currencyField, installmentField, dateField, categoryField, deptField);
         
         VerticalLayout formContainer = new VerticalLayout(form, new Span("Belge Eki (Opsiyonel / Akıllı Tarama)"), uploadField);
         formContainer.setPadding(false);
@@ -542,7 +547,9 @@ public class ExpenseView extends VerticalLayout {
             targetExpense.setInstallments(installmentField.getValue() != null ? installmentField.getValue() : 1);
             targetExpense.setExpenseDate(dateField.getValue());
             targetExpense.setCategory(categoryField.getValue());
-            targetExpense.setTag(tagField.getValue());
+            if (deptField.getValue() != null && targetExpense.getCard() != null) {
+                targetExpense.getCard().setDepartment(deptField.getValue());
+            }
 
             if (isEdit) {
                 try {

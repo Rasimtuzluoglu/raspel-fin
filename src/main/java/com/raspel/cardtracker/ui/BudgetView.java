@@ -425,6 +425,7 @@ public class BudgetView extends VerticalLayout {
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle(deptName + " - Bütçeden Harca");
         dialog.setWidth("480px");
+        dialog.getElement().getStyle().set("overflow", "hidden").set("max-height", "90vh");
 
         FormLayout form = new FormLayout();
 
