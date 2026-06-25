@@ -62,6 +62,7 @@ public class MainLayout extends AppLayout {
     private final AppSettingsService appSettingsService;
     private H2 viewTitle;
     private VerticalLayout cardDebtList;
+    private Span alertBadge;
 
     public MainLayout(CardService cardService, ExpenseService expenseService, PaymentReminderService reminderService, UserService userService, NoteService noteService, DepartmentBudgetService departmentBudgetService, AppSettingsService appSettingsService) {
         this.cardService = cardService;
@@ -183,6 +184,7 @@ public class MainLayout extends AppLayout {
         bellIcon.getStyle().set("color", "var(--lumo-tertiary-text-color)");
         
         Span alertBadge = new Span("0");
+        this.alertBadge = alertBadge;
         alertBadge.getElement().getThemeList().add("badge error pill");
         alertBadge.getStyle().set("font-size", "0.75em").set("padding", "0.2em 0.5em");
         alertBadge.setVisible(false);
@@ -857,7 +859,19 @@ public class MainLayout extends AppLayout {
 
     private void updateBellBadge() {
         getUI().ifPresent(ui -> ui.access(() -> {
-            // Bu metot header'daki bell badge'i guncellemek icin placeholder
+            try {
+                int total = 0;
+                int readCount = 0;
+                Integer rc = (Integer) com.vaadin.flow.server.VaadinSession.getCurrent().getAttribute("notificationsReadCount");
+                if (rc != null) readCount = rc;
+                PaymentReminderService.ReminderSummary s = reminderService.getReminderSummary();
+                total = s.getTotalCount();
+                int unread = Math.max(0, total - readCount);
+                if (alertBadge != null) {
+                    alertBadge.setText(String.valueOf(unread));
+                    alertBadge.setVisible(unread > 0);
+                }
+            } catch (Exception ignored) {}
         }));
     }
 }
