@@ -599,7 +599,7 @@ public class MainLayout extends AppLayout {
                 .set("padding", "var(--lumo-space-m)")
                 .set("border-top", "1px solid var(--lumo-contrast-10pct)");
 
-        Span copyright = new Span("© 2026 RasPel");
+        Span copyright = new Span("© 2026 RasPel Co.");
         copyright.getStyle()
                 .set("font-size", "0.8em")
                 .set("font-weight", "600")

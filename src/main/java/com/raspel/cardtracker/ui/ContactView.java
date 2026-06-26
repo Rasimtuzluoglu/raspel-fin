@@ -261,6 +261,18 @@ public class ContactView extends VerticalLayout {
                         .addThemeVariants(NotificationVariant.LUMO_ERROR);
                 return;
             }
+            String ph = phoneField.getValue().replaceAll("[\\s-]", "");
+            if (!ph.isEmpty() && !ph.matches("^(05\\d{9}|5\\d{9})$")) {
+                Notification.show("Geçersiz telefon. Örn: 05321234567", 3000, Notification.Position.MIDDLE)
+                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                return;
+            }
+            String em = emailField.getValue().trim();
+            if (!em.isEmpty() && !em.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
+                Notification.show("Geçersiz e-posta. Örn: ornek@firma.com", 3000, Notification.Position.MIDDLE)
+                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                return;
+            }
 
             Contact contact = contactToEdit != null ? contactToEdit : new Contact();
             contact.setName(nameField.getValue().trim());

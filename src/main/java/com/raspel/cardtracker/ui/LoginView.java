@@ -59,7 +59,7 @@ public class LoginView extends VerticalLayout implements BeforeEnterObserver {
                 .set("text-shadow", "0 1px 2px rgba(0,0,0,0.2)")
                 .set("margin-top", "0.5em");
 
-        Paragraph footerText = new Paragraph("© 2026 RasPel | Yazılım: Rasim Tuzluoğlu");
+        Paragraph footerText = new Paragraph("© 2026 RasPel Co. | Yazılım: Rasim Tuzluoğlu");
         footerText.getStyle()
                 .set("font-size", "0.85em")
                 .set("color", "rgba(255, 255, 255, 0.65)")
