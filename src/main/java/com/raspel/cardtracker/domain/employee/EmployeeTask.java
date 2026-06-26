@@ -52,4 +52,13 @@ public class EmployeeTask {
 
     @Column(name = "created_by", length = 50)
     private String createdBy;
+
+    @Column(name = "atayan_user_id")
+    private Long atayanUserId;
+
+    @Column(name = "tamamlayan_user_id")
+    private Long tamamlayanUserId;
+
+    @Column(name = "tamamlanma_tarihi")
+    private LocalDateTime tamamlanmaTarihi;
 }
