@@ -2,10 +2,10 @@ package com.raspel.cardtracker.config;
 
 import com.raspel.cardtracker.domain.user.AppUser;
 import com.raspel.cardtracker.domain.user.UserRepository;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
+import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
@@ -15,17 +15,16 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import java.util.Optional;
 
 @Component
-@ConditionalOnProperty(name = "TELEGRAM_BOT_TOKEN")
+@ConditionalOnExpression("T(org.springframework.util.StringUtils).hasText(environment.getProperty('TELEGRAM_BOT_TOKEN'))")
 @Slf4j
 public class TelegramBotService extends TelegramLongPollingBot {
 
     private final UserRepository userRepository;
+    private final Environment environment;
 
-    @Value("${TELEGRAM_BOT_TOKEN:}")
-    private String botToken;
-
-    public TelegramBotService(UserRepository userRepository) {
+    public TelegramBotService(UserRepository userRepository, Environment environment) {
         this.userRepository = userRepository;
+        this.environment = environment;
     }
 
     @Override
@@ -35,7 +34,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
 
     @Override
     public String getBotToken() {
-        return botToken;
+        return environment.getProperty("TELEGRAM_BOT_TOKEN");
     }
 
     @Override
