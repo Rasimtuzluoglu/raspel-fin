@@ -10,4 +10,5 @@ uploads/
 backups/
 .vscode/
 *.log
+logs/
 
