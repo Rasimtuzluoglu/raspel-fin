@@ -33,9 +33,10 @@ public class AppUser {
     @Column(name = "full_name", length = 100)
     private String fullName;
 
+    @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
     @Builder.Default
-    private String role = "USER";
+    private Role role = Role.USER;
 
     @Column(nullable = false)
     @Builder.Default
@@ -61,4 +62,10 @@ public class AppUser {
     @Column(name = "dark_mode", nullable = false)
     @Builder.Default
     private Boolean darkMode = false;
+
+    @Column(name = "telegram_chat_id", unique = true)
+    private Long telegramChatId;
+
+    @Column(name = "telegram_verification_code", length = 20)
+    private String telegramVerificationCode;
 }

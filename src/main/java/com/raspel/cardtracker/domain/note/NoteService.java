@@ -21,22 +21,27 @@ public class NoteService {
         this.auditLogService = auditLogService;
     }
 
+    @Transactional(readOnly = true)
     public List<Note> findAllByUser(String username) {
         return noteRepository.findByCreatedByOrderByPinnedDescUpdatedAtDesc(username);
     }
 
+    @Transactional(readOnly = true)
     public List<Note> findByCategory(String username, String category) {
         return noteRepository.findByCreatedByAndCategoryOrderByPinnedDescUpdatedAtDesc(username, category);
     }
 
+    @Transactional(readOnly = true)
     public List<Note> search(String username, String term) {
         return noteRepository.searchByTerm(username, term);
     }
 
+    @Transactional(readOnly = true)
     public List<Note> searchByTermAndCategory(String username, String term, String category) {
         return noteRepository.searchByTermAndCategory(username, term, category);
     }
 
+    @Transactional(readOnly = true)
     public List<String> getCategories(String username) {
         return noteRepository.findDistinctCategoriesByCreatedBy(username);
     }
@@ -50,6 +55,7 @@ public class NoteService {
         return saved;
     }
 
+    @Transactional(readOnly = true)
     public Optional<Note> findById(Long id) {
         return noteRepository.findById(id);
     }
@@ -69,6 +75,7 @@ public class NoteService {
         });
     }
 
+    @Transactional(readOnly = true)
     public List<Note> getDueReminders(String username) {
         return noteRepository.findDueReminders(username, LocalDateTime.now());
     }

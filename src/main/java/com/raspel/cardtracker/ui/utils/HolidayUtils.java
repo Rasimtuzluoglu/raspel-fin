@@ -159,6 +159,51 @@ public class HolidayUtils {
             return true;
         }
 
+        // 2037 sonrası için yaklaşık hesaplama (lunar yıl bazlı tahmin)
+        if (date.getYear() > 2036) {
+            return isApproximateReligiousHoliday(date);
+        }
+
+        return false;
+    }
+
+    /**
+     * 2037 ve sonrası için dini bayramları yaklaşık olarak tahmin eder.
+     * Hicri takvim baz alınır, dini bayramlar her yıl yaklaşık 10-11 gün geri gelir.
+     */
+    private static boolean isApproximateReligiousHoliday(LocalDate date) {
+        // 2036 Ramazan Bayramı başlangıcı (referans noktası)
+        LocalDate refRamazan2036 = LocalDate.of(2036, 11, 19);
+        // 2036 Kurban Bayramı başlangıcı
+        LocalDate refKurban2036 = LocalDate.of(2036, 2, 4);
+
+        int yearDiff = date.getYear() - 2036;
+
+        // Her yıl yaklaşık 10.8 gün geri gelir (lunar year offset)
+        int ramazanOffset = (int) Math.round(yearDiff * 10.875);
+        LocalDate estimatedRamazanStart = refRamazan2036.minusDays(ramazanOffset);
+
+        int kurbanOffset = (int) Math.round(yearDiff * 10.875);
+        LocalDate estimatedKurbanStart = refKurban2036.minusDays(kurbanOffset);
+
+        // Ramazan Bayramı 3 gün
+        if (!date.isBefore(estimatedRamazanStart) && !date.isAfter(estimatedRamazanStart.plusDays(2))) {
+            return true;
+        }
+        // Ramazan Bayramı arife (1 gün öncesi)
+        if (date.equals(estimatedRamazanStart.minusDays(1))) {
+            return true;
+        }
+
+        // Kurban Bayramı 4 gün
+        if (!date.isBefore(estimatedKurbanStart) && !date.isAfter(estimatedKurbanStart.plusDays(3))) {
+            return true;
+        }
+        // Kurban Bayramı arife (1 gün öncesi)
+        if (date.equals(estimatedKurbanStart.minusDays(1))) {
+            return true;
+        }
+
         return false;
     }
 

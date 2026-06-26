@@ -19,14 +19,17 @@ public class EmployeeService {
 
     // --- EMPLOYEE METHODS ---
 
+    @Transactional(readOnly = true)
     public List<Employee> findAllEmployees() {
         return employeeRepository.findAll();
     }
 
+    @Transactional(readOnly = true)
     public List<Employee> findAllActiveEmployees() {
         return employeeRepository.findAllByActiveTrue();
     }
 
+    @Transactional(readOnly = true)
     public Optional<Employee> findEmployeeById(Long id) {
         return employeeRepository.findById(id);
     }
@@ -52,10 +55,12 @@ public class EmployeeService {
 
     // --- TASK METHODS ---
 
+    @Transactional(readOnly = true)
     public List<EmployeeTask> findAllTasks() {
         return employeeTaskRepository.findAllWithEmployee();
     }
 
+    @Transactional(readOnly = true)
     public Optional<EmployeeTask> findTaskById(Long id) {
         return employeeTaskRepository.findById(id);
     }

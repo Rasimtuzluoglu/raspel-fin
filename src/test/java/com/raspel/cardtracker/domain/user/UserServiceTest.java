@@ -34,10 +34,10 @@ class UserServiceTest {
     @Test
     void createUser_shouldCreateUserWithValidData() {
         String username = "testuser";
-        String rawPassword = "securepass";
-        String encodedPassword = "encoded_securepass";
+        String rawPassword = "Secure1Pass";
+        String encodedPassword = "encoded_Secure1Pass";
         String fullName = "Test User";
-        String role = "USER";
+        Role role = Role.USER;
 
         when(userRepository.existsByUsername(username)).thenReturn(false);
         when(passwordEncoder.encode(rawPassword)).thenReturn(encodedPassword);
@@ -67,39 +67,39 @@ class UserServiceTest {
 
     @Test
     void createUser_shouldThrowWhenPasswordIsNull() {
-        assertThatThrownBy(() -> userService.createUser("testuser", null, "Full Name", "USER"))
+        assertThatThrownBy(() -> userService.createUser("testuser", null, "Full Name", Role.USER))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Şifre en az 4 karakter olmalıdır");
+                .hasMessageContaining("en az");
     }
 
     @Test
     void createUser_shouldThrowWhenPasswordIsTooShort() {
-        assertThatThrownBy(() -> userService.createUser("testuser", "ab", "Full Name", "USER"))
+        assertThatThrownBy(() -> userService.createUser("testuser", "Ab1", "Full Name", Role.USER))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("Şifre en az 4 karakter olmalıdır");
+                .hasMessageContaining("en az");
     }
 
     @Test
     void createUser_shouldThrowWhenUsernameAlreadyExists() {
         when(userRepository.existsByUsername("existinguser")).thenReturn(true);
 
-        assertThatThrownBy(() -> userService.createUser("existinguser", "password", "Full Name", "USER"))
+        assertThatThrownBy(() -> userService.createUser("existinguser", "Password1", "Full Name", Role.USER))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("Bu kullanıcı adı zaten kullanılıyor");
     }
 
     @Test
     void createUser_shouldEncodePasswordBeforeSaving() {
-        String rawPassword = "mypassword";
+        String rawPassword = "Mypassword1";
         when(userRepository.existsByUsername(anyString())).thenReturn(false);
-        when(passwordEncoder.encode(rawPassword)).thenReturn("encoded_mypassword");
+        when(passwordEncoder.encode(rawPassword)).thenReturn("encoded_Mypassword1");
         when(userRepository.save(any(AppUser.class))).thenAnswer(inv -> inv.getArgument(0));
 
-        userService.createUser("newuser", rawPassword, "New User", "USER");
+        userService.createUser("newuser", rawPassword, "New User", Role.USER);
 
         ArgumentCaptor<AppUser> captor = ArgumentCaptor.forClass(AppUser.class);
         verify(userRepository).save(captor.capture());
-        assertThat(captor.getValue().getPassword()).isEqualTo("encoded_mypassword");
+        assertThat(captor.getValue().getPassword()).isEqualTo("encoded_Mypassword1");
         assertThat(captor.getValue().getPassword()).isNotEqualTo(rawPassword);
     }
 
@@ -110,7 +110,7 @@ class UserServiceTest {
                 .id(1L)
                 .username(username)
                 .password("hashedpassword")
-                .role("USER")
+                .role(Role.USER)
                 .active(true)
                 .build();
 
@@ -142,7 +142,7 @@ class UserServiceTest {
                 .id(1L)
                 .username("inactive")
                 .password("hashed")
-                .role("USER")
+                .role(Role.USER)
                 .active(false)
                 .build();
 

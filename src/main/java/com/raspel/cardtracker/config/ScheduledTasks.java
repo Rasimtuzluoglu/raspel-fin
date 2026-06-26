@@ -36,7 +36,12 @@ public class ScheduledTasks {
                     companySlug,
                     lastMonth.format(DateTimeFormatter.ofPattern("yyyy_MM")));
 
-            Path reportDir = Paths.get(System.getProperty("user.home"), "cardtracker", "reports");
+            // Docker ortamında REPORTS_DIR env değişkeni kullanılır; yoksa /app/reports'a fallback yapılır
+            String reportDirStr = System.getenv("REPORTS_DIR");
+            if (reportDirStr == null || reportDirStr.isBlank()) {
+                reportDirStr = "/app/reports";
+            }
+            Path reportDir = Paths.get(reportDirStr);
             if (!Files.exists(reportDir)) {
                 Files.createDirectories(reportDir);
             }

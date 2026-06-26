@@ -24,6 +24,8 @@ import com.vaadin.flow.component.textfield.IntegerField;
 import com.vaadin.flow.component.textfield.TextField;
 import com.raspel.cardtracker.ui.utils.FormatUtils;
 import com.raspel.cardtracker.ui.utils.HolidayUtils;
+import com.raspel.cardtracker.ui.utils.TurkishDatePickerI18n;
+import com.raspel.cardtracker.ui.utils.CategoryConstants;
 import com.vaadin.flow.component.upload.Upload;
 import com.vaadin.flow.component.upload.receivers.MemoryBuffer;
 import com.vaadin.flow.router.PageTitle;
@@ -156,6 +158,7 @@ public class ExpenseView extends VerticalLayout {
         }).setHeader("Taksit").setSortable(true).setAutoWidth(true);
 
         grid.addColumn(entry -> {
+            if (entry.getExpense().getCard() == null) return "-";
             YearMonth ym = YearMonth.of(entry.getDueYear(), entry.getDueMonth());
             int cd = Math.min(entry.getExpense().getCard().getClosingDay(), ym.lengthOfMonth());
             return HolidayUtils.getNextBusinessDay(
@@ -173,6 +176,10 @@ public class ExpenseView extends VerticalLayout {
         grid.addComponentColumn(entry -> {
             String receiptPath = entry.getExpense().getReceiptPath();
             if (receiptPath != null && !receiptPath.trim().isEmpty()) {
+                String validatedPath = validateReceiptPath(receiptPath);
+                if (validatedPath == null) {
+                    return new Span("-");
+                }
                 Anchor downloadAnchor = new Anchor();
                 downloadAnchor.getElement().setAttribute("download", true);
                 Button downloadBtn = new Button(new Icon(VaadinIcon.DOWNLOAD_ALT));
@@ -180,14 +187,14 @@ public class ExpenseView extends VerticalLayout {
                 downloadBtn.getElement().setAttribute("title", "İndir");
                 downloadAnchor.add(downloadBtn);
                 downloadAnchor.setHref(new StreamResource(
-                    new java.io.File(receiptPath).getName(),
-                    () -> { try { return java.nio.file.Files.newInputStream(java.nio.file.Paths.get(receiptPath)); }
+                    new java.io.File(validatedPath).getName(),
+                    () -> { try { return java.nio.file.Files.newInputStream(java.nio.file.Paths.get(validatedPath)); }
                             catch (Exception ex) { return null; } }));
 
                 Button previewBtn = new Button(new Icon(VaadinIcon.EYE));
                 previewBtn.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
                 previewBtn.getElement().setAttribute("title", "Önizleme");
-                previewBtn.addClickListener(e -> openReceiptPreview(receiptPath));
+                previewBtn.addClickListener(e -> openReceiptPreview(validatedPath));
 
                 HorizontalLayout actions = new HorizontalLayout(downloadAnchor, previewBtn);
                 actions.setSpacing(false);
@@ -393,7 +400,7 @@ public class ExpenseView extends VerticalLayout {
         contactField.setWidthFull();
 
         ComboBox<String> categoryField = new ComboBox<>("Kategori");
-        categoryField.setItems("Ofis Giderleri", "Seyahat", "Tedarik", "IT", "Yemek", "Yakıt", "Genel");
+        categoryField.setItems(CategoryConstants.EXPENSE_CATEGORIES);
         categoryField.setAllowCustomValue(true);
         categoryField.addCustomValueSetListener(e -> categoryField.setValue(e.getDetail()));
 
@@ -427,18 +434,11 @@ public class ExpenseView extends VerticalLayout {
         DatePicker dateField = new DatePicker("Harcama Tarihi");
         dateField.setValue(LocalDate.now());
         dateField.setRequired(true);
-        DatePicker.DatePickerI18n turkishI18n = new DatePicker.DatePickerI18n();
-        turkishI18n.setDateFormat("dd/MM/yyyy");
-        turkishI18n.setMonthNames(List.of("Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"));
-        turkishI18n.setWeekdays(List.of("Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"));
-        turkishI18n.setWeekdaysShort(List.of("Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"));
-        turkishI18n.setToday("Bugün");
-        turkishI18n.setCancel("İptal");
-        turkishI18n.setFirstDayOfWeek(1); // Pazartesi
+        DatePicker.DatePickerI18n turkishI18n = TurkishDatePickerI18n.get();
         dateField.setI18n(turkishI18n);
 
         ComboBox<String> tagField = new ComboBox<>("Etiket");
-        tagField.setItems("Zorunlu", "İsteğe Bağlı", "Ertelenebilir");
+        tagField.setItems(CategoryConstants.EXPENSE_TAGS);
         tagField.setClearButtonVisible(true);
         tagField.setWidthFull();
 
@@ -762,5 +762,19 @@ public class ExpenseView extends VerticalLayout {
 
         confirmDialog.getFooter().add(cancelBtn, confirmBtn);
         confirmDialog.open();
+    }
+
+    private String validateReceiptPath(String receiptPath) {
+        if (receiptPath == null || receiptPath.trim().isEmpty()) return null;
+        try {
+            java.nio.file.Path path = java.nio.file.Paths.get(receiptPath).toRealPath();
+            java.nio.file.Path uploadsDir = java.nio.file.Paths.get("uploads").toRealPath();
+            if (!path.startsWith(uploadsDir)) {
+                return null;
+            }
+            return path.toString();
+        } catch (Exception ex) {
+            return null;
+        }
     }
 }

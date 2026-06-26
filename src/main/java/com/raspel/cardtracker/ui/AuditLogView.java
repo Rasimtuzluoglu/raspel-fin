@@ -21,6 +21,7 @@ import com.vaadin.flow.router.Route;
 import com.raspel.cardtracker.domain.audit.AuditAction;
 import com.raspel.cardtracker.domain.audit.AuditLog;
 import com.raspel.cardtracker.domain.audit.AuditLogService;
+import com.raspel.cardtracker.ui.utils.TurkishDatePickerI18n;
 import jakarta.annotation.security.RolesAllowed;
 
 import java.time.LocalDateTime;
@@ -87,14 +88,7 @@ public class AuditLogView extends VerticalLayout {
         entityTypeFilter.setClearButtonVisible(true);
         entityTypeFilter.addValueChangeListener(e -> refreshGrid());
 
-        DatePicker.DatePickerI18n turkishI18n = new DatePicker.DatePickerI18n();
-        turkishI18n.setDateFormat("dd/MM/yyyy");
-        turkishI18n.setMonthNames(List.of("Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"));
-        turkishI18n.setWeekdays(List.of("Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"));
-        turkishI18n.setWeekdaysShort(List.of("Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"));
-        turkishI18n.setToday("Bugün");
-        turkishI18n.setCancel("İptal");
-        turkishI18n.setFirstDayOfWeek(1);
+        DatePicker.DatePickerI18n turkishI18n = TurkishDatePickerI18n.get();
 
         startDateFilter.setI18n(turkishI18n);
         startDateFilter.addValueChangeListener(e -> refreshGrid());

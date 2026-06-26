@@ -23,6 +23,8 @@ import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.raspel.cardtracker.domain.note.Note;
 import com.raspel.cardtracker.domain.note.NoteService;
+import com.raspel.cardtracker.ui.utils.CategoryConstants;
+import com.raspel.cardtracker.ui.utils.TurkishDatePickerI18n;
 import jakarta.annotation.security.PermitAll;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -138,11 +140,7 @@ public class NoteView extends VerticalLayout {
         List<String> existingCategories = noteService.getCategories(username);
         // Varsayılan kategoriler ekle
         java.util.Set<String> allCategories = new java.util.LinkedHashSet<>();
-        allCategories.add("Ödemeler");
-        allCategories.add("Hatırlatmalar");
-        allCategories.add("Kişisel");
-        allCategories.add("İş");
-        allCategories.add("Alışveriş");
+        allCategories.addAll(CategoryConstants.NOTE_CATEGORIES);
         allCategories.addAll(existingCategories);
         categoryField.setItems(allCategories);
         categoryField.setAllowCustomValue(true);
@@ -154,15 +152,7 @@ public class NoteView extends VerticalLayout {
         reminderPicker.setWidthFull();
         reminderPicker.setStep(java.time.Duration.ofMinutes(1));
         reminderPicker.setLocale(Locale.of("tr", "TR"));
-        DatePicker.DatePickerI18n i18n = new DatePicker.DatePickerI18n();
-        i18n.setMonthNames(java.util.List.of("Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
-                "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"));
-        i18n.setWeekdays(java.util.List.of("Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"));
-        i18n.setWeekdaysShort(java.util.List.of("Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"));
-        i18n.setToday("Bugün");
-        i18n.setCancel("İptal");
-        i18n.setFirstDayOfWeek(1);
-        reminderPicker.setDatePickerI18n(i18n);
+        reminderPicker.setDatePickerI18n(TurkishDatePickerI18n.get());
 
         // Renk seçimi
         HorizontalLayout colorPicker = new HorizontalLayout();

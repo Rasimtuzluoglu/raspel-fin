@@ -36,17 +36,27 @@ services:
       - "8080:8080"
     volumes:
       - ./uploads:/app/uploads
+      - ./backups:/app/backups
+      - logs:/app/logs
+      - reports:/app/reports
     env_file:
       - .env
     environment:
       DB_URL: jdbc:postgresql://db:5432/cardtracker
       TZ: Europe/Istanbul
+      REPORTS_DIR: /app/reports
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     deploy:
       resources:
         limits:
           cpus: '1.0'
-          memory: 1G
+          memory: 1.5G
 
   db-backup:
     image: prodrigestivill/postgres-backup-local:15
@@ -64,6 +74,7 @@ services:
       BACKUP_ON_START: "FALSE"
       BACKUP_WEEKLY_KEEP: 8
       BACKUP_MONTHLY_KEEP: 12
+      TZ: Europe/Istanbul
     volumes:
       - ./backups:/backups
     depends_on:
@@ -90,3 +101,5 @@ services:
 
 volumes:
   pgdata:
+  logs:
+  reports:

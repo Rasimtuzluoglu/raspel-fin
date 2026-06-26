@@ -226,7 +226,7 @@ public class ReminderView extends VerticalLayout {
         installmentGrid.setPageSize(20);
         installmentGrid.setSizeFull();
 
-        installmentGrid.addColumn(entry -> entry.getExpense().getCard().getName())
+        installmentGrid.addColumn(entry -> entry.getExpense().getCard() != null ? entry.getExpense().getCard().getName() : "-")
                 .setHeader("Kart Adı").setSortable(true).setAutoWidth(true);
         installmentGrid.addColumn(entry -> entry.getExpense().getDescription())
                 .setHeader("Harcama").setSortable(true).setAutoWidth(true);

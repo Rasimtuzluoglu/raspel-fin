@@ -16,18 +16,22 @@ public class ChequeService {
     private final ChequeRepository chequeRepository;
     private final AuditLogService auditLogService;
 
+    @Transactional(readOnly = true)
     public List<Cheque> findAll() {
         return chequeRepository.findAllByOrderByMaturityDateAsc();
     }
 
+    @Transactional(readOnly = true)
     public List<Cheque> searchByTerm(String term) {
         return chequeRepository.searchByTerm(term);
     }
 
+    @Transactional(readOnly = true)
     public Optional<Cheque> findById(Long id) {
         return chequeRepository.findById(id);
     }
 
+    @Transactional(readOnly = true)
     public Optional<Cheque> findByChequeNumber(String chequeNumber) {
         return chequeRepository.findByChequeNumber(chequeNumber);
     }

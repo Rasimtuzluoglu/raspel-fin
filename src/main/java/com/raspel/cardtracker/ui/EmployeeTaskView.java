@@ -30,6 +30,7 @@ import com.raspel.cardtracker.domain.employee.EmployeeService;
 import com.raspel.cardtracker.domain.employee.EmployeeTask;
 import com.raspel.cardtracker.domain.employee.TaskPriority;
 import com.raspel.cardtracker.domain.employee.TaskStatus;
+import com.raspel.cardtracker.ui.utils.TurkishDatePickerI18n;
 import jakarta.annotation.security.PermitAll;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -378,15 +379,7 @@ public class EmployeeTaskView extends VerticalLayout {
         assignedTo.setValue(task.getAssignedTo());
 
         DatePicker dueDate = new DatePicker("Son Tarih");
-        DatePicker.DatePickerI18n turkishI18n = new DatePicker.DatePickerI18n();
-        turkishI18n.setDateFormat("dd/MM/yyyy");
-        turkishI18n.setMonthNames(java.util.List.of("Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"));
-        turkishI18n.setWeekdays(java.util.List.of("Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"));
-        turkishI18n.setWeekdaysShort(java.util.List.of("Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"));
-        turkishI18n.setToday("Bugün");
-        turkishI18n.setCancel("İptal");
-        turkishI18n.setFirstDayOfWeek(1);
-        dueDate.setI18n(turkishI18n);
+        TurkishDatePickerI18n.applyTo(dueDate);
         dueDate.setValue(task.getDueDate());
 
         ComboBox<TaskStatus> status = new ComboBox<>("Durum");

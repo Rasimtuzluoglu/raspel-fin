@@ -200,6 +200,14 @@ public class ContactView extends VerticalLayout {
     private void refreshGrid() {
         loadingBar.setVisible(true);
         List<Contact> contacts = contactService.findAll();
+        
+        String searchTerm = searchFilter.getValue() != null ? searchFilter.getValue().trim().toLowerCase() : "";
+        if (!searchTerm.isEmpty()) {
+            contacts = contacts.stream()
+                .filter(c -> c.getName().toLowerCase().contains(searchTerm))
+                .collect(java.util.stream.Collectors.toList());
+        }
+        
         grid.setItems(contacts);
 
         if (contacts.isEmpty()) {

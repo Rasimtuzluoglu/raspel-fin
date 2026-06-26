@@ -36,11 +36,14 @@ services:
     volumes:
       - ./uploads:/app/uploads
       - ./backups:/app/backups
+      - logs:/app/logs
+      - reports:/app/reports
     env_file:
       - .env
     environment:
       DB_URL: jdbc:postgresql://db:5432/cardtracker
       TZ: Europe/Istanbul
+      REPORTS_DIR: /app/reports
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health"]
@@ -70,6 +73,7 @@ services:
       BACKUP_ON_START: "FALSE"
       BACKUP_WEEKLY_KEEP: 8
       BACKUP_MONTHLY_KEEP: 12
+      TZ: Europe/Istanbul
     volumes:
       - ./backups:/backups
     depends_on:
@@ -83,3 +87,5 @@ services:
 
 volumes:
   pgdata:
+  logs:
+  reports:

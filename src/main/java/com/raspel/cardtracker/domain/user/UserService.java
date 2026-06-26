@@ -16,6 +16,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.time.LocalDateTime;
+import java.util.regex.Pattern;
 
 @Service
 @RequiredArgsConstructor
@@ -25,7 +26,18 @@ public class UserService implements UserDetailsService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
+    /**
+     * Şifre politikası:
+     * - En az 8 karakter
+     * - En az 1 büyük harf
+     * - En az 1 rakam
+     */
+    private static final int MIN_PASSWORD_LENGTH = 8;
+    private static final Pattern UPPERCASE_PATTERN = Pattern.compile("[A-Z]");
+    private static final Pattern DIGIT_PATTERN = Pattern.compile("[0-9]");
+
     @Override
+    @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         AppUser appUser = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("Geçersiz kullanıcı adı veya şifre"));
@@ -41,18 +53,21 @@ public class UserService implements UserDetailsService {
         return new User(
                 appUser.getUsername(),
                 appUser.getPassword(),
-                Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + appUser.getRole()))
+                Collections.singletonList(new SimpleGrantedAuthority("ROLE_" + appUser.getRole().name()))
         );
     }
 
+    @Transactional(readOnly = true)
     public List<AppUser> findAll() {
         return userRepository.findAll();
     }
 
+    @Transactional(readOnly = true)
     public List<AppUser> findAllActive() {
         return userRepository.findAllByActiveTrue();
     }
 
+    @Transactional(readOnly = true)
     public Optional<AppUser> findByUsername(String username) {
         return userRepository.findByUsername(username);
     }
@@ -86,15 +101,15 @@ public class UserService implements UserDetailsService {
         return true;
     }
 
-    public AppUser createUser(String username, String password, String fullName, String role) {
-        if (password == null || password.length() < 4) throw new IllegalArgumentException("Şifre en az 4 karakter olmalıdır");
+    public AppUser createUser(String username, String rawPassword, String fullName, Role role) {
+        validatePassword(rawPassword);
         if (userRepository.existsByUsername(username)) {
             throw new IllegalArgumentException("Bu kullanıcı adı zaten kullanılıyor: " + username);
         }
 
         AppUser user = AppUser.builder()
                 .username(username)
-                .password(passwordEncoder.encode(password))
+                .password(passwordEncoder.encode(rawPassword))
                 .fullName(fullName)
                 .role(role)
                 .active(true)
@@ -103,16 +118,32 @@ public class UserService implements UserDetailsService {
         return userRepository.save(user);
     }
 
+    @Transactional(readOnly = true)
     public boolean validatePassword(String username, String plainPassword) {
         return userRepository.findByUsername(username)
                 .map(user -> passwordEncoder.matches(plainPassword, user.getPassword()))
                 .orElse(false);
     }
 
-    public void updatePassword(Long userId, String newPassword) {
-        if (newPassword == null || newPassword.length() < 4) {
-            throw new IllegalArgumentException("Şifre en az 4 karakter olmalıdır");
+    /**
+     * Şifrenin güvenlik politikasına uygunluğunu doğrular.
+     * Geçersizse {@link IllegalArgumentException} fırlatır.
+     */
+    public void validatePassword(String password) {
+        if (password == null || password.length() < MIN_PASSWORD_LENGTH) {
+            throw new IllegalArgumentException(
+                    "Şifre en az " + MIN_PASSWORD_LENGTH + " karakter olmalıdır");
         }
+        if (!UPPERCASE_PATTERN.matcher(password).find()) {
+            throw new IllegalArgumentException("Şifre en az 1 büyük harf içermelidir");
+        }
+        if (!DIGIT_PATTERN.matcher(password).find()) {
+            throw new IllegalArgumentException("Şifre en az 1 rakam içermelidir");
+        }
+    }
+
+    public void updatePassword(Long userId, String newPassword) {
+        validatePassword(newPassword);
         userRepository.findById(userId).ifPresent(user -> {
             user.setPassword(passwordEncoder.encode(newPassword));
             userRepository.save(user);
@@ -121,7 +152,7 @@ public class UserService implements UserDetailsService {
 
     public void deactivateUser(Long userId) {
         userRepository.findById(userId).ifPresent(user -> {
-            if ("ADMIN".equalsIgnoreCase(user.getRole())) {
+            if (Role.ADMIN.equals(user.getRole())) {
                 throw new IllegalStateException("Yönetici (ADMIN) rolündeki kullanıcılar devre dışı bırakılamaz!");
             }
             user.setActive(false);
@@ -136,6 +167,7 @@ public class UserService implements UserDetailsService {
         });
     }
 
+    @Transactional(readOnly = true)
     public DashboardConfig getDashboardConfig(String username) {
         return userRepository.findByUsername(username)
                 .map(user -> DashboardConfig.fromJson(user.getDashboardConfig()))
@@ -145,6 +177,28 @@ public class UserService implements UserDetailsService {
     public void saveDashboardConfig(String username, DashboardConfig config) {
         userRepository.findByUsername(username).ifPresent(user -> {
             user.setDashboardConfig(config.toJson());
+            userRepository.save(user);
+        });
+    }
+
+    public String generateTelegramVerificationCode(String username) {
+        AppUser user = userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalArgumentException("Kullanıcı bulunamadı"));
+        String code = String.format("%06d", new java.util.Random().nextInt(999999));
+        user.setTelegramVerificationCode(code);
+        userRepository.save(user);
+        return code;
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<AppUser> findByTelegramChatId(Long chatId) {
+        return userRepository.findByTelegramChatId(chatId);
+    }
+
+    public void disconnectTelegram(String username) {
+        userRepository.findByUsername(username).ifPresent(user -> {
+            user.setTelegramChatId(null);
+            user.setTelegramVerificationCode(null);
             userRepository.save(user);
         });
     }

@@ -37,6 +37,7 @@ import com.raspel.cardtracker.domain.audit.AuditLog;
 import com.raspel.cardtracker.domain.audit.AuditLogService;
 import com.raspel.cardtracker.ui.utils.FormatUtils;
 import com.raspel.cardtracker.ui.utils.HolidayUtils;
+import com.raspel.cardtracker.ui.utils.TurkishDatePickerI18n;
 import jakarta.annotation.security.PermitAll;
 
 import java.math.BigDecimal;
@@ -252,14 +253,7 @@ public class ChequeView extends VerticalLayout {
         statusFilter.setClearButtonVisible(true);
         statusFilter.addValueChangeListener(e -> applyFilters());
 
-        DatePicker.DatePickerI18n turkishI18n = new DatePicker.DatePickerI18n();
-        turkishI18n.setDateFormat("dd/MM/yyyy");
-        turkishI18n.setMonthNames(List.of("Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"));
-        turkishI18n.setWeekdays(List.of("Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"));
-        turkishI18n.setWeekdaysShort(List.of("Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"));
-        turkishI18n.setToday("Bugün");
-        turkishI18n.setCancel("İptal");
-        turkishI18n.setFirstDayOfWeek(1);
+        DatePicker.DatePickerI18n turkishI18n = TurkishDatePickerI18n.get();
         startDateFilter.setI18n(turkishI18n);
         startDateFilter.setClearButtonVisible(true);
         startDateFilter.addValueChangeListener(e -> applyFilters());
@@ -376,14 +370,7 @@ public class ChequeView extends VerticalLayout {
 
         DatePicker maturityField = new DatePicker("Vade Tarihi");
         maturityField.setRequired(true);
-        DatePicker.DatePickerI18n turkishI18n = new DatePicker.DatePickerI18n();
-        turkishI18n.setDateFormat("dd/MM/yyyy");
-        turkishI18n.setMonthNames(List.of("Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"));
-        turkishI18n.setWeekdays(List.of("Pazar", "Pazartesi", "Salı", "Çarşamba", "Perşembe", "Cuma", "Cumartesi"));
-        turkishI18n.setWeekdaysShort(List.of("Paz", "Pzt", "Sal", "Çar", "Per", "Cum", "Cmt"));
-        turkishI18n.setToday("Bugün");
-        turkishI18n.setCancel("İptal");
-        turkishI18n.setFirstDayOfWeek(1);
+        DatePicker.DatePickerI18n turkishI18n = TurkishDatePickerI18n.get();
         maturityField.setI18n(turkishI18n);
 
         TextField amountField = new TextField("Tutar");
@@ -448,7 +435,7 @@ public class ChequeView extends VerticalLayout {
                 return;
             }
 
-            if (isNew && maturityField.getValue().isBefore(LocalDate.now())) {
+            if (maturityField.getValue().isBefore(LocalDate.now())) {
                 Notification.show("Vade tarihi geçmiş bir tarih olamaz", 3000, Notification.Position.BOTTOM_CENTER)
                         .addThemeVariants(NotificationVariant.LUMO_ERROR);
                 return;
@@ -609,6 +596,7 @@ public class ChequeView extends VerticalLayout {
     }
 
     private void loadData() {
+        try {
         String term = searchFilter.getValue().trim();
         List<Cheque> all;
         if (!term.isEmpty()) {
@@ -661,6 +649,12 @@ public class ChequeView extends VerticalLayout {
         } else {
             grid.setVisible(true);
             emptyState.getStyle().set("display", "none");
+        }
+        } catch (Exception ex) {
+            grid.setVisible(false);
+            emptyState.getStyle().set("display", "flex");
+            Notification.show("Veri yüklenirken hata oluştu.", 3000, Notification.Position.BOTTOM_CENTER)
+                    .addThemeVariants(NotificationVariant.LUMO_ERROR);
         }
     }
 

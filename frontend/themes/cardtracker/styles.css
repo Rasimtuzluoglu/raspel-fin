@@ -103,7 +103,7 @@ html {
         min-width: 100% !important;
         margin-bottom: var(--lumo-space-s);
     }
-    
+
     /* Gridler mobilde yatay scroll edilebilsin */
     vaadin-grid {
         overflow-x: auto;
@@ -122,6 +122,95 @@ html {
     vaadin-dialog-overlay::part(overlay) {
         width: 95vw !important;
         max-width: 95vw !important;
+    }
+
+    /* Hamburger menü butonu büyüt */
+    vaadin-drawer-toggle {
+        min-width: 48px !important;
+        min-height: 48px !important;
+        font-size: 1.3em !important;
+    }
+
+    /* Sidebar overlay - içeriğin üstüne binsin */
+    vaadin-app-layout::part(drawer) {
+        z-index: 999 !important;
+        box-shadow: 4px 0 20px rgba(0,0,0,0.25) !important;
+        width: 280px !important;
+    }
+
+    /* İçerik alanı kenar boşlukları */
+    vaadin-app-layout::part(content) {
+        padding: 0 !important;
+    }
+
+    /* Tüm view sayfaları için padding */
+    .dashboard-view, .card-list-view, .expense-view, .cheque-view,
+    .budget-view, .contact-view, .audit-log-view,
+    .note-view, .user-management-view {
+        padding: 8px 10px 80px 10px !important;
+    }
+
+    /* Dialog alttan açılsın (sheet style) */
+    vaadin-dialog-overlay::part(overlay) {
+        align-self: flex-end !important;
+        border-radius: 16px 16px 0 0 !important;
+        max-height: 90vh !important;
+        width: 100vw !important;
+        max-width: 100vw !important;
+    }
+
+    /* Grid kompakt */
+    vaadin-grid {
+        font-size: 0.82em !important;
+    }
+    vaadin-grid::part(cell) {
+        padding: 3px 5px !important;
+    }
+    vaadin-grid::part(header-cell) {
+        padding: 3px 5px !important;
+        font-size: 0.75em !important;
+    }
+
+    /* Form alanları iOS zoom engelleme için 16px */
+    vaadin-text-field::part(input-field),
+    vaadin-combo-box::part(input-field),
+    vaadin-date-picker::part(input-field),
+    vaadin-date-time-picker::part(input-field),
+    vaadin-integer-field::part(input-field),
+    vaadin-number-field::part(input-field),
+    vaadin-text-area::part(input-field) {
+        font-size: 16px !important;
+        min-height: 48px !important;
+    }
+
+    /* ComboBox ok butonu büyüt */
+    vaadin-combo-box::part(toggle-button) {
+        min-width: 44px !important;
+    }
+
+    /* Başlıklar daha küçük */
+    h3, h4 { font-size: 1em !important; }
+    h2 { font-size: 1.1em !important; }
+
+    /* Kart hover efektini kaldır (dokunmatikte anlamsız) */
+    .stat-card:hover {
+        transform: none !important;
+        box-shadow: none !important;
+    }
+
+    /* Tablo satırları daha ince */
+    vaadin-grid::part(row) {
+        min-height: 32px !important;
+    }
+
+    /* Footer gizle */
+    footer {
+        display: none !important;
+    }
+
+    /* ApexCharts yüksekliği */
+    apex-charts {
+        height: 200px !important;
     }
 }
 
@@ -373,94 +462,7 @@ apex-charts {
     flex-wrap: wrap !important;
 }
 
-/* ============ MOBİL İYİLEŞTİRMELER ============ */
-@media (max-width: 768px) {
-    /* Hamburger menü butonu büyüt */
-    vaadin-drawer-toggle {
-        min-width: 48px !important;
-        min-height: 48px !important;
-        font-size: 1.3em !important;
-    }
-    
-    /* Sidebar overlay - içeriğin üstüne binsin */
-    vaadin-app-layout::part(drawer) {
-        z-index: 999 !important;
-        box-shadow: 4px 0 20px rgba(0,0,0,0.25) !important;
-        width: 280px !important;
-    }
-    
-    /* İçerik alanı kenar boşlukları */
-    vaadin-app-layout::part(content) {
-        padding: 0 !important;
-    }
-    
-    /* Tüm view sayfaları için padding */
-    .dashboard-view, .card-list-view, .expense-view, .cheque-view, 
-    .budget-view, .contact-view, .audit-log-view,
-    .note-view, .user-management-view {
-        padding: 8px 10px 80px 10px !important;
-    }
-    
-    /* Dialog alttan açılsın (sheet style) */
-    vaadin-dialog-overlay::part(overlay) {
-        align-self: flex-end !important;
-        border-radius: 16px 16px 0 0 !important;
-        max-height: 90vh !important;
-        width: 100vw !important;
-        max-width: 100vw !important;
-    }
-    
-    /* Grid kompakt */
-    vaadin-grid {
-        font-size: 0.82em !important;
-    }
-    vaadin-grid::part(cell) {
-        padding: 3px 5px !important;
-    }
-    vaadin-grid::part(header-cell) {
-        padding: 3px 5px !important;
-        font-size: 0.75em !important;
-    }
-    
-    /* Form alanları iOS zoom engelleme için 16px */
-    vaadin-text-field::part(input-field),
-    vaadin-combo-box::part(input-field),
-    vaadin-date-picker::part(input-field),
-    vaadin-date-time-picker::part(input-field),
-    vaadin-integer-field::part(input-field),
-    vaadin-number-field::part(input-field),
-    vaadin-text-area::part(input-field) {
-        font-size: 16px !important;
-        min-height: 48px !important;
-    }
-    
-    /* ComboBox ok butonu büyüt */
-    vaadin-combo-box::part(toggle-button) {
-        min-width: 44px !important;
-    }
-    
-    /* Başlıklar daha küçük */
-    h3, h4 { font-size: 1em !important; }
-    h2 { font-size: 1.1em !important; }
-    
-    /* Kart hover efektini kaldır (dokunmatikte anlamsız) */
-    .stat-card:hover {
-        transform: none !important;
-        box-shadow: none !important;
-    }
-    
-    /* Tablo satırları daha ince */
-    vaadin-grid::part(row) {
-        min-height: 32px !important;
-    }
-    
-    /* Footer gizle */
-    footer {
-        display: none !important;
-    }
-    
-    /* ApexCharts yüksekliği */
-    apex-charts {
-        height: 200px !important;
-    }
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
 }

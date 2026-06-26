@@ -2,6 +2,7 @@ package com.raspel.cardtracker.ui;
 
 import com.vaadin.flow.component.button.Button;
 import com.vaadin.flow.component.button.ButtonVariant;
+import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.formlayout.FormLayout;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H3;
@@ -113,7 +114,7 @@ public class ProfileView extends VerticalLayout {
         fullNameField.setWidthFull();
 
         TextField roleField = new TextField("Rol");
-        roleField.setValue(user.getRole());
+        roleField.setValue(user.getRole() != null ? user.getRole().name() : "");
         roleField.setReadOnly(true);
         roleField.setWidthFull();
 
@@ -129,6 +130,123 @@ public class ProfileView extends VerticalLayout {
         form.add(usernameField, fullNameField, roleField, saveProfileBtn);
         profileCard.add(form);
         grid.add(profileCard);
+
+        // TELEGRAM BAĞLANTISI
+        Div telegramCard = buildCard("Telegram Bağlantısı");
+        VerticalLayout telegramContent = new VerticalLayout();
+        telegramContent.setPadding(false);
+        telegramContent.setSpacing(true);
+
+        if (user.getTelegramChatId() != null) {
+            Span connectedIcon = new Span("\u2705");
+            connectedIcon.getStyle().set("font-size", "24px").set("display", "block");
+
+            Span connectedText = new Span("Telegram hesabınız bağlı!");
+            connectedText.getStyle()
+                    .set("font-weight", "600")
+                    .set("color", "var(--lumo-success-text-color)")
+                    .set("font-size", "0.95em");
+
+            Span chatIdInfo = new Span("Chat ID: " + user.getTelegramChatId());
+            chatIdInfo.getStyle()
+                    .set("font-size", "0.8em")
+                    .set("color", "var(--lumo-secondary-text-color)");
+
+            Button disconnectBtn = new Button("Telegram Bağlantısını Kes", new Icon(VaadinIcon.UNLINK), e -> {
+                userService.disconnectTelegram(username);
+                Notification.show("Telegram bağlantısı kesildi.", 3000, Notification.Position.BOTTOM_CENTER)
+                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                getUI().ifPresent(ui -> ui.getPage().reload());
+            });
+            disconnectBtn.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_SMALL);
+
+            telegramContent.add(connectedIcon, connectedText, chatIdInfo, disconnectBtn);
+        } else {
+            Span notConnected = new Span("Telegram hesabınız henüz bağlı değil.");
+            notConnected.getStyle()
+                    .set("font-size", "0.9em")
+                    .set("color", "var(--lumo-secondary-text-color)")
+                    .set("display", "block");
+
+            Span instructions = new Span("Bağlamak için:\n" +
+                    "1. Aşağıdaki butona tıklayarak doğrulama kodu alın\n" +
+                    "2. Telegram'da @raspel_fin_bot bot'unu başlatın\n" +
+                    "3. /start yazın ve size verilen kodu gönderin");
+            instructions.getStyle()
+                    .set("font-size", "0.8em")
+                    .set("color", "var(--lumo-secondary-text-color)")
+                    .set("display", "block")
+                    .set("white-space", "pre-wrap")
+                    .set("margin-top", "4px");
+
+            Button connectBtn = new Button("Telegram'a Bağlan", new Icon(VaadinIcon.PAPERPLANE), e -> {
+                try {
+                    String code = userService.generateTelegramVerificationCode(username);
+                    Dialog codeDialog = new Dialog();
+                    codeDialog.setHeaderTitle("Telegram Doğrulama Kodu");
+                    codeDialog.setWidth("400px");
+
+                    Div codeDisplay = new Div();
+                    codeDisplay.getStyle()
+                            .set("background", "var(--lumo-contrast-5pct)")
+                            .set("border-radius", "12px")
+                            .set("padding", "24px")
+                            .set("text-align", "center");
+
+                    Span codeLabel = new Span("Doğrulama Kodunuz");
+                    codeLabel.getStyle()
+                            .set("font-size", "0.8em")
+                            .set("color", "var(--lumo-secondary-text-color)")
+                            .set("display", "block")
+                            .set("margin-bottom", "8px");
+
+                    Span codeValue = new Span(code);
+                    codeValue.getStyle()
+                            .set("font-size", "2em")
+                            .set("font-weight", "bold")
+                            .set("letter-spacing", "0.1em")
+                            .set("color", "var(--lumo-primary-text-color)")
+                            .set("display", "block")
+                            .set("font-family", "monospace");
+
+                    Span botLink = new Span("Bu kodu @raspel_fin_bot bot'una gönderin");
+                    botLink.getStyle()
+                            .set("font-size", "0.8em")
+                            .set("color", "var(--lumo-secondary-text-color)")
+                            .set("display", "block")
+                            .set("margin-top", "12px");
+
+                    codeDisplay.add(codeLabel, codeValue, botLink);
+
+                    Button openBotBtn = new Button("Bot'u Aç", new Icon(VaadinIcon.EXTERNAL_LINK), ev -> {
+                        getUI().ifPresent(ui -> ui.getPage().open("https://t.me/raspel_fin_bot"));
+                    });
+                    openBotBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+                    openBotBtn.getStyle().set("margin-top", "12px");
+
+                    codeDisplay.add(openBotBtn);
+
+                    Button closeBtn = new Button("Tamam, Kodladım", ev2 -> {
+                        codeDialog.close();
+                        getUI().ifPresent(ui -> ui.getPage().reload());
+                    });
+                    closeBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+
+                    codeDialog.add(codeDisplay);
+                    codeDialog.getFooter().add(closeBtn);
+                    codeDialog.open();
+                    codeDialog.getElement().getStyle().set("overflow", "hidden");
+                } catch (Exception ex) {
+                    Notification.show("Kod oluşturulurken hata oluştu.", 3000, Notification.Position.BOTTOM_CENTER)
+                            .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                }
+            });
+            connectBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+
+            telegramContent.add(notConnected, instructions, connectBtn);
+        }
+        telegramCard.add(telegramContent);
+        grid.add(telegramCard);
 
         // 2. SAĞ ÜST: Hesap Özeti
         Div statsCard = buildCard("Hesap Özeti");
@@ -364,14 +482,6 @@ public class ProfileView extends VerticalLayout {
                 .set("display", "block").set("margin-top", "2px");
         item.add(val, lbl);
         return item;
-    }
-
-    private Div createMiniStat(String label, String value, String color) {
-        return buildStatItem(label, value, color);
-    }
-
-    private Div createCard(String title) {
-        return buildCard(title);
     }
 
     private HorizontalLayout createRecentItem(String type, String date, String desc, String amount, String color) {

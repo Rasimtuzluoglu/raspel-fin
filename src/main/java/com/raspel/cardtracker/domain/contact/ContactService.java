@@ -16,10 +16,12 @@ public class ContactService {
     private final ContactRepository contactRepository;
     private final AuditLogService auditLogService;
 
+    @Transactional(readOnly = true)
     public List<Contact> findAll() {
         return contactRepository.findAll();
     }
 
+    @Transactional(readOnly = true)
     public List<Contact> search(String query) {
         if (query == null || query.trim().isEmpty()) {
             return findAll();
@@ -27,10 +29,12 @@ public class ContactService {
         return contactRepository.findByNameContainingIgnoreCase(query.trim());
     }
 
+    @Transactional(readOnly = true)
     public Optional<Contact> findById(Long id) {
         return contactRepository.findById(id);
     }
 
+    @Transactional(readOnly = true)
     public Optional<Contact> findByName(String name) {
         return contactRepository.findByName(name);
     }

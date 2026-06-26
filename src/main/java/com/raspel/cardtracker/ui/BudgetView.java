@@ -257,7 +257,6 @@ public class BudgetView extends VerticalLayout {
         actions.expand(toggleBtn);
 
         card.add(content, actions, detail);
-        card.getElement().addEventListener("click", ev -> {});
         VerticalLayout wrapper = new VerticalLayout(card);
         wrapper.setPadding(false); wrapper.setSpacing(false);
         return wrapper;

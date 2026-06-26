@@ -21,14 +21,17 @@ public class CardService {
     private final InstallmentEntryRepository installmentEntryRepository;
     private final AuditLogService auditLogService;
 
+    @Transactional(readOnly = true)
     public List<Card> findAllActive() {
         return cardRepository.findAllByActiveTrue();
     }
 
+    @Transactional(readOnly = true)
     public List<Card> findAll() {
         return cardRepository.findAll();
     }
 
+    @Transactional(readOnly = true)
     public Optional<Card> findById(Long id) {
         return cardRepository.findById(id);
     }
@@ -83,10 +86,12 @@ public class CardService {
         auditLogService.log(AuditAction.DELETE, "Kart", id, "Kart ve tüm harcamaları kalıcı olarak silindi");
     }
 
+    @Transactional(readOnly = true)
     public List<Card> findByCategory(String category) {
         return cardRepository.findByCategory(category);
     }
 
+    @Transactional(readOnly = true)
     public long count() {
         return cardRepository.count();
     }

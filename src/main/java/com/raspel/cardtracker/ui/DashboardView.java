@@ -768,68 +768,68 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
         } else {
             for (CardSchedule schedule : cardSchedules) {
                 Card card = schedule.card;
-            
-            HorizontalLayout item = new HorizontalLayout();
-            item.setWidthFull();
-            item.setAlignItems(Alignment.CENTER);
-            item.getStyle()
-                    .set("border-bottom", "1px solid var(--lumo-contrast-10pct)")
-                    .set("padding-bottom", "0.8em")
-                    .set("margin-bottom", "0.5em");
 
-            Div colorIcon = new Div();
-            colorIcon.getStyle()
-                    .set("width", "12px")
-                    .set("height", "12px")
-                    .set("border-radius", "50%")
-                    .set("background-color", card.getColor() != null ? card.getColor() : "#1976D2")
-                    .set("flex-shrink", "0");
+                HorizontalLayout item = new HorizontalLayout();
+                item.setWidthFull();
+                item.setAlignItems(Alignment.CENTER);
+                item.getStyle()
+                        .set("border-bottom", "1px solid var(--lumo-contrast-10pct)")
+                        .set("padding-bottom", "0.8em")
+                        .set("margin-bottom", "0.5em");
 
-            VerticalLayout cardDetails = new VerticalLayout();
-            cardDetails.setPadding(false);
-            cardDetails.setSpacing(false);
-            Span cardName = new Span(card.getName() + " (" + card.getBank() + ")");
-            cardName.getStyle().set("font-weight", "bold").set("font-size", "0.95em");
-            Span ownerInfo = new Span((card.getHolderName() != null ? card.getHolderName() : "-") + 
-                                     " | " + (card.getDepartment() != null ? card.getDepartment() : "-"));
-            ownerInfo.getStyle().set("font-size", "0.8em").set("color", "var(--lumo-secondary-text-color)");
-            cardDetails.add(cardName, ownerInfo);
+                Div colorIcon = new Div();
+                colorIcon.getStyle()
+                        .set("width", "12px")
+                        .set("height", "12px")
+                        .set("border-radius", "50%")
+                        .set("background-color", card.getColor() != null ? card.getColor() : "#1976D2")
+                        .set("flex-shrink", "0");
 
-            VerticalLayout datesDetails = new VerticalLayout();
-            datesDetails.setPadding(false);
-            datesDetails.setSpacing(false);
-            datesDetails.setAlignItems(Alignment.END);
-            Span closeDate = new Span("Hesap Kesim: " + schedule.statementDate.format(DateTimeFormatter.ofPattern("dd MMMM", Locale.of("tr"))));
-            closeDate.getStyle().set("font-size", "0.8em").set("color", "var(--lumo-secondary-text-color)");
-            Span dueDate = new Span("Son Ödeme: " + schedule.actualDueDate.format(DateTimeFormatter.ofPattern("dd MMMM EEEE", Locale.of("tr"))));
-            dueDate.getStyle().set("font-weight", "500").set("font-size", "0.85em");
-            datesDetails.add(closeDate, dueDate);
+                VerticalLayout cardDetails = new VerticalLayout();
+                cardDetails.setPadding(false);
+                cardDetails.setSpacing(false);
+                Span cardName = new Span(card.getName() + " (" + card.getBank() + ")");
+                cardName.getStyle().set("font-weight", "bold").set("font-size", "0.95em");
+                Span ownerInfo = new Span((card.getHolderName() != null ? card.getHolderName() : "-") +
+                                         " | " + (card.getDepartment() != null ? card.getDepartment() : "-"));
+                ownerInfo.getStyle().set("font-size", "0.8em").set("color", "var(--lumo-secondary-text-color)");
+                cardDetails.add(cardName, ownerInfo);
 
-            if (!schedule.actualDueDate.equals(schedule.originalDueDate)) {
-                Span holidayWarning = new Span("Tatil/Haftasonu nedeniyle ertelenmiştir (" + schedule.originalDueDate.format(DateTimeFormatter.ofPattern("dd.MM")) + ")");
-                holidayWarning.getStyle().set("font-size", "0.7em").set("color", "var(--lumo-error-color)");
-                datesDetails.add(holidayWarning);
+                VerticalLayout datesDetails = new VerticalLayout();
+                datesDetails.setPadding(false);
+                datesDetails.setSpacing(false);
+                datesDetails.setAlignItems(Alignment.END);
+                Span closeDate = new Span("Hesap Kesim: " + schedule.statementDate.format(DateTimeFormatter.ofPattern("dd MMMM", Locale.of("tr"))));
+                closeDate.getStyle().set("font-size", "0.8em").set("color", "var(--lumo-secondary-text-color)");
+                Span dueDate = new Span("Son Ödeme: " + schedule.actualDueDate.format(DateTimeFormatter.ofPattern("dd MMMM EEEE", Locale.of("tr"))));
+                dueDate.getStyle().set("font-weight", "500").set("font-size", "0.85em");
+                datesDetails.add(closeDate, dueDate);
+
+                if (!schedule.actualDueDate.equals(schedule.originalDueDate)) {
+                    Span holidayWarning = new Span("Tatil/Haftasonu nedeniyle ertelenmiştir (" + schedule.originalDueDate.format(DateTimeFormatter.ofPattern("dd.MM")) + ")");
+                    holidayWarning.getStyle().set("font-size", "0.7em").set("color", "var(--lumo-error-color)");
+                    datesDetails.add(holidayWarning);
+                }
+
+                Span daysBadge = new Span();
+                if (schedule.daysRemaining < 0) {
+                    daysBadge.setText("Gecikti");
+                    daysBadge.getElement().getThemeList().add("badge error");
+                } else if (schedule.daysRemaining <= 3) {
+                    daysBadge.setText(schedule.daysRemaining + " Gün Kaldı");
+                    daysBadge.getElement().getThemeList().add("badge error");
+                } else if (schedule.daysRemaining <= 7) {
+                    daysBadge.setText(schedule.daysRemaining + " Gün Kaldı");
+                    daysBadge.getElement().getThemeList().add("badge contrast");
+                } else {
+                    daysBadge.setText(schedule.daysRemaining + " Gün");
+                    daysBadge.getElement().getThemeList().add("badge success");
+                }
+                daysBadge.getStyle().set("min-width", "80px").set("text-align", "center");
+
+                item.add(colorIcon, cardDetails, datesDetails, daysBadge);
+                scheduleList.add(item);
             }
-
-            Span daysBadge = new Span();
-            if (schedule.daysRemaining < 0) {
-                daysBadge.setText("Gecikti");
-                daysBadge.getElement().getThemeList().add("badge error");
-            } else if (schedule.daysRemaining <= 3) {
-                daysBadge.setText(schedule.daysRemaining + " Gün Kaldı");
-                daysBadge.getElement().getThemeList().add("badge error");
-            } else if (schedule.daysRemaining <= 7) {
-                daysBadge.setText(schedule.daysRemaining + " Gün Kaldı");
-                daysBadge.getElement().getThemeList().add("badge contrast");
-            } else {
-                daysBadge.setText(schedule.daysRemaining + " Gün");
-                daysBadge.getElement().getThemeList().add("badge success");
-            }
-            daysBadge.getStyle().set("min-width", "80px").set("text-align", "center");
-
-            item.add(colorIcon, cardDetails, datesDetails, daysBadge);
-            scheduleList.add(item);
-        }
         } // close the else block
 
         if (activeCards.isEmpty()) {
@@ -1248,11 +1248,6 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
                     .set("border", "2px solid #EF9A9A")
                     .set("font-weight", "700")
                     .set("animation", "pulse 1.5s infinite");
-            row.getElement().executeJs(
-                "var style=document.createElement('style');" +
-                "style.textContent='@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.7}}';" +
-                "if(!document.getElementById('pulse-style')){style.id='pulse-style';document.head.appendChild(style);}"
-            );
         } else if (isToday) {
             icon = "\uD83D\uDFE1";
             row.getStyle()

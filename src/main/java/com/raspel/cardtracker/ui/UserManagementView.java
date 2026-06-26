@@ -22,6 +22,7 @@ import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.raspel.cardtracker.domain.user.AppUser;
+import com.raspel.cardtracker.domain.user.Role;
 import com.raspel.cardtracker.domain.user.UserService;
 import jakarta.annotation.security.RolesAllowed;
 
@@ -102,7 +103,7 @@ public class UserManagementView extends VerticalLayout {
             );
             toggleBtn.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
             
-            if ("ADMIN".equalsIgnoreCase(user.getRole()) && user.getActive()) {
+            if (Role.ADMIN.equals(user.getRole()) && user.getActive()) {
                 toggleBtn.setEnabled(false);
                 toggleBtn.setTooltipText("Yöneticiler devre dışı bırakılamaz.");
             }
@@ -141,13 +142,15 @@ public class UserManagementView extends VerticalLayout {
 
         PasswordField passwordField = new PasswordField("Şifre");
         passwordField.setRequired(true);
-        passwordField.setMinLength(4);
+        passwordField.setMinLength(8);
+        passwordField.setHelperText("En az 8 karakter, 1 büyük harf ve 1 rakam içermelidir");
 
         TextField fullNameField = new TextField("Ad Soyad");
 
-        ComboBox<String> roleField = new ComboBox<>("Rol");
-        roleField.setItems("USER", "ADMIN");
-        roleField.setValue("USER");
+        ComboBox<Role> roleField = new ComboBox<>("Rol");
+        roleField.setItems(Role.values());
+        roleField.setValue(Role.USER);
+        roleField.setItemLabelGenerator(Role::name);
 
         form.add(usernameField, passwordField, fullNameField, roleField);
 
@@ -170,7 +173,7 @@ public class UserManagementView extends VerticalLayout {
                 dialog.close();
                 refreshGrid();
             } catch (IllegalArgumentException ex) {
-                Notification.show("Bir hata oluştu, lütfen tekrar deneyin.", 3000, Notification.Position.BOTTOM_CENTER)
+                Notification.show(ex.getMessage() != null ? ex.getMessage() : "Bir hata oluştu, lütfen tekrar deneyin.", 3000, Notification.Position.BOTTOM_CENTER)
                         .addThemeVariants(NotificationVariant.LUMO_ERROR);
             }
         });

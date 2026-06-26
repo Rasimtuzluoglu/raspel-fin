@@ -16,14 +16,17 @@ public class DepartmentBudgetService {
     private final DepartmentBudgetRepository repository;
     private final AuditLogService auditLogService;
 
+    @Transactional(readOnly = true)
     public List<DepartmentBudget> findAll() {
         return repository.findAll();
     }
 
+    @Transactional(readOnly = true)
     public List<DepartmentBudget> findByYearAndMonth(Integer year, Integer month) {
         return repository.findByBudgetYearAndBudgetMonth(year, month);
     }
 
+    @Transactional(readOnly = true)
     public Optional<DepartmentBudget> findByDepartmentAndYearAndMonth(Long departmentId, Integer year, Integer month) {
         return repository.findByDepartmentIdAndBudgetYearAndBudgetMonth(departmentId, year, month);
     }

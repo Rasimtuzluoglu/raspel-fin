@@ -26,4 +26,12 @@ public interface UserRepository extends JpaRepository<AppUser, Long> {
     @Modifying
     @Query(value = "UPDATE app_user SET failed_login_attempts = 0, locked_until = NULL WHERE username = :username", nativeQuery = true)
     void recordSuccessfulLogin(@Param("username") String username);
+
+    Optional<AppUser> findByTelegramVerificationCode(String verificationCode);
+
+    Optional<AppUser> findByTelegramChatId(Long chatId);
+
+    @Modifying
+    @Query(value = "UPDATE app_user SET telegram_chat_id = :chatId, telegram_verification_code = NULL WHERE id = :userId", nativeQuery = true)
+    void linkTelegramChatId(@Param("userId") Long userId, @Param("chatId") Long chatId);
 }

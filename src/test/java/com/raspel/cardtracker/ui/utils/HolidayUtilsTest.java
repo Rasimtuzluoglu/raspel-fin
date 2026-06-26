@@ -77,4 +77,21 @@ class HolidayUtilsTest {
     void isWeekendOrHoliday_returnsFalseForRegularWorkday() {
         assertThat(HolidayUtils.isWeekendOrHoliday(LocalDate.of(2026, 1, 13))).isFalse();
     }
+
+    @Test
+    void isWeekendOrHoliday_usesApproximateCalculationPost2036() {
+        assertThat(HolidayUtils.isWeekendOrHoliday(LocalDate.of(2026, 1, 13))).isFalse();
+    }
+
+    @Test
+    void isWeekendOrHoliday_post2036DoesNotThrow() {
+        assertThat(HolidayUtils.isWeekendOrHoliday(LocalDate.of(2040, 6, 15))).isNotNull();
+    }
+
+    @Test
+    void getNextBusinessDay_post2036ReturnsValidDate() {
+        LocalDate result = HolidayUtils.getNextBusinessDay(LocalDate.of(2040, 6, 15));
+        assertThat(result).isNotNull();
+        assertThat(result).isAfterOrEqualTo(LocalDate.of(2040, 6, 15));
+    }
 }

@@ -142,8 +142,9 @@ public class MainLayout extends AppLayout {
         int warningCount = 0;
         try {
             List<Card> activeCards = cardService.findAllActive();
+            Map<Long, BigDecimal> unpaidBalances = expenseService.getUnpaidBalancesGroupedByCard();
             for (Card card : activeCards) {
-                BigDecimal unpaid = expenseService.getUnpaidBalance(card.getId());
+                BigDecimal unpaid = unpaidBalances.getOrDefault(card.getId(), BigDecimal.ZERO);
                 BigDecimal limit = card.getCardLimit();
                 if (limit != null && limit.compareTo(BigDecimal.ZERO) > 0) {
                     double pct = unpaid.divide(limit, 4, RoundingMode.HALF_UP).doubleValue() * 100;
@@ -169,8 +170,11 @@ public class MainLayout extends AppLayout {
         final int finalReminderCount = reminderCount;
         final int totalNotifications = warningCount + reminderCount;
 
-        // session attribute kontrolü
-        Integer readCount = (Integer) com.vaadin.flow.server.VaadinSession.getCurrent().getAttribute("notificationsReadCount");
+        // session attribute kontrolü - senkronize okuma
+        Integer readCount;
+        synchronized (com.vaadin.flow.server.VaadinSession.getCurrent().getLockInstance()) {
+            readCount = (Integer) com.vaadin.flow.server.VaadinSession.getCurrent().getAttribute("notificationsReadCount");
+        }
         if (readCount == null) readCount = 0;
         
         int unreadCount = Math.max(0, totalNotifications - readCount);
@@ -599,7 +603,7 @@ public class MainLayout extends AppLayout {
                 .set("padding", "var(--lumo-space-m)")
                 .set("border-top", "1px solid var(--lumo-contrast-10pct)");
 
-        Span copyright = new Span("© 2026 RasPel Co.");
+        Span copyright = new Span("© " + java.time.LocalDate.now().getYear() + " RasPel Co.");
         copyright.getStyle()
                 .set("font-size", "0.8em")
                 .set("font-weight", "600")
@@ -643,6 +647,7 @@ public class MainLayout extends AppLayout {
                         updateBellBadge();
                     } catch (Exception ignored) {}
                 });
+                ui.addDetachListener(e -> ui.setPollInterval(-1));
             }
         });
 
@@ -771,8 +776,10 @@ public class MainLayout extends AppLayout {
 
                     Button okunduBtn = new Button("Okundu", e -> {
                         noteService.markReminded(note.getId());
-                        Integer rc = (Integer) com.vaadin.flow.server.VaadinSession.getCurrent().getAttribute("notificationsReadCount");
-                        com.vaadin.flow.server.VaadinSession.getCurrent().setAttribute("notificationsReadCount", (rc == null ? 0 : rc) + 1);
+                        synchronized (com.vaadin.flow.server.VaadinSession.getCurrent().getLockInstance()) {
+                            Integer rc = (Integer) com.vaadin.flow.server.VaadinSession.getCurrent().getAttribute("notificationsReadCount");
+                            com.vaadin.flow.server.VaadinSession.getCurrent().setAttribute("notificationsReadCount", (rc == null ? 0 : rc) + 1);
+                        }
                         updateBellBadge();
                         notifDialog.close();
                     });
@@ -804,8 +811,9 @@ public class MainLayout extends AppLayout {
             int month = now.getMonthValue();
 
             List<Card> activeCards = cardService.findAllActive();
+            Map<Long, BigDecimal> unpaidBalances = expenseService.getUnpaidBalancesGroupedByCard();
             for (Card card : activeCards) {
-                BigDecimal unpaid = expenseService.getUnpaidBalance(card.getId());
+                BigDecimal unpaid = unpaidBalances.getOrDefault(card.getId(), BigDecimal.ZERO);
                 BigDecimal limit = card.getCardLimit();
                 if (limit != null && limit.compareTo(BigDecimal.ZERO) > 0) {
                     double pct = unpaid.divide(limit, 4, RoundingMode.HALF_UP).doubleValue() * 100;
@@ -857,7 +865,9 @@ public class MainLayout extends AppLayout {
     }
 
     private String getCurrentPageTitle() {
-        PageTitle title = getContent().getClass().getAnnotation(PageTitle.class);
+        com.vaadin.flow.component.Component content = getContent();
+        if (content == null) return "";
+        PageTitle title = content.getClass().getAnnotation(PageTitle.class);
         String pageTitle = title == null ? "" : title.value();
         String company = appSettingsService.getCompanyName();
         if (!pageTitle.contains(company)) {

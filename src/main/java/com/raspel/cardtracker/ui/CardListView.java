@@ -21,6 +21,7 @@ import com.vaadin.flow.component.progressbar.ProgressBar;
 import com.vaadin.flow.component.textfield.IntegerField;
 import com.vaadin.flow.component.textfield.TextField;
 import com.raspel.cardtracker.ui.utils.FormatUtils;
+import com.raspel.cardtracker.ui.utils.CategoryConstants;
 import com.raspel.cardtracker.ui.utils.HolidayUtils;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
@@ -286,7 +287,7 @@ public class CardListView extends VerticalLayout {
         FormatUtils.attachCurrencyFormatting(monthlyAssignmentField);
 
         ComboBox<String> categoryField = new ComboBox<>("Kategori");
-        categoryField.setItems("Ofis Giderleri", "Seyahat", "Tedarik", "Genel", "IT", "Pazarlama");
+        categoryField.setItems(CategoryConstants.CARD_CATEGORIES);
         categoryField.setAllowCustomValue(true);
         categoryField.addCustomValueSetListener(e -> categoryField.setValue(e.getDetail()));
 
