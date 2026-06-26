@@ -15,8 +15,7 @@ RUN chmod +x mvnw && \
 COPY frontend frontend
 COPY src src
 
-RUN ./mvnw package -Pproduction -DskipTests -o || \
-    ./mvnw package -Pproduction -DskipTests && \
+RUN ./mvnw package -Pproduction -DskipTests && \
     rm -rf /root/.m2 && \
     rm -rf /app/src /app/frontend /app/target/*.original
 

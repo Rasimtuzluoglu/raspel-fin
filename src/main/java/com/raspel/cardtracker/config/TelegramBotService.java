@@ -2,9 +2,9 @@ package com.raspel.cardtracker.config;
 
 import com.raspel.cardtracker.domain.user.AppUser;
 import com.raspel.cardtracker.domain.user.UserRepository;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnExpression;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
@@ -15,7 +15,7 @@ import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
 import java.util.Optional;
 
 @Component
-@ConditionalOnExpression("T(org.springframework.util.StringUtils).hasText(environment.getProperty('TELEGRAM_BOT_TOKEN'))")
+@Lazy(false)
 @Slf4j
 public class TelegramBotService extends TelegramLongPollingBot {
 
@@ -23,18 +23,23 @@ public class TelegramBotService extends TelegramLongPollingBot {
     private final Environment environment;
 
     public TelegramBotService(UserRepository userRepository, Environment environment) {
+        super(environment.getProperty("TELEGRAM_BOT_TOKEN", ""));
         this.userRepository = userRepository;
         this.environment = environment;
+    }
+
+    @PostConstruct
+    void init() {
+        if (environment.getProperty("TELEGRAM_BOT_TOKEN", "").isEmpty()) {
+            log.info("TELEGRAM_BOT_TOKEN tanımlı değil, Telegram bot devre dışı.");
+        } else {
+            log.info("Telegram bot başlatıldı: @raspel_fin_bot, chatId ile doğrulama aktif.");
+        }
     }
 
     @Override
     public String getBotUsername() {
         return "raspel_fin_bot";
-    }
-
-    @Override
-    public String getBotToken() {
-        return environment.getProperty("TELEGRAM_BOT_TOKEN");
     }
 
     @Override
