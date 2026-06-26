@@ -1,7 +1,7 @@
 package com.raspel.cardtracker.config;
 
 import com.raspel.cardtracker.domain.user.AppUser;
-import com.raspel.cardtracker.domain.user.UserRepository;
+import com.raspel.cardtracker.domain.user.UserService;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Lazy;
@@ -26,12 +26,12 @@ import java.util.Optional;
 @Slf4j
 public class TelegramBotService extends TelegramLongPollingBot {
 
-    private final UserRepository userRepository;
+    private final UserService userService;
     private final Environment environment;
 
-    public TelegramBotService(UserRepository userRepository, Environment environment) {
+    public TelegramBotService(UserService userService, Environment environment) {
         super(environment.getProperty("TELEGRAM_BOT_TOKEN", ""));
-        this.userRepository = userRepository;
+        this.userService = userService;
         this.environment = environment;
     }
 
@@ -120,7 +120,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
     }
 
     private void sendStatusMessage(Long chatId) {
-        Optional<AppUser> userOpt = userRepository.findByTelegramChatId(chatId);
+        Optional<AppUser> userOpt = userService.findByTelegramChatId(chatId);
         if (userOpt.isPresent()) {
             AppUser user = userOpt.get();
             String msg = "<b>✅ Bağlantı Durumu: Aktif</b>\n\n" +
@@ -140,15 +140,9 @@ public class TelegramBotService extends TelegramLongPollingBot {
     }
 
     private void sendDisconnectConfirmation(Long chatId) {
-        Optional<AppUser> userOpt = userRepository.findByTelegramChatId(chatId);
-        if (userOpt.isPresent()) {
-            AppUser user = userOpt.get();
-            user.setTelegramChatId(null);
-            user.setTelegramVerificationCode(null);
-            userRepository.save(user);
-            log.info("Telegram bağlantısı kesildi: {} -> chatId={}", user.getUsername(), chatId);
+        if (userService.disconnectTelegramByChatId(chatId)) {
             sendMessage(chatId, "<b>🔌 Bağlantı Kesildi</b>\n\n" +
-                    "\"" + escapeHtml(user.getUsername()) + "\" hesabının Telegram bağlantısı kaldırıldı.\n\n" +
+                    "Telegram bağlantınız kaldırıldı.\n\n" +
                     "Tekrar bağlanmak için web panelden yeni bir kod alıp /start ile başlayabilirsiniz.");
         } else {
             sendMessage(chatId, "❌ Bu Telegram hesabı zaten bir kullanıcıya bağlı değil.");
@@ -161,7 +155,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
             return;
         }
 
-        Optional<AppUser> userOpt = userRepository.findByTelegramVerificationCode(code);
+        Optional<AppUser> userOpt = userService.findByTelegramVerificationCode(code);
 
         if (userOpt.isEmpty()) {
             sendMessage(chatId, "❌ Bu doğrulama kodu bulunamadı.\n\n" +
@@ -171,7 +165,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
 
         AppUser user = userOpt.get();
 
-        Optional<AppUser> existingChatUser = userRepository.findByTelegramChatId(chatId);
+        Optional<AppUser> existingChatUser = userService.findByTelegramChatId(chatId);
         if (existingChatUser.isPresent() && !existingChatUser.get().getId().equals(user.getId())) {
             sendMessage(chatId, "⚠️ Bu Telegram hesabı zaten başka bir kullanıcıya (<b>" +
                     escapeHtml(existingChatUser.get().getUsername()) + "</b>) bağlı.\n\n" +
@@ -179,7 +173,10 @@ public class TelegramBotService extends TelegramLongPollingBot {
             return;
         }
 
-        userRepository.linkTelegramChatId(user.getId(), chatId);
+        if (!userService.linkTelegramChatId(code, chatId)) {
+            sendMessage(chatId, "❌ Bağlantı kurulamadı. Lütfen tekrar deneyin.");
+            return;
+        }
         log.info("Telegram bağlantısı kuruldu: {} -> chatId={}", user.getUsername(), chatId);
 
         String msg = "<b>✅ Doğrulama Başarılı!</b>\n\n" +

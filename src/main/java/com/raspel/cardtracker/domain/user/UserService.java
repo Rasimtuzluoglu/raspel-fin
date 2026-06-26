@@ -202,4 +202,33 @@ public class UserService implements UserDetailsService {
             userRepository.save(user);
         });
     }
+
+    public boolean linkTelegramChatId(String verificationCode, Long chatId) {
+        AppUser user = userRepository.findByTelegramVerificationCode(verificationCode)
+                .orElse(null);
+        if (user == null) return false;
+
+        Optional<AppUser> existingChatUser = userRepository.findByTelegramChatId(chatId);
+        if (existingChatUser.isPresent() && !existingChatUser.get().getId().equals(user.getId())) {
+            return false;
+        }
+
+        userRepository.linkTelegramChatId(user.getId(), chatId);
+        return true;
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<AppUser> findByTelegramVerificationCode(String code) {
+        return userRepository.findByTelegramVerificationCode(code);
+    }
+
+    public boolean disconnectTelegramByChatId(Long chatId) {
+        Optional<AppUser> userOpt = userRepository.findByTelegramChatId(chatId);
+        if (userOpt.isEmpty()) return false;
+        AppUser user = userOpt.get();
+        user.setTelegramChatId(null);
+        user.setTelegramVerificationCode(null);
+        userRepository.save(user);
+        return true;
+    }
 }
