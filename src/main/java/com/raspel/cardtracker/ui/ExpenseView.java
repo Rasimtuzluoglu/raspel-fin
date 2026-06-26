@@ -211,19 +211,6 @@ public class ExpenseView extends VerticalLayout {
             btn.getElement().setAttribute("title", "Ödendi İşaretle");
             return btn;
         }).setHeader("").setWidth("50px").setFlexGrow(0);
-
-        // Düzenle/Sil
-        grid.addComponentColumn(entry -> {
-            Button editBtn = new Button(new Icon(VaadinIcon.EDIT), e -> openExpenseDialog(entry.getExpense()));
-            editBtn.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
-
-            Button deleteBtn = new Button(new Icon(VaadinIcon.TRASH), e -> deleteExpense(entry.getExpense()));
-            deleteBtn.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_ERROR);
-
-            HorizontalLayout layout = new HorizontalLayout(editBtn, deleteBtn);
-            layout.setSpacing(true);
-            return layout;
-        }).setHeader("İşlemler").setAutoWidth(true);
     }
 
     private void configureFilters() {
@@ -255,9 +242,6 @@ public class ExpenseView extends VerticalLayout {
     private HorizontalLayout createToolbar() {
         H3 title = new H3("Harcama Yönetimi");
         title.getStyle().set("margin", "0");
-
-        Button addBtn = new Button("Yeni Harcama", new Icon(VaadinIcon.PLUS), e -> openExpenseDialog(null));
-        addBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
         Button importBtn = new Button("Excel Import", new Icon(VaadinIcon.UPLOAD), e -> openImportDialog());
         importBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
@@ -328,7 +312,7 @@ public class ExpenseView extends VerticalLayout {
         );
         pdfExportAnchor.setHref(pdfExportResource);
 
-        HorizontalLayout toolbar = new HorizontalLayout(title, addBtn, importBtn, templateAnchor, exportAnchor, pdfExportAnchor);
+        HorizontalLayout toolbar = new HorizontalLayout(title, importBtn, templateAnchor, exportAnchor, pdfExportAnchor);
         toolbar.setAlignItems(Alignment.CENTER);
         toolbar.setWidthFull();
         toolbar.expand(title);

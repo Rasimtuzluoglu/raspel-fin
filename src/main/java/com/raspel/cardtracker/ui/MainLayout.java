@@ -673,7 +673,7 @@ public class MainLayout extends AppLayout {
             if ("card".equals(dialogType) && content instanceof CardListView cv) {
                 cv.openEditDialog(null);
             } else if ("expense".equals(dialogType) && content instanceof ExpenseView ev) {
-                ev.openExpenseDialog(null);
+                getUI().ifPresent(ui -> ui.navigate("budgets"));
             } else if ("cheque".equals(dialogType) && content instanceof ChequeView cv) {
                 cv.openEditDialog(null, com.raspel.cardtracker.domain.cheque.ChequeType.ENTERING);
             }

@@ -5,8 +5,6 @@ import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.combobox.ComboBox;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.formlayout.FormLayout;
-import com.vaadin.flow.component.grid.Grid;
-import com.vaadin.flow.component.grid.GridVariant;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.H3;
 import com.vaadin.flow.component.html.H4;
@@ -17,7 +15,6 @@ import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
-import com.vaadin.flow.component.progressbar.ProgressBar;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
@@ -47,13 +44,12 @@ public class BudgetView extends VerticalLayout {
     private final DepartmentService departmentService;
     private final CardService cardService;
     private final ExpenseService expenseService;
-    
-    private final Grid<DepartmentBudget> grid = new Grid<>(DepartmentBudget.class, false);
-    private final ProgressBar loadingBar = new ProgressBar();
-    private final Div emptyState = new Div();
-    private final VerticalLayout deptListSection = new VerticalLayout();
 
-    public BudgetView(DepartmentBudgetService budgetService, CardService cardService, DepartmentService departmentService, ExpenseService expenseService) {
+    private final VerticalLayout cardsContainer = new VerticalLayout();
+    private final Div emptyState = new Div();
+
+    public BudgetView(DepartmentBudgetService budgetService, CardService cardService,
+                      DepartmentService departmentService, ExpenseService expenseService) {
         this.budgetService = budgetService;
         this.departmentService = departmentService;
         this.cardService = cardService;
@@ -64,451 +60,277 @@ public class BudgetView extends VerticalLayout {
         setPadding(true);
         setSpacing(true);
 
-        loadingBar.setIndeterminate(true);
-        loadingBar.setVisible(false);
-        loadingBar.setWidthFull();
-        add(loadingBar);
+        H3 title = new H3("Bütçe Yönetimi");
+        title.getStyle().set("margin-top", "0");
 
-        HorizontalLayout toolbar = createToolbar();
-        toolbar.addClassName("view-toolbar");
-        configureGrid();
+        HorizontalLayout toolbar = new HorizontalLayout(title, createAddSection());
+        toolbar.setWidthFull();
+        toolbar.setAlignItems(Alignment.CENTER);
+        toolbar.expand(title);
 
-        HorizontalLayout deptAddSection = createDepartmentAddSection();
-        deptAddSection.getStyle().set("margin-bottom", "16px");
-
-        deptListSection.setPadding(false);
-        deptListSection.setSpacing(false);
-        refreshDeptList();
-
-        add(toolbar, deptAddSection, deptListSection, grid);
         configureEmptyState();
-        add(emptyState);
-        refreshGrid();
+        cardsContainer.setPadding(false);
+        cardsContainer.setSpacing(false);
+        cardsContainer.getStyle().set("gap", "12px");
+
+        add(toolbar, cardsContainer, emptyState);
+        refreshAll();
     }
 
-    private HorizontalLayout createDepartmentAddSection() {
-        TextField deptNameField = new TextField();
-        deptNameField.setPlaceholder("Departman adı girin");
-        deptNameField.setWidth("250px");
+    private HorizontalLayout createAddSection() {
+        Button newBudgetBtn = new Button("Yeni Bütçe", new Icon(VaadinIcon.PLUS), e -> openBudgetDialog(null));
+        newBudgetBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
 
-        ComboBox<Department> deptSelect = new ComboBox<>();
-        deptSelect.setItems(departmentService.findAllActive());
-        deptSelect.setItemLabelGenerator(Department::getName);
-        deptSelect.setPlaceholder("Silinecek departman");
-        deptSelect.setWidth("250px");
+        Button deptBtn = new Button("Departman Ekle", new Icon(VaadinIcon.PLUS), e -> openDeptDialog());
+        deptBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
 
-        Button addBtn = new Button("Ekle", new Icon(VaadinIcon.PLUS), e -> {
-            String name = deptNameField.getValue();
-            if (name == null || name.trim().isEmpty()) {
-                Notification.show("Departman adı boş olamaz", 3000, Notification.Position.MIDDLE)
-                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
-                return;
-            }
-            if (departmentService.findByName(name.trim()).isPresent()) {
-                Notification.show("Bu isimde bir departman zaten mevcut", 3000, Notification.Position.MIDDLE)
-                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
-                return;
-            }
-            Department dept = Department.builder().name(name.trim()).isActive(true).build();
-            departmentService.save(dept);
-            Notification.show("Departman eklendi: " + name.trim(), 3000, Notification.Position.MIDDLE)
-                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-            deptNameField.clear();
-            deptSelect.setItems(departmentService.findAllActive());
-            refreshDeptList();
-            refreshGrid();
-        });
-        addBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_SMALL);
-
-        Button deleteBtn = new Button("Sil", new Icon(VaadinIcon.TRASH), e -> {
-            Department selected = deptSelect.getValue();
-            if (selected == null) {
-                Notification.show("Lütfen bir departman seçin", 3000, Notification.Position.MIDDLE)
-                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
-                return;
-            }
-            Dialog confirm = new Dialog();
-            confirm.setHeaderTitle("Departman Sil");
-            confirm.add(new Span("\"" + selected.getName() + "\" departmanı ve varsa bu departmana ait tüm bütçe kayıtları silinecektir. Kartların departman bağlantısı kaldırılacaktır."));
-            Button yesBtn = new Button("Evet, Sil", ev -> {
-                departmentService.delete(selected.getId());
-                Notification.show("Departman silindi: " + selected.getName(), 3000, Notification.Position.MIDDLE)
-                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-                deptSelect.setItems(departmentService.findAllActive());
-                deptSelect.clear();
-                refreshDeptList();
-                refreshGrid();
-                confirm.close();
-            });
-            yesBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_ERROR);
-            Button noBtn = new Button("Vazgeç", ev -> confirm.close());
-            confirm.getFooter().add(noBtn, yesBtn);
-            confirm.open();
-        });
-        deleteBtn.addThemeVariants(ButtonVariant.LUMO_ERROR, ButtonVariant.LUMO_SMALL);
-
-        HorizontalLayout section = new HorizontalLayout(deptNameField, addBtn, deptSelect, deleteBtn);
-        section.setAlignItems(Alignment.END);
-        section.setSpacing(true);
-        section.setWidthFull();
-        section.getStyle().set("flex-wrap", "wrap");
-
-        return section;
+        return new HorizontalLayout(newBudgetBtn, deptBtn);
     }
 
-    private void refreshDeptList() {
-        deptListSection.removeAll();
-        Span deptListTitle = new Span("Mevcut Departmanlar:");
-        deptListTitle.getStyle().set("font-weight", "600").set("font-size", "0.9em").set("color", "var(--lumo-secondary-text-color)").set("margin-bottom", "0.5em");
-        deptListSection.add(deptListTitle);
-        List<Department> departments = departmentService.findAllActive();
-        if (departments.isEmpty()) {
-            deptListSection.add(new Span("Henüz departman eklenmemiş."));
-        } else {
-            HorizontalLayout deptCards = new HorizontalLayout();
-            deptCards.setSpacing(true);
-            deptCards.getStyle().set("flex-wrap", "wrap").set("gap", "8px");
-            for (Department d : departments) {
-                long cardCount = cardService.findAllActive().stream().filter(c -> c.getDepartment() != null && c.getDepartment().getId().equals(d.getId())).count();
-                LocalDate now = LocalDate.now();
-                var budgetOpt = budgetService.findByDepartmentAndYearAndMonth(d.getId(), now.getYear(), now.getMonthValue());
-                String budgetInfo = budgetOpt.map(b -> FormatUtils.formatNumber(b.getBudgetLimit()) + " ₺").orElse("Bütçe yok");
+    private void openDeptDialog() {
+        Dialog d = new Dialog();
+        d.setHeaderTitle("Yeni Departman");
+        d.setWidth("380px");
+        TextField name = new TextField("Departman Adı");
+        name.setWidthFull();
+        Button save = new Button("Ekle", ev -> {
+            String n = name.getValue().trim();
+            if (n.isEmpty()) { Notification.show("Ad boş olamaz", 3000, Notification.Position.MIDDLE).addThemeVariants(NotificationVariant.LUMO_ERROR); return; }
+            departmentService.save(Department.builder().name(n).isActive(true).build());
+            Notification.show("Eklendi", 2000, Notification.Position.MIDDLE).addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+            d.close(); refreshAll();
+        });
+        save.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        Button cancel = new Button("İptal", ev -> d.close());
+        d.add(name);
+        d.getFooter().add(cancel, save);
+        d.open();
+        d.getElement().getStyle().set("overflow", "hidden");
+    }
 
-                Div card = new Div();
-                card.getStyle()
-                        .set("background", "var(--lumo-contrast-5pct)")
-                        .set("border-radius", "10px")
-                        .set("padding", "0.7em 1em")
-                        .set("min-width", "160px");
-                Span name = new Span(d.getName());
-                name.getStyle().set("font-weight", "600").set("font-size", "0.9em").set("display", "block");
-                Span info = new Span(cardCount + " kart · " + budgetInfo);
-                info.getStyle().set("font-size", "0.7em").set("color", "var(--lumo-secondary-text-color)").set("display", "block").set("margin-top", "0.2em");
-                card.add(name, info);
-                deptCards.add(card);
+    private void openBudgetDialog(DepartmentBudget edit) {
+        Dialog d = new Dialog();
+        d.setHeaderTitle(edit == null ? "Yeni Bütçe" : "Bütçe Düzenle");
+        d.setWidth("420px");
+        FormLayout f = new FormLayout();
+
+        ComboBox<Department> deptCb = new ComboBox<>("Departman");
+        deptCb.setItems(departmentService.findAllActive());
+        deptCb.setItemLabelGenerator(Department::getName);
+        deptCb.setWidthFull();
+
+        int yr = LocalDate.now().getYear();
+        ComboBox<Integer> yearCb = new ComboBox<>("Yıl");
+        yearCb.setItems(java.util.stream.IntStream.rangeClosed(yr - 2, yr + 10).boxed().toList());
+        yearCb.setValue(yr); yearCb.setWidthFull();
+
+        ComboBox<Integer> monthCb = new ComboBox<>("Ay");
+        monthCb.setItems(1,2,3,4,5,6,7,8,9,10,11,12);
+        monthCb.setValue(LocalDate.now().getMonthValue()); monthCb.setWidthFull();
+
+        TextField limitF = new TextField("Limit (₺)");
+        limitF.setValue("0,00"); FormatUtils.attachCurrencyFormatting(limitF); limitF.setWidthFull();
+
+        if (edit != null) {
+            deptCb.setValue(edit.getDepartment());
+            yearCb.setValue(edit.getBudgetYear());
+            monthCb.setValue(edit.getBudgetMonth());
+            limitF.setValue(FormatUtils.formatTurkishCurrency(edit.getBudgetLimit()));
+        }
+
+        f.add(deptCb, yearCb, monthCb, limitF);
+
+        Button save = new Button("Kaydet", ev -> {
+            if (deptCb.isEmpty() || yearCb.isEmpty() || monthCb.isEmpty() || limitF.isEmpty()) {
+                Notification.show("Tüm alanları doldurun", 3000, Notification.Position.MIDDLE).addThemeVariants(NotificationVariant.LUMO_ERROR); return;
             }
-            deptListSection.add(deptCards);
+            BigDecimal lim = FormatUtils.parseTurkishCurrency(limitF.getValue());
+            if (lim.compareTo(BigDecimal.ZERO) <= 0) {
+                Notification.show("Limit > 0 olmalı", 3000, Notification.Position.MIDDLE).addThemeVariants(NotificationVariant.LUMO_ERROR); return;
+            }
+            Department dept = deptCb.getValue();
+            var ex = budgetService.findByDepartmentAndYearAndMonth(dept.getId(), yearCb.getValue(), monthCb.getValue());
+            if (ex.isPresent() && (edit == null || !ex.get().getId().equals(edit.getId()))) {
+                Notification.show("Bu ay için zaten bütçe var", 4000, Notification.Position.MIDDLE).addThemeVariants(NotificationVariant.LUMO_ERROR); return;
+            }
+            DepartmentBudget b = edit != null ? edit : new DepartmentBudget();
+            b.setDepartment(dept); b.setBudgetYear(yearCb.getValue()); b.setBudgetMonth(monthCb.getValue()); b.setBudgetLimit(lim);
+            budgetService.save(b);
+            Notification.show("Kaydedildi", 2000, Notification.Position.MIDDLE).addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+            d.close(); refreshAll();
+        });
+        save.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        Button cancel = new Button("İptal", ev -> d.close());
+        d.add(f); d.getFooter().add(cancel, save);
+        d.open(); d.getElement().getStyle().set("overflow", "hidden");
+    }
+
+    private void refreshAll() {
+        cardsContainer.removeAll();
+        int yr = LocalDate.now().getYear();
+        int mn = LocalDate.now().getMonthValue();
+        List<DepartmentBudget> budgets = budgetService.findByYearAndMonth(yr, mn);
+        if (budgets.isEmpty()) { emptyState.getStyle().set("display", "flex"); cardsContainer.setVisible(false); return; }
+        emptyState.getStyle().set("display", "none"); cardsContainer.setVisible(true);
+        for (DepartmentBudget b : budgets) {
+            cardsContainer.add(buildDeptCard(b));
         }
     }
 
-    private HorizontalLayout createToolbar() {
-        H3 title = new H3("Departman Aylık Bütçe Limitleri");
-        title.getStyle().set("margin", "0");
+    private VerticalLayout buildDeptCard(DepartmentBudget budget) {
+        String deptName = budget.getDepartment() != null ? budget.getDepartment().getName() : "Bilinmeyen";
+        BigDecimal limit = budget.getBudgetLimit();
+        BigDecimal spent = expenseService.getDepartmentSpentForMonth(deptName, budget.getBudgetYear(), budget.getBudgetMonth());
+        BigDecimal remaining = limit.subtract(spent);
+        boolean over = remaining.compareTo(BigDecimal.ZERO) < 0;
 
-        Button addBtn = new Button("Yeni Bütçe Tanımla", new Icon(VaadinIcon.PLUS), e -> openEditDialog(null));
-        addBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        Div card = new Div();
+        card.getStyle()
+                .set("border-radius", "12px")
+                .set("padding", "16px 20px")
+                .set("background", over ? "var(--lumo-error-color-10pct)" : "var(--lumo-base-color)")
+                .set("border", over ? "2px solid var(--lumo-error-color)" : "1px solid var(--lumo-contrast-10pct)")
+                .set("box-shadow", "0 1px 4px rgba(0,0,0,0.06)");
 
-        HorizontalLayout toolbar = new HorizontalLayout(title, addBtn);
-        toolbar.setAlignItems(Alignment.CENTER);
-        toolbar.setWidthFull();
-        toolbar.expand(title);
-        return toolbar;
+        HorizontalLayout top = new HorizontalLayout();
+        top.setWidthFull(); top.setAlignItems(Alignment.CENTER);
+
+        Span nameSpan = new Span(deptName);
+        nameSpan.getStyle().set("font-weight", "700").set("font-size", "1em");
+
+        Span spentSpan = new Span(FormatUtils.formatNumber(spent) + " / " + FormatUtils.formatNumber(limit) + " ₺");
+        spentSpan.getStyle().set("font-size", "0.8em").set("color", "var(--lumo-secondary-text-color)");
+
+        Span remainingSpan = new Span("Kalan: " + FormatUtils.formatNumber(remaining.abs()) + " ₺");
+        remainingSpan.getStyle().set("font-weight", "600").set("font-size", "0.8em")
+                .set("color", over ? "var(--lumo-error-color)" : "var(--lumo-success-color)");
+
+        top.add(nameSpan, spentSpan, remainingSpan);
+        top.expand(nameSpan);
+
+        Div bar = new Div();
+        bar.getStyle().set("height", "10px").set("border-radius", "5px").set("background", "var(--lumo-contrast-10pct)").set("margin-top", "10px").set("overflow", "hidden");
+        double pct = limit.compareTo(BigDecimal.ZERO) > 0 ? Math.min(100, spent.doubleValue() / limit.doubleValue() * 100) : 0;
+        Div fill = new Div();
+        fill.getStyle().set("height", "100%").set("width", pct + "%").set("background", over ? "var(--lumo-error-color)" : "var(--lumo-success-color)").set("border-radius", "5px").set("transition", "width 0.3s ease");
+        bar.add(fill);
+
+        VerticalLayout content = new VerticalLayout(top, bar);
+        content.setPadding(false); content.setSpacing(false);
+
+        // Expandable expense list
+        Div detail = new Div();
+        detail.setVisible(false);
+        detail.getStyle().set("margin-top", "12px").set("padding-top", "12px").set("border-top", "1px solid var(--lumo-contrast-10pct)");
+        VerticalLayout expList = new VerticalLayout();
+        expList.setPadding(false); expList.setSpacing(false); expList.getStyle().set("gap", "4px");
+        buildExpenseList(budget, expList);
+
+        Button toggleBtn = new Button("Harcamalar", new Icon(VaadinIcon.CHEVRON_DOWN), ev -> {
+            boolean show = !detail.isVisible();
+            detail.setVisible(show);
+            if (show) { expList.removeAll(); buildExpenseList(budget, expList); }
+            ev.getSource().setIcon(new Icon(show ? VaadinIcon.CHEVRON_UP : VaadinIcon.CHEVRON_DOWN));
+        });
+        toggleBtn.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
+
+        Button addExpBtn = new Button("Yeni Harcama", new Icon(VaadinIcon.PLUS), ev -> openBudgetExpenseDialog(budget));
+        addExpBtn.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_PRIMARY);
+
+        Button editBtn = new Button(new Icon(VaadinIcon.EDIT), ev -> openBudgetDialog(budget));
+        editBtn.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
+
+        Button delBtn = new Button(new Icon(VaadinIcon.TRASH), ev -> {
+            Dialog c = new Dialog(); c.setHeaderTitle("Bütçeyi Sil");
+            c.add(new Span("Bu bütçe silinecek. Emin misiniz?"));
+            Button yes = new Button("Sil", e2 -> { budgetService.delete(budget.getId()); c.close(); refreshAll(); });
+            yes.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_ERROR);
+            Button no = new Button("İptal", e2 -> c.close());
+            c.getFooter().add(no, yes); c.open();
+        });
+        delBtn.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_ERROR);
+
+        detail.add(expList);
+
+        HorizontalLayout actions = new HorizontalLayout(toggleBtn, addExpBtn, editBtn, delBtn);
+        actions.setWidthFull(); actions.setSpacing(true);
+        actions.expand(toggleBtn);
+
+        card.add(content, actions, detail);
+        card.getElement().addEventListener("click", ev -> {});
+        VerticalLayout wrapper = new VerticalLayout(card);
+        wrapper.setPadding(false); wrapper.setSpacing(false);
+        return wrapper;
     }
 
-    private void configureGrid() {
-        grid.addThemeVariants(GridVariant.LUMO_ROW_STRIPES, GridVariant.LUMO_WRAP_CELL_CONTENT);
-        grid.setSizeFull();
+    private VerticalLayout buildExpenseList(DepartmentBudget budget, VerticalLayout container) {
+        container.removeAll();
+        String deptName = budget.getDepartment() != null ? budget.getDepartment().getName() : "";
+        // Get expenses for this department in this month via installment entries
+        List<com.raspel.cardtracker.domain.expense.InstallmentEntry> entries = expenseService.getInstallmentsForMonth(budget.getBudgetYear(), budget.getBudgetMonth());
+        boolean found = false;
+        for (com.raspel.cardtracker.domain.expense.InstallmentEntry ie : entries) {
+            if (ie.getExpense() == null || ie.getExpense().getCard() == null) continue;
+            String cd = ie.getExpense().getCard().getDepartment() != null ? ie.getExpense().getCard().getDepartment().getName() : "";
+            if (!cd.equalsIgnoreCase(deptName)) continue;
+            found = true;
+            HorizontalLayout row = new HorizontalLayout();
+            row.setWidthFull(); row.setAlignItems(Alignment.CENTER); row.getStyle().set("padding", "2px 0").set("gap", "8px");
+            String desc = ie.getExpense().getDescription() != null ? ie.getExpense().getDescription() : "";
+            if (desc.length() > 25) desc = desc.substring(0, 25) + "...";
+            Span d = new Span(desc);
+            d.getStyle().set("font-size", "0.8em"); Span a = new Span(FormatUtils.formatNumber(ie.getAmount()) + " ₺");
+            a.getStyle().set("font-weight", "600").set("font-size", "0.8em").set("margin-left", "auto");
+            row.add(d, a); row.expand(d);
+            container.add(row);
+        }
+        if (!found) container.add(new Span("Henüz harcama yok."));
+        return container;
+    }
 
-        grid.addColumn(b -> b.getDepartment() != null ? b.getDepartment().getName() : "-").setHeader("Departman").setSortable(true).setAutoWidth(true);
-        grid.addColumn(DepartmentBudget::getBudgetYear).setHeader("Yıl").setSortable(true).setAutoWidth(true);
-        grid.addColumn(b -> {
-            String[] months = {"", "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
-                    "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"};
-            return months[b.getBudgetMonth()];
-        }).setHeader("Ay").setSortable(true).setAutoWidth(true);
+    private void openBudgetExpenseDialog(DepartmentBudget budget) {
+        String deptName = budget.getDepartment() != null ? budget.getDepartment().getName() : "";
+        BigDecimal spent = expenseService.getDepartmentSpentForMonth(deptName, budget.getBudgetYear(), budget.getBudgetMonth());
+        BigDecimal raw = budget.getBudgetLimit().subtract(spent);
+        final BigDecimal remaining = raw.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : raw;
 
-        grid.addColumn(b -> FormatUtils.formatNumber(b.getBudgetLimit()) + " ₺")
-                .setHeader("Bütçe Limiti").setSortable(true).setAutoWidth(true);
+        Dialog d = new Dialog();
+        d.setHeaderTitle(deptName + " - Harcama Ekle");
+        d.setWidth("420px");
 
-        grid.addComponentColumn(budget -> {
-            String deptName = budget.getDepartment() != null ? budget.getDepartment().getName() : "";
-            BigDecimal spent = expenseService.getDepartmentSpentForMonth(deptName, budget.getBudgetYear(), budget.getBudgetMonth());
-            BigDecimal limit = budget.getBudgetLimit();
-            BigDecimal remaining = limit != null ? limit.subtract(spent) : BigDecimal.ZERO;
-            if (remaining.compareTo(BigDecimal.ZERO) < 0) remaining = BigDecimal.ZERO;
+        Span rem = new Span("Kalan: " + FormatUtils.formatNumber(remaining) + " ₺");
+        rem.getStyle().set("font-weight", "600").set("color", remaining.compareTo(BigDecimal.ZERO) <= 0 ? "var(--lumo-error-color)" : "var(--lumo-success-color)").set("display", "block").set("text-align", "center").set("padding", "8px").set("background", "var(--lumo-contrast-5pct)").set("border-radius", "8px");
 
-            double pct = limit != null && limit.compareTo(BigDecimal.ZERO) > 0
-                    ? spent.divide(limit, 4, RoundingMode.HALF_UP).doubleValue() * 100 : 0;
-            if (pct > 100) pct = 100;
+        ComboBox<Card> cardCb = new ComboBox<>("Kart");
+        List<Card> deptCards = cardService.findAllActive().stream().filter(c -> c.getDepartment() != null && c.getDepartment().getId().equals(budget.getDepartment().getId())).collect(java.util.stream.Collectors.toList());
+        cardCb.setItems(deptCards.isEmpty() ? cardService.findAllActive() : deptCards);
+        cardCb.setItemLabelGenerator(c -> c.getName() + " (" + c.getBank() + ")"); cardCb.setWidthFull();
 
-            Span pctSpan = new Span(FormatUtils.formatNumber(spent) + " ₺ / %" + String.format("%.0f", pct));
-            pctSpan.getStyle().set("font-size", "0.8em");
-            pctSpan.getStyle().set("color", pct >= 80 ? "var(--lumo-error-color)" : "var(--lumo-body-text-color)");
-            return pctSpan;
-        }).setHeader("Harcanan / %").setAutoWidth(true);
+        TextArea descF = new TextArea("Açıklama"); descF.setWidthFull();
+        TextField amtF = new TextField("Tutar (₺)"); amtF.setValue("0,00"); FormatUtils.attachCurrencyFormatting(amtF); amtF.setWidthFull();
 
-        grid.addComponentColumn(budget -> {
-            Button spendBtn = new Button(new Icon(VaadinIcon.MONEY), e -> openSpendDialog(budget));
-            spendBtn.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_SUCCESS);
-            spendBtn.getElement().setAttribute("title", "Harca");
-
-            Button editBtn = new Button(new Icon(VaadinIcon.EDIT), e -> openEditDialog(budget));
-            editBtn.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
-            editBtn.getElement().setAttribute("title", "Düzenle");
-
-            Button deleteBtn = new Button(new Icon(VaadinIcon.TRASH), e -> deleteBudget(budget));
-            deleteBtn.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_ERROR);
-            deleteBtn.getElement().setAttribute("title", "Sil");
-
-            HorizontalLayout layout = new HorizontalLayout(spendBtn, editBtn, deleteBtn);
-            layout.setSpacing(true);
-            return layout;
-        }).setHeader("İşlemler").setAutoWidth(true);
+        Button save = new Button("Kaydet", ev -> {
+            if (cardCb.isEmpty()) { Notification.show("Kart seçin", 3000, Notification.Position.MIDDLE).addThemeVariants(NotificationVariant.LUMO_ERROR); return; }
+            BigDecimal amt = FormatUtils.parseTurkishCurrency(amtF.getValue());
+            if (amt == null || amt.compareTo(BigDecimal.ZERO) <= 0) { Notification.show("Geçerli tutar girin", 3000, Notification.Position.MIDDLE).addThemeVariants(NotificationVariant.LUMO_ERROR); return; }
+            if (amt.compareTo(remaining) > 0) { Notification.show("Tutar kalan bütçeyi aşıyor: " + FormatUtils.formatNumber(remaining) + " ₺", 4000, Notification.Position.MIDDLE).addThemeVariants(NotificationVariant.LUMO_ERROR); return; }
+            Card card = cardCb.getValue();
+            if (card.getDepartment() == null || !card.getDepartment().getId().equals(budget.getDepartment().getId())) {
+                card.setDepartment(budget.getDepartment()); cardService.save(card);
+            }
+            Expense exp = Expense.builder().card(card).description(descF.getValue() != null ? descF.getValue() : deptName + " harcaması").totalAmount(amt).originalAmount(amt).installments(1).expenseDate(LocalDate.now()).currency("TRY").category(deptName).build();
+            expenseService.createExpense(exp);
+            Notification.show("Kaydedildi: " + FormatUtils.formatNumber(amt) + " ₺", 2000, Notification.Position.MIDDLE).addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+            d.close(); refreshAll();
+        });
+        save.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        Button cancel = new Button("İptal", ev -> d.close());
+        d.add(rem, cardCb, descF, amtF); d.getFooter().add(cancel, save);
+        d.open(); d.getElement().getStyle().set("overflow", "hidden");
     }
 
     private void configureEmptyState() {
-        emptyState.getStyle()
-                .set("display", "none")
-                .set("flex-direction", "column")
-                .set("align-items", "center")
-                .set("justify-content", "center")
-                .set("text-align", "center")
-                .set("flex", "1")
-                .set("margin", "auto")
-                .set("width", "100%");
-        Span emptyIcon = new Span("\uD83D\uDCB0");
-        emptyIcon.getStyle().set("font-size", "3em").set("display", "block");
-        Span emptyText = new Span("Henüz bütçe kaydı bulunmuyor.");
-        emptyText.getStyle()
-                .set("color", "var(--lumo-secondary-text-color)")
-                .set("font-size", "1.1em")
-                .set("margin-top", "1em");
-        emptyState.add(emptyIcon, emptyText);
-    }
-
-    private void refreshGrid() {
-        loadingBar.setVisible(true);
-        List<DepartmentBudget> budgets = budgetService.findAll();
-        grid.setItems(budgets);
-        if (budgets.isEmpty()) {
-            grid.setVisible(false);
-            emptyState.getStyle().set("display", "flex");
-        } else {
-            grid.setVisible(true);
-            emptyState.getStyle().set("display", "none");
-        }
-        refreshDeptList();
-        loadingBar.setVisible(false);
-    }
-
-    private void openEditDialog(DepartmentBudget budgetToEdit) {
-        Dialog dialog = new Dialog();
-        dialog.setHeaderTitle(budgetToEdit == null ? "Yeni Bütçe Tanımla" : "Bütçe Düzenle");
-        dialog.setWidth("450px");
-
-        FormLayout form = new FormLayout();
-
-        ComboBox<Department> deptField = new ComboBox<>("Departman");
-        deptField.setItems(departmentService.findAllActive());
-        deptField.setItemLabelGenerator(Department::getName);
-        deptField.setRequired(true);
-        deptField.setWidthFull();
-
-        int currentYear = LocalDate.now().getYear();
-        ComboBox<Integer> yearField = new ComboBox<>("Yil");
-        yearField.setItems(java.util.stream.IntStream.rangeClosed(currentYear - 2, currentYear + 10).boxed().toList());
-        yearField.setValue(currentYear);
-        yearField.setRequired(true);
-
-        ComboBox<Integer> monthField = new ComboBox<>("Ay");
-        monthField.setItems(List.of(1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12));
-        monthField.setItemLabelGenerator(m -> {
-            String[] months = {"", "Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran",
-                    "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"};
-            return months[m];
-        });
-        monthField.setValue(LocalDate.now().getMonthValue());
-        monthField.setRequired(true);
-
-        TextField limitField = new TextField("Bütçe Limiti (TL)");
-        limitField.setValue("0,00");
-        limitField.setRequired(true);
-        FormatUtils.attachCurrencyFormatting(limitField);
-
-        form.add(deptField, yearField, monthField, limitField);
-
-        if (budgetToEdit != null) {
-            deptField.setValue(budgetToEdit.getDepartment());
-            yearField.setValue(budgetToEdit.getBudgetYear());
-            monthField.setValue(budgetToEdit.getBudgetMonth());
-            limitField.setValue(FormatUtils.formatTurkishCurrency(budgetToEdit.getBudgetLimit()));
-        }
-
-        Button saveBtn = new Button("Kaydet", e -> {
-            if (deptField.isEmpty() || yearField.isEmpty() || monthField.isEmpty() || limitField.isEmpty()) {
-                Notification.show("Lütfen tüm alanları doldurun!", 3000, Notification.Position.MIDDLE)
-                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
-                return;
-            }
-
-            BigDecimal limitVal = FormatUtils.parseTurkishCurrency(limitField.getValue());
-            if (limitVal.compareTo(BigDecimal.ZERO) <= 0) {
-                Notification.show("Bütçe limiti 0'dan büyük olmalıdır!", 3000, Notification.Position.MIDDLE)
-                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
-                return;
-            }
-
-            Department dept = deptField.getValue();
-            if (dept == null) {
-                Notification.show("Lütfen bir departman seçin!", 3000, Notification.Position.MIDDLE).addThemeVariants(NotificationVariant.LUMO_ERROR);
-                return;
-            }
-            Integer yr = yearField.getValue();
-            Integer mn = monthField.getValue();
-
-            var existing = budgetService.findByDepartmentAndYearAndMonth(dept.getId(), yr, mn);
-            if (existing.isPresent() && (budgetToEdit == null || !existing.get().getId().equals(budgetToEdit.getId()))) {
-                Notification.show("Bu departman ve tarih için zaten bir bütçe tanımlanmış!", 4000, Notification.Position.MIDDLE)
-                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
-                return;
-            }
-
-            DepartmentBudget budget = budgetToEdit != null ? budgetToEdit : new DepartmentBudget();
-            budget.setDepartment(dept);
-            budget.setBudgetYear(yr);
-            budget.setBudgetMonth(mn);
-            budget.setBudgetLimit(limitVal);
-
-            try {
-                budgetService.save(budget);
-                Notification.show("Bütçe kaydedildi.", 3000, Notification.Position.MIDDLE)
-                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-                dialog.close();
-                refreshGrid();
-            } catch (Exception ex) {
-                Notification.show("Bir hata oluştu, lütfen tekrar deneyin.", 3000, Notification.Position.MIDDLE)
-                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
-            }
-        });
-        saveBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-        saveBtn.addClickShortcut(com.vaadin.flow.component.Key.ENTER);
-
-        Button cancelBtn = new Button("İptal", e -> dialog.close());
-        cancelBtn.addClickShortcut(com.vaadin.flow.component.Key.ESCAPE);
-        dialog.getFooter().add(cancelBtn, saveBtn);
-
-        dialog.add(form);
-        dialog.open();
-        dialog.getElement().getStyle().set("overflow", "hidden");
-    }
-
-    private void deleteBudget(DepartmentBudget budget) {
-        Dialog confirm = new Dialog();
-        confirm.setHeaderTitle("Bütçeyi Sil");
-        confirm.add(new Span("Seçilen departman bütçesi silinecektir. Emin misiniz?"));
-
-        Button yesBtn = new Button("Evet, Sil", e -> {
-            try {
-                budgetService.delete(budget.getId());
-                Notification.show("Bütçe silindi.", 3000, Notification.Position.BOTTOM_END)
-                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-                confirm.close();
-                refreshGrid();
-            } catch (Exception ex) {
-                Notification.show("Bir hata oluştu, lütfen tekrar deneyin.", 3000, Notification.Position.MIDDLE)
-                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
-            }
-        });
-        yesBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_ERROR);
-
-        Button noBtn = new Button("Vazgeç", e -> confirm.close());
-        confirm.getFooter().add(noBtn, yesBtn);
-        confirm.open();
-    }
-
-    private void openSpendDialog(DepartmentBudget budget) {
-        String deptName = budget.getDepartment() != null ? budget.getDepartment().getName() : "";
-        BigDecimal spent = expenseService.getDepartmentSpentForMonth(deptName, budget.getBudgetYear(), budget.getBudgetMonth());
-        BigDecimal rawRemaining = budget.getBudgetLimit().subtract(spent);
-        final BigDecimal remaining = rawRemaining.compareTo(BigDecimal.ZERO) < 0 ? BigDecimal.ZERO : rawRemaining;
-
-        Dialog dialog = new Dialog();
-        dialog.setHeaderTitle(deptName + " - Bütçeden Harca");
-        dialog.setWidth("480px");
-        dialog.getElement().getStyle().set("overflow", "hidden").set("max-height", "90vh");
-        dialog.getElement().executeJs("this.$.overlay.style.overflow='hidden'");
-
-        FormLayout form = new FormLayout();
-
-        Span remainingSpan = new Span("Kalan bütçe: " + FormatUtils.formatNumber(remaining) + " ₺");
-        remainingSpan.getStyle()
-                .set("font-weight", "600")
-                .set("color", remaining.compareTo(BigDecimal.ZERO) <= 0 ? "var(--lumo-error-color)" : "var(--lumo-success-color)")
-                .set("font-size", "1.1em")
-                .set("padding", "0.8em")
-                .set("background", "var(--lumo-contrast-5pct)")
-                .set("border-radius", "8px")
-                .set("display", "block")
-                .set("text-align", "center");
-
-        ComboBox<Card> cardField = new ComboBox<>("Kart Seçin");
-        List<Card> deptCards = cardService.findAllActive().stream()
-                .filter(c -> c.getDepartment() != null && c.getDepartment().getId().equals(budget.getDepartment().getId()))
-                .collect(java.util.stream.Collectors.toList());
-        List<Card> cards = deptCards.isEmpty() ? cardService.findAllActive() : deptCards;
-        cardField.setItems(cards);
-        cardField.setItemLabelGenerator(c -> c.getName() + " (" + c.getBank() + ")");
-        cardField.setWidthFull();
-
-        TextArea descField = new TextArea("Açıklama");
-        descField.setPlaceholder("Harcama açıklaması...");
-        descField.setWidthFull();
-        descField.getStyle().set("min-height", "60px").set("max-height", "80px").set("overflow-x", "hidden");
-
-        TextField amountField = new TextField("Tutar (TL)");
-        amountField.setValue("0,00");
-        FormatUtils.attachCurrencyFormatting(amountField);
-        amountField.setWidthFull();
-
-        form.add(remainingSpan, cardField, descField, amountField);
-
-        Button saveBtn = new Button("Harca", e -> {
-            if (cardField.isEmpty()) {
-                Notification.show("Lütfen bir kart seçin", 3000, Notification.Position.MIDDLE).addThemeVariants(NotificationVariant.LUMO_ERROR);
-                return;
-            }
-            BigDecimal amt = FormatUtils.parseTurkishCurrency(amountField.getValue());
-            if (amt == null || amt.compareTo(BigDecimal.ZERO) <= 0) {
-                Notification.show("Geçerli bir tutar girin", 3000, Notification.Position.MIDDLE).addThemeVariants(NotificationVariant.LUMO_ERROR);
-                return;
-            }
-            if (amt.compareTo(remaining) > 0) {
-                Notification.show("Tutar kalan bütçeyi aşıyor! (Kalan: " + FormatUtils.formatNumber(remaining) + " ₺)", 4000, Notification.Position.MIDDLE).addThemeVariants(NotificationVariant.LUMO_ERROR);
-                return;
-            }
-
-            try {
-                Card selectedCard = cardField.getValue();
-                if (selectedCard.getDepartment() == null || !selectedCard.getDepartment().getId().equals(budget.getDepartment().getId())) {
-                    selectedCard.setDepartment(budget.getDepartment());
-                    cardService.save(selectedCard);
-                }
-                Expense expense = Expense.builder()
-                        .card(selectedCard)
-                        .description(descField.getValue() != null ? descField.getValue() : deptName + " bütçe harcaması")
-                        .totalAmount(amt)
-                        .originalAmount(amt)
-                        .installments(1)
-                        .expenseDate(LocalDate.now())
-                        .currency("TRY")
-                        .category(deptName)
-                        .build();
-                expenseService.createExpense(expense);
-                Notification.show("Harcama kaydedildi. " + FormatUtils.formatNumber(amt) + " ₺", 3000, Notification.Position.MIDDLE)
-                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-                dialog.close();
-                refreshGrid();
-            } catch (Exception ex) {
-                Notification.show("Bir hata oluştu, lütfen tekrar deneyin.", 3000, Notification.Position.MIDDLE)
-                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
-            }
-        });
-        saveBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-
-        Button cancelBtn = new Button("İptal", e -> dialog.close());
-        dialog.getFooter().add(cancelBtn, saveBtn);
-        dialog.add(form);
-        dialog.open();
-        dialog.getElement().getStyle().set("overflow", "hidden");
+        emptyState.getStyle().set("display", "none").set("flex-direction", "column").set("align-items", "center").set("justify-content", "center").set("text-align", "center").set("padding", "3em");
+        emptyState.add(new Span("💰") {{ getStyle().set("font-size", "2.5em").set("display","block"); }}, new Span("Bu ay için bütçe tanımlanmamış.") {{ getStyle().set("color","var(--lumo-secondary-text-color)").set("margin-top","0.5em"); }});
     }
 }
