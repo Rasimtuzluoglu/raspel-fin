@@ -8,12 +8,14 @@ import org.springframework.context.annotation.Lazy;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
+import org.telegram.telegrambots.meta.TelegramBotsApi;
 import org.telegram.telegrambots.meta.api.methods.commands.SetMyCommands;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.commands.BotCommand;
 import org.telegram.telegrambots.meta.api.objects.commands.scope.BotCommandScopeDefault;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
+import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -38,8 +40,14 @@ public class TelegramBotService extends TelegramLongPollingBot {
         if (environment.getProperty("TELEGRAM_BOT_TOKEN", "").isEmpty()) {
             log.info("TELEGRAM_BOT_TOKEN tanımlı değil, Telegram bot devre dışı.");
         } else {
-            registerCommands();
-            log.info("Telegram bot başlatıldı: @raspel_fin_bot, chatId ile doğrulama aktif.");
+            try {
+                TelegramBotsApi botsApi = new TelegramBotsApi(DefaultBotSession.class);
+                botsApi.registerBot(this);
+                registerCommands();
+                log.info("Telegram bot başlatıldı ve API'ye kaydedildi: @raspel_fin_bot");
+            } catch (TelegramApiException e) {
+                log.error("Telegram bot kaydedilemedi: {}", e.getMessage());
+            }
         }
     }
 
