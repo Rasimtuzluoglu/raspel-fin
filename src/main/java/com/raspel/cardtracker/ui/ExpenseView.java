@@ -437,11 +437,10 @@ public class ExpenseView extends VerticalLayout {
         turkishI18n.setFirstDayOfWeek(1); // Pazartesi
         dateField.setI18n(turkishI18n);
 
-        ComboBox<Department> deptField = new ComboBox<>("Departman");
-        deptField.setItems(departmentService.findAllActive());
-        deptField.setItemLabelGenerator(Department::getName);
-        deptField.setClearButtonVisible(true);
-        deptField.setWidthFull();
+        ComboBox<String> tagField = new ComboBox<>("Etiket");
+        tagField.setItems("Zorunlu", "İsteğe Bağlı", "Ertelenebilir");
+        tagField.setClearButtonVisible(true);
+        tagField.setWidthFull();
 
         // Fiş/Fatura Yükleme (Upload) Bölümü
         MemoryBuffer buffer = new MemoryBuffer();
@@ -502,13 +501,13 @@ public class ExpenseView extends VerticalLayout {
             installmentField.setValue(expenseToEdit.getInstallments() != null ? expenseToEdit.getInstallments() : 1);
             dateField.setValue(expenseToEdit.getExpenseDate() != null ? expenseToEdit.getExpenseDate() : LocalDate.now());
             categoryField.setValue(expenseToEdit.getCategory());
-            deptField.setValue(expenseToEdit.getCard() != null ? expenseToEdit.getCard().getDepartment() : null);
+            tagField.setValue(expenseToEdit.getTag());
             uploadedPath[0] = expenseToEdit.getReceiptPath();
             uploadedContentType[0] = expenseToEdit.getReceiptContentType();
         }
 
         // Form düzeni
-        form.add(cardField, contactField, descField, amountField, currencyField, installmentField, dateField, categoryField, deptField);
+        form.add(cardField, contactField, descField, amountField, currencyField, installmentField, dateField, categoryField, tagField);
         
         VerticalLayout formContainer = new VerticalLayout(form, new Span("Belge Eki (Opsiyonel / Akıllı Tarama)"), uploadField);
         formContainer.setPadding(false);
@@ -544,9 +543,7 @@ public class ExpenseView extends VerticalLayout {
             targetExpense.setInstallments(installmentField.getValue() != null ? installmentField.getValue() : 1);
             targetExpense.setExpenseDate(dateField.getValue());
             targetExpense.setCategory(categoryField.getValue());
-            if (deptField.getValue() != null && targetExpense.getCard() != null) {
-                targetExpense.getCard().setDepartment(deptField.getValue());
-            }
+            targetExpense.setTag(tagField.getValue());
 
             if (isEdit) {
                 try {

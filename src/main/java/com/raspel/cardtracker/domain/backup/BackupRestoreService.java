@@ -88,7 +88,23 @@ public class BackupRestoreService {
             log.error("psql geri yükleme hatası: {}", err);
             throw new RuntimeException("Geri yükleme başarısız: " + err);
         }
+        resetSequences();
         log.info("Geri yükleme tamamlandı.");
+    }
+
+    private void resetSequences() throws Exception {
+        String dbName = extractDbName(dbUrl);
+        String host = extractHost(dbUrl);
+        int port = extractPort(dbUrl);
+        String sql = "SELECT 'SELECT SETVAL(' || quote_literal(quote_ident(pgt.schemaname) || '.' || quote_ident(s.relname)) || ', COALESCE(MAX(' || quote_ident(c.attname) || '), 1)) FROM ' || quote_ident(pgt.schemaname) || '.' || quote_ident(t.relname) || ';' FROM pg_class s JOIN pg_depend d ON d.objid = s.oid AND d.classid = 'pg_class'::regclass AND d.refclassid = 'pg_class'::regclass JOIN pg_class t ON t.oid = d.refobjid JOIN pg_attribute c ON c.attrelid = t.oid AND c.attnum = d.refobjsubid JOIN pg_namespace pgt ON pgt.oid = t.relnamespace WHERE s.relkind = 'S' AND pgt.nspname = 'public';";
+
+        ProcessBuilder pb = new ProcessBuilder("psql", "-h", host, "-p", String.valueOf(port), "-U", dbUser, "-d", dbName, "-c", sql);
+        pb.environment().put("PGPASSWORD", dbPass);
+        Process p = pb.start();
+        int exit = p.waitFor();
+        if (exit != 0) {
+            log.warn("Sequence reset hatasi: {}", new String(p.getErrorStream().readAllBytes()));
+        }
     }
 
     private String extractDbName(String url) {
