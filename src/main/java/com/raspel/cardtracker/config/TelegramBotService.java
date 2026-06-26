@@ -2,6 +2,10 @@ package com.raspel.cardtracker.config;
 
 import com.raspel.cardtracker.domain.card.Card;
 import com.raspel.cardtracker.domain.card.CardService;
+import com.raspel.cardtracker.domain.cheque.Cheque;
+import com.raspel.cardtracker.domain.cheque.ChequeService;
+import com.raspel.cardtracker.domain.cheque.ChequeStatus;
+import com.raspel.cardtracker.domain.cheque.ChequeType;
 import com.raspel.cardtracker.domain.expense.Expense;
 import com.raspel.cardtracker.domain.expense.ExpenseService;
 import com.raspel.cardtracker.domain.expense.InstallmentEntry;
@@ -30,6 +34,7 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 @Component
@@ -40,14 +45,17 @@ public class TelegramBotService extends TelegramLongPollingBot {
     private final UserService userService;
     private final CardService cardService;
     private final ExpenseService expenseService;
+    private final ChequeService chequeService;
     private final Environment environment;
 
     public TelegramBotService(UserService userService, CardService cardService,
-                              ExpenseService expenseService, Environment environment) {
+                              ExpenseService expenseService, ChequeService chequeService,
+                              Environment environment) {
         super(environment.getProperty("TELEGRAM_BOT_TOKEN", ""));
         this.userService = userService;
         this.cardService = cardService;
         this.expenseService = expenseService;
+        this.chequeService = chequeService;
         this.environment = environment;
     }
 
@@ -57,321 +65,363 @@ public class TelegramBotService extends TelegramLongPollingBot {
             log.info("TELEGRAM_BOT_TOKEN tanımlı değil, Telegram bot devre dışı.");
         } else {
             try {
-                TelegramBotsApi botsApi = new TelegramBotsApi(DefaultBotSession.class);
-                botsApi.registerBot(this);
+                new TelegramBotsApi(DefaultBotSession.class).registerBot(this);
                 registerCommands();
-                log.info("Telegram bot başlatıldı ve API'ye kaydedildi: @raspel_fin_bot");
+                log.info("Telegram bot başlatıldı: @raspel_fin_bot (12 komut)");
             } catch (TelegramApiException e) {
-                log.error("Telegram bot kaydedilemedi: {}", e.getMessage());
+                log.error("Bot kaydedilemedi: {}", e.getMessage());
             }
         }
     }
 
     private void registerCommands() {
-        List<BotCommand> commands = new ArrayList<>();
-        commands.add(new BotCommand("start", "Bot'u başlat ve bilgi al"));
-        commands.add(new BotCommand("help", "Yardım ve kullanım kılavuzu"));
-        commands.add(new BotCommand("durum", "Hesap bağlantı durumunu sorgula"));
-        commands.add(new BotCommand("kartlar", "Kayıtlı kartlar ve son ödeme tarihleri"));
-        commands.add(new BotCommand("bakiye", "Kart borç durumu"));
-        commands.add(new BotCommand("limit", "Kart limit kullanım oranları"));
-        commands.add(new BotCommand("odemeler", "Bu ayki taksit ödemeleri"));
-        commands.add(new BotCommand("sonharcamalar", "Son 5 harcama"));
-        commands.add(new BotCommand("baglantikes", "Telegram bağlantısını kes"));
-        try {
-            execute(new SetMyCommands(commands, new BotCommandScopeDefault(), null));
-        } catch (TelegramApiException e) {
-            log.error("Bot komutları kaydedilemedi: {}", e.getMessage());
-        }
+        List<BotCommand> cmds = Arrays.asList(
+                new BotCommand("start", "Bot'u başlat"),
+                new BotCommand("help", "Komut listesi"),
+                new BotCommand("durum", "Bağlantı durumu"),
+                new BotCommand("ozet", "Günlük finansal özet"),
+                new BotCommand("kartlar", "Kartlar ve son ödeme tarihleri"),
+                new BotCommand("bakiye", "Kart borç durumu"),
+                new BotCommand("limit", "Limit kullanım oranları"),
+                new BotCommand("odemeler", "Bu ayki taksitler"),
+                new BotCommand("gecikmeler", "Vadesi geçmiş ödemeler"),
+                new BotCommand("cekler", "Portföydeki çekler"),
+                new BotCommand("sonharcamalar", "Son 5 harcama"),
+                new BotCommand("baglantikes", "Bağlantıyı kes")
+        );
+        try { execute(new SetMyCommands(cmds, new BotCommandScopeDefault(), null)); }
+        catch (TelegramApiException e) { log.error("Komutlar kaydedilemedi: {}", e.getMessage()); }
     }
 
-    @Override
-    public String getBotUsername() {
-        return "raspel_fin_bot";
-    }
+    @Override public String getBotUsername() { return "raspel_fin_bot"; }
 
     @Override
     public void onUpdateReceived(Update update) {
-        if (!update.hasMessage() || !update.getMessage().hasText()) {
-            return;
-        }
-
+        if (!update.hasMessage() || !update.getMessage().hasText()) return;
         String text = update.getMessage().getText().trim();
         Long chatId = update.getMessage().getChatId();
-        String firstName = update.getMessage().getFrom().getFirstName();
+        String fn = update.getMessage().getFrom().getFirstName();
 
         switch (text.toLowerCase()) {
-            case "/start" -> sendWelcomeMessage(chatId, firstName);
-            case "/help" -> sendHelpMessage(chatId);
-            case "/durum" -> sendStatusMessage(chatId);
-            case "/kartlar" -> sendCardsMessage(chatId);
-            case "/bakiye" -> sendBalanceMessage(chatId);
-            case "/limit" -> sendLimitMessage(chatId);
-            case "/odemeler" -> sendInstallmentsMessage(chatId);
-            case "/sonharcamalar" -> sendRecentExpensesMessage(chatId);
-            case "/baglantikes" -> sendDisconnectConfirmation(chatId);
+            case "/start" -> sendWelcome(chatId, fn);
+            case "/help" -> sendHelp(chatId);
+            case "/durum" -> sendStatus(chatId);
+            case "/ozet" -> sendSummary(chatId);
+            case "/kartlar" -> sendCards(chatId);
+            case "/bakiye" -> sendBalance(chatId);
+            case "/limit" -> sendLimits(chatId);
+            case "/odemeler" -> sendInstallments(chatId);
+            case "/gecikmeler" -> sendOverdue(chatId);
+            case "/cekler" -> sendCheques(chatId);
+            case "/sonharcamalar" -> sendRecent(chatId);
+            case "/baglantikes" -> sendDisconnect(chatId);
             default -> {
-                if (text.startsWith("/")) {
-                    sendMessage(chatId, "❌ Geçersiz komut. /help yazarak komut listesini görebilirsiniz.");
-                } else {
-                    handleVerificationCode(chatId, text, firstName);
-                }
+                if (text.startsWith("/")) sendMsg(chatId, "❌ Bilinmeyen komut. /help yazın.");
+                else handleCode(chatId, text);
             }
         }
     }
 
-    // --- Public API for system notifications ---
+    public void notifyUser(Long chatId, String message) { sendMsg(chatId, message); }
 
-    public void notifyUser(Long chatId, String message) {
-        sendMessage(chatId, message);
+    // ── Komutlar ──
+
+    private void sendWelcome(Long chatId, String firstName) {
+        sendMsg(chatId, "<b>Hoş Geldiniz!</b> \uD83D\uDC4B\n\n" +
+                "<b>RasPel Finans Bot'u</b>\n\n" +
+                "Kart borçları, ödemeler, çekler ve limit durumunuzu Telegram'dan takip edin.\n\n" +
+                "<b>Bağlanmak için:</b>\n" +
+                "1️⃣ Web panel → Profilim → Telegram'a Bağlan\n" +
+                "2️⃣ Aldığınız <b>6 haneli kodu</b> buraya gönderin\n\n" +
+                "/help ile tüm komutları görebilirsiniz.");
     }
 
-    // --- Command handlers ---
-
-    private void sendWelcomeMessage(Long chatId, String firstName) {
-        String msg = "<b>Hoş Geldiniz!</b> \uD83D\uDC4B\n\n" +
-                "<b>RasPel Finans Yönetim Bot'u</b>\n\n" +
-                "Bu bot ile kredi kartı harcamalarınızı, borç durumunuzu ve ödemelerinizi Telegram üzerinden takip edebilirsiniz.\n\n" +
-                "<b>Bağlantı kurmak için:</b>\n" +
-                "1️⃣ Web panelde <b>Profilim</b> sayfasına gidin\n" +
-                "2️⃣ <b>Telegram'a Bağlan</b> butonuna tıklayın\n" +
-                "3️⃣ Size verilen <b>6 haneli kodu</b> buraya gönderin\n\n" +
-                "<i>Komutları görmek için /help yazabilirsiniz.</i>";
-        sendMessage(chatId, msg);
+    private void sendHelp(Long chatId) {
+        sendMsg(chatId, "<b>📋 Komutlar</b>\n\n" +
+                "/start - Başlangıç\n/help - Bu menü\n/durum - Bağlantı bilgisi\n" +
+                "/ozet - <b>Günlük finansal özet</b>\n/kartlar - Kart listesi\n" +
+                "/bakiye - Borç durumu\n/limit - Limit kullanımı\n" +
+                "/odemeler - Bu ay taksitler\n/gecikmeler - <b>Geciken ödemeler</b>\n" +
+                "/cekler - Portföy çekleri\n/sonharcamalar - Son harcamalar\n" +
+                "/baglantikes - Bağlantıyı kes\n\n<b>Bağlantı:</b> Web panel → Profilim → Telegram'a Bağlan → Kodu gönder");
     }
 
-    private void sendHelpMessage(Long chatId) {
-        String msg = "<b>📋 Kullanılabilir Komutlar</b>\n\n" +
-                "<b>/start</b> - Bot'u başlat, bağlantı bilgisi al\n" +
-                "<b>/help</b> - Bu yardım menüsü\n" +
-                "<b>/durum</b> - Hesap bağlantı durumu\n" +
-                "<b>/kartlar</b> - Kayıtlı kartlar ve son ödeme tarihleri\n" +
-                "<b>/bakiye</b> - Kart borç durumu\n" +
-                "<b>/limit</b> - Kart limit kullanım oranları\n" +
-                "<b>/odemeler</b> - Bu ay yapılacak taksit ödemeleri\n" +
-                "<b>/sonharcamalar</b> - Son 5 harcama kaydı\n" +
-                "<b>/baglantikes</b> - Telegram bağlantısını kes\n\n" +
-                "<b>🔗 Bağlantı Kurma:</b>\n" +
-                "Web panel → Profilim → Telegram'a Bağlan → Kodu buraya yazın";
-        sendMessage(chatId, msg);
+    private void sendStatus(Long chatId) {
+        var u = getUser(chatId);
+        if (u.isEmpty()) { sendNotConnected(chatId); return; }
+        sendMsg(chatId, "<b>✅ Bağlı</b>\nKullanıcı: <b>" + esc(u.get().getUsername()) + "</b>\nAd Soyad: <b>" +
+                esc(u.get().getFullName() != null ? u.get().getFullName() : "-") + "</b>\nChat ID: <code>" + chatId + "</code>");
     }
 
-    private void sendStatusMessage(Long chatId) {
-        Optional<AppUser> userOpt = userService.findByTelegramChatId(chatId);
-        if (userOpt.isPresent()) {
-            AppUser user = userOpt.get();
-            String msg = "<b>✅ Bağlantı Aktif</b>\n\n" +
-                    "Kullanıcı: <b>" + esc(user.getUsername()) + "</b>\n" +
-                    "Ad Soyad: <b>" + esc(user.getFullName() != null ? user.getFullName() : "-") + "</b>\n" +
-                    "Chat ID: <code>" + chatId + "</code>";
-            sendMessage(chatId, msg);
-        } else {
-            sendMessage(chatId, "<b>❌ Bağlı Değil</b>\n\nBu Telegram hesabı henüz bir kullanıcıya bağlanmamış.\n\nBağlanmak için web panel → Profilim → Telegram'a Bağlan");
-        }
-    }
-
-    private void sendCardsMessage(Long chatId) {
-        Optional<AppUser> userOpt = userService.findByTelegramChatId(chatId);
-        if (userOpt.isEmpty()) { sendNotConnected(chatId); return; }
+    // ── /ozet ──
+    private void sendSummary(Long chatId) {
+        var u = getUser(chatId);
+        if (u.isEmpty()) { sendNotConnected(chatId); return; }
 
         List<Card> cards = cardService.findAllActive();
-        if (cards.isEmpty()) { sendMessage(chatId, "Kayıtlı aktif kart bulunamadı."); return; }
+        Map<Long, BigDecimal> unpaidMap = expenseService.getUnpaidBalancesGroupedByCard();
+        BigDecimal totalDebt = cards.stream().map(c -> unpaidMap.getOrDefault(c.getId(), BigDecimal.ZERO)).reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        StringBuilder sb = new StringBuilder("<b>💳 Kayıtlı Kartlar</b>\n\n");
+        LocalDate today = LocalDate.now();
+        YearMonth ym = YearMonth.now();
+        List<InstallmentEntry> monthEntries = expenseService.getInstallmentsForMonth(ym.getYear(), ym.getMonthValue());
+        long overdueCount = monthEntries.stream().filter(e -> !e.getIsPaid() &&
+                HolidayUtils.getNextBusinessDay(LocalDate.of(e.getDueYear(), e.getDueMonth(),
+                        Math.min(e.getExpense().getCard().getClosingDay(), YearMonth.of(e.getDueYear(), e.getDueMonth()).lengthOfMonth()))
+                        .plusDays(e.getExpense().getCard().getDueDay())).isBefore(today)).count();
+
+        List<Cheque> cheques = chequeService.findAll();
+        long incomingCheques = cheques.stream().filter(c -> c.getType() == ChequeType.ENTERING && c.getStatus() == ChequeStatus.PORTFOLIO).count();
+        long outgoingCheques = cheques.stream().filter(c -> c.getType() == ChequeType.EXITING && c.getStatus() == ChequeStatus.PORTFOLIO).count();
+
+        int limitWarnings = 0;
+        for (Card c : cards) {
+            BigDecimal unpaid = unpaidMap.getOrDefault(c.getId(), BigDecimal.ZERO);
+            if (c.getCardLimit() != null && c.getCardLimit().compareTo(BigDecimal.ZERO) > 0 &&
+                    unpaid.divide(c.getCardLimit(), 4, RoundingMode.HALF_UP).doubleValue() >= 0.8) limitWarnings++;
+        }
+
+        StringBuilder sb = new StringBuilder("<b>📊 Günlük Finansal Özet</b>\n");
+        sb.append(today.format(DateTimeFormatter.ofPattern("dd MMMM yyyy", Locale.of("tr")))).append("\n\n");
+
+        sb.append("<b>💰 Borç:</b> ").append(FormatUtils.formatNumber(totalDebt)).append(" ₺  (").append(cards.size()).append(" kart)\n");
+        sb.append("<b>📅 Bu Ay Taksit:</b> ").append(monthEntries.size()).append(" adet\n");
+        sb.append("<b>🔴 Geciken:</b> ").append(overdueCount).append(" ödeme\n");
+        sb.append("<b>📄 Çek:</b> ").append(incomingCheques).append(" giriş / ").append(outgoingCheques).append(" çıkış\n");
+        if (limitWarnings > 0) sb.append("<b>⚠️ Limit Uyarısı:</b> ").append(limitWarnings).append(" kart\n");
+        if (overdueCount == 0 && limitWarnings == 0) sb.append("\n✅ Tüm ödemeler güncel, limitler normal.");
+        sendMsg(chatId, sb.toString());
+    }
+
+    // ── /kartlar ──
+    private void sendCards(Long chatId) {
+        var u = getUser(chatId); if (u.isEmpty()) { sendNotConnected(chatId); return; }
+        List<Card> cards = cardService.findAllActive();
+        if (cards.isEmpty()) { sendMsg(chatId, "Aktif kart yok."); return; }
+
         Map<Long, BigDecimal> unpaidMap = expenseService.getUnpaidBalancesGroupedByCard();
         LocalDate today = LocalDate.now();
+        StringBuilder sb = new StringBuilder("<b>💳 Kartlar</b>\n\n");
 
         for (Card card : cards) {
             BigDecimal unpaid = unpaidMap.getOrDefault(card.getId(), BigDecimal.ZERO);
-            String color = card.getColor() != null ? card.getColor().substring(1) : "1976D2";
-
             YearMonth ym = YearMonth.from(today);
-            int closingDay = Math.min(card.getClosingDay() != null ? card.getClosingDay() : 1, ym.lengthOfMonth());
-            LocalDate statementDate = LocalDate.of(ym.getYear(), ym.getMonthValue(), closingDay);
-            if (today.isAfter(statementDate)) statementDate = statementDate.plusMonths(1);
-            LocalDate dueDate = HolidayUtils.getNextBusinessDay(
-                    statementDate.plusDays(card.getDueDay() != null ? card.getDueDay() : 10));
+            int cd = Math.min(card.getClosingDay() != null ? card.getClosingDay() : 1, ym.lengthOfMonth());
+            LocalDate stmt = LocalDate.of(ym.getYear(), ym.getMonthValue(), cd);
+            if (today.isAfter(stmt)) stmt = stmt.plusMonths(1);
+            LocalDate due = HolidayUtils.getNextBusinessDay(stmt.plusDays(card.getDueDay() != null ? card.getDueDay() : 10));
 
             sb.append("• <b>").append(esc(card.getName())).append("</b> (").append(esc(card.getBank())).append(")\n");
             sb.append("  Borç: ").append(FormatUtils.formatNumber(unpaid)).append(" ₺");
-            if (card.getCardLimit() != null && card.getCardLimit().compareTo(BigDecimal.ZERO) > 0) {
+            if (card.getCardLimit() != null && card.getCardLimit().compareTo(BigDecimal.ZERO) > 0)
                 sb.append(" / ").append(FormatUtils.formatNumber(card.getCardLimit())).append(" ₺");
-            }
-            sb.append("\n");
-            sb.append("  Son Ödeme: ").append(dueDate.format(DateTimeFormatter.ofPattern("dd MMMM EEEE", Locale.of("tr")))).append("\n\n");
+            sb.append("\n  Son Ödeme: ").append(due.format(DateTimeFormatter.ofPattern("dd MMMM EEEE", Locale.of("tr")))).append("\n\n");
         }
-        sendMessage(chatId, sb.toString());
+        sendMsg(chatId, sb.toString());
     }
 
-    private void sendBalanceMessage(Long chatId) {
-        Optional<AppUser> userOpt = userService.findByTelegramChatId(chatId);
-        if (userOpt.isEmpty()) { sendNotConnected(chatId); return; }
-
+    // ── /bakiye ──
+    private void sendBalance(Long chatId) {
+        var u = getUser(chatId); if (u.isEmpty()) { sendNotConnected(chatId); return; }
         List<Card> cards = cardService.findAllActive();
-        if (cards.isEmpty()) { sendMessage(chatId, "Aktif kart bulunamadı."); return; }
-
-        Map<Long, BigDecimal> unpaidMap = expenseService.getUnpaidBalancesGroupedByCard();
-        BigDecimal totalDebt = BigDecimal.ZERO;
+        Map<Long, BigDecimal> m = expenseService.getUnpaidBalancesGroupedByCard();
+        BigDecimal total = BigDecimal.ZERO;
         StringBuilder sb = new StringBuilder("<b>💰 Borç Durumu</b>\n\n");
-
-        for (Card card : cards) {
-            BigDecimal unpaid = unpaidMap.getOrDefault(card.getId(), BigDecimal.ZERO);
-            totalDebt = totalDebt.add(unpaid);
-            sb.append("• <b>").append(esc(card.getName())).append("</b>: ").append(FormatUtils.formatNumber(unpaid)).append(" ₺\n");
+        for (Card c : cards) {
+            BigDecimal unpaid = m.getOrDefault(c.getId(), BigDecimal.ZERO);
+            total = total.add(unpaid);
+            sb.append("• <b>").append(esc(c.getName())).append("</b>: ").append(FormatUtils.formatNumber(unpaid)).append(" ₺\n");
         }
-        sb.append("\n<b>Toplam Borç: ").append(FormatUtils.formatNumber(totalDebt)).append(" ₺</b>");
-        sendMessage(chatId, sb.toString());
+        sb.append("\n<b>Toplam: ").append(FormatUtils.formatNumber(total)).append(" ₺</b>");
+        sendMsg(chatId, sb.toString());
     }
 
-    private void sendLimitMessage(Long chatId) {
-        Optional<AppUser> userOpt = userService.findByTelegramChatId(chatId);
-        if (userOpt.isEmpty()) { sendNotConnected(chatId); return; }
-
+    // ── /limit ──
+    private void sendLimits(Long chatId) {
+        var u = getUser(chatId); if (u.isEmpty()) { sendNotConnected(chatId); return; }
         List<Card> cards = cardService.findAllActive();
-        if (cards.isEmpty()) { sendMessage(chatId, "Aktif kart bulunamadı."); return; }
-
-        Map<Long, BigDecimal> unpaidMap = expenseService.getUnpaidBalancesGroupedByCard();
+        Map<Long, BigDecimal> m = expenseService.getUnpaidBalancesGroupedByCard();
         StringBuilder sb = new StringBuilder("<b>📊 Limit Kullanımı</b>\n\n");
-
-        for (Card card : cards) {
-            BigDecimal unpaid = unpaidMap.getOrDefault(card.getId(), BigDecimal.ZERO);
-            BigDecimal limit = card.getCardLimit();
-            if (limit != null && limit.compareTo(BigDecimal.ZERO) > 0) {
-                double pct = unpaid.divide(limit, 4, RoundingMode.HALF_UP).doubleValue() * 100;
-                String bar = buildProgressBar(pct);
-                String emoji = pct >= 90 ? "🔴" : pct >= 80 ? "🟡" : "🟢";
-                sb.append(emoji).append(" <b>").append(esc(card.getName())).append("</b>\n");
-                sb.append("  ").append(bar).append(" %").append(String.format("%.0f", pct)).append("\n");
-                sb.append("  ").append(FormatUtils.formatNumber(unpaid)).append(" / ").append(FormatUtils.formatNumber(limit)).append(" ₺\n\n");
-            }
+        boolean found = false;
+        for (Card c : cards) {
+            BigDecimal unpaid = m.getOrDefault(c.getId(), BigDecimal.ZERO);
+            if (c.getCardLimit() == null || c.getCardLimit().compareTo(BigDecimal.ZERO) <= 0) continue;
+            found = true;
+            double pct = unpaid.divide(c.getCardLimit(), 4, RoundingMode.HALF_UP).doubleValue() * 100;
+            String emoji = pct >= 90 ? "🔴" : pct >= 80 ? "🟡" : "🟢";
+            sb.append(emoji).append(" <b>").append(esc(c.getName())).append("</b>\n");
+            sb.append("  ").append(progressBar(pct)).append(" %").append(String.format("%.0f", pct)).append("\n");
+            sb.append("  ").append(FormatUtils.formatNumber(unpaid)).append(" / ").append(FormatUtils.formatNumber(c.getCardLimit())).append(" ₺\n\n");
         }
-        if (sb.toString().equals("<b>📊 Limit Kullanımı</b>\n\n")) {
-            sendMessage(chatId, "Limit tanımlı kart bulunamadı.");
-            return;
-        }
-        sendMessage(chatId, sb.toString());
+        if (!found) sb.append("Limit tanımlı kart yok.");
+        sendMsg(chatId, sb.toString());
     }
 
-    private void sendInstallmentsMessage(Long chatId) {
-        Optional<AppUser> userOpt = userService.findByTelegramChatId(chatId);
-        if (userOpt.isEmpty()) { sendNotConnected(chatId); return; }
+    // ── /odemeler ──
+    private void sendInstallments(Long chatId) {
+        var u = getUser(chatId); if (u.isEmpty()) { sendNotConnected(chatId); return; }
+        YearMonth ym = YearMonth.now();
+        List<InstallmentEntry> entries = expenseService.getInstallmentsForMonth(ym.getYear(), ym.getMonthValue());
+        if (entries.isEmpty()) { sendMsg(chatId, "Bu ay taksit yok."); return; }
 
-        YearMonth now = YearMonth.now();
-        List<InstallmentEntry> entries = expenseService.getInstallmentsForMonth(now.getYear(), now.getMonthValue());
-        if (entries.isEmpty()) { sendMessage(chatId, "Bu ay için taksit bulunamadı."); return; }
+        entries.sort(Comparator.comparing(e -> {
+            YearMonth ym2 = YearMonth.of(e.getDueYear(), e.getDueMonth());
+            int cd = Math.min(e.getExpense().getCard().getClosingDay(), ym2.lengthOfMonth());
+            return HolidayUtils.getNextBusinessDay(LocalDate.of(e.getDueYear(), e.getDueMonth(), cd).plusDays(e.getExpense().getCard().getDueDay()));
+        }));
 
         StringBuilder sb = new StringBuilder("<b>📅 Bu Ayki Ödemeler</b>\n\n");
-        entries.sort(Comparator.comparing(e -> HolidayUtils.getNextBusinessDay(
-                LocalDate.of(e.getDueYear(), e.getDueMonth(),
-                        Math.min(e.getExpense().getCard().getClosingDay(), YearMonth.of(e.getDueYear(), e.getDueMonth()).lengthOfMonth()))
-                        .plusDays(e.getExpense().getCard().getDueDay()))));
-
-        int count = 0;
-        for (InstallmentEntry entry : entries) {
-            if (count++ >= 15) { sb.append("\n<i>... ve daha fazlası</i>"); break; }
-            String cardName = entry.getExpense().getCard() != null ? entry.getExpense().getCard().getName() : "-";
-            String desc = entry.getExpense().getDescription() != null ? entry.getExpense().getDescription() : "";
-            if (desc.length() > 25) desc = desc.substring(0, 25) + "...";
-            YearMonth ym = YearMonth.of(entry.getDueYear(), entry.getDueMonth());
-            int cd = Math.min(entry.getExpense().getCard().getClosingDay(), ym.lengthOfMonth());
-            LocalDate due = HolidayUtils.getNextBusinessDay(
-                    LocalDate.of(entry.getDueYear(), entry.getDueMonth(), cd).plusDays(entry.getExpense().getCard().getDueDay()));
-
-            String status = entry.getIsPaid() ? "✅" : "⏳";
-            sb.append(status).append(" <b>").append(esc(cardName)).append("</b> ").append(FormatUtils.formatNumber(entry.getAmount())).append(" ₺\n");
+        int cnt = 0;
+        for (InstallmentEntry e : entries) {
+            if (cnt++ >= 15) { sb.append("\n<i>...ve daha fazlası</i>"); break; }
+            String cn = e.getExpense().getCard() != null ? e.getExpense().getCard().getName() : "-";
+            String desc = e.getExpense().getDescription() != null ? e.getExpense().getDescription() : "";
+            if (desc.length() > 22) desc = desc.substring(0, 22) + "...";
+            YearMonth ym2 = YearMonth.of(e.getDueYear(), e.getDueMonth());
+            int cd = Math.min(e.getExpense().getCard().getClosingDay(), ym2.lengthOfMonth());
+            LocalDate due = HolidayUtils.getNextBusinessDay(LocalDate.of(e.getDueYear(), e.getDueMonth(), cd).plusDays(e.getExpense().getCard().getDueDay()));
+            String st = e.getIsPaid() ? "✅" : "⏳";
+            sb.append(st).append(" <b>").append(esc(cn)).append("</b> ").append(FormatUtils.formatNumber(e.getAmount())).append(" ₺\n");
             sb.append("  ").append(esc(desc)).append(" | ").append(due.format(DateTimeFormatter.ofPattern("dd.MM"))).append("\n\n");
         }
-        sendMessage(chatId, sb.toString());
+        sendMsg(chatId, sb.toString());
     }
 
-    private void sendRecentExpensesMessage(Long chatId) {
-        Optional<AppUser> userOpt = userService.findByTelegramChatId(chatId);
-        if (userOpt.isEmpty()) { sendNotConnected(chatId); return; }
+    // ── /gecikmeler ──
+    private void sendOverdue(Long chatId) {
+        var u = getUser(chatId); if (u.isEmpty()) { sendNotConnected(chatId); return; }
+        LocalDate today = LocalDate.now();
+        List<InstallmentEntry> all = expenseService.getInstallmentsForMonth(today.getYear(), today.getMonthValue());
 
-        List<Expense> expenses = expenseService.findRecentByCreatedBy(userOpt.get().getUsername(), 5);
-        if (expenses.isEmpty()) { sendMessage(chatId, "Henüz harcama kaydı bulunamadı."); return; }
+        List<InstallmentEntry> overdue = all.stream().filter(e -> !e.getIsPaid()).filter(e -> {
+            YearMonth ym = YearMonth.of(e.getDueYear(), e.getDueMonth());
+            int cd = Math.min(e.getExpense().getCard().getClosingDay(), ym.lengthOfMonth());
+            LocalDate due = HolidayUtils.getNextBusinessDay(LocalDate.of(e.getDueYear(), e.getDueMonth(), cd).plusDays(e.getExpense().getCard().getDueDay()));
+            return due.isBefore(today);
+        }).toList();
+
+        List<InstallmentEntry> upcoming = all.stream().filter(e -> !e.getIsPaid()).filter(e -> {
+            YearMonth ym = YearMonth.of(e.getDueYear(), e.getDueMonth());
+            int cd = Math.min(e.getExpense().getCard().getClosingDay(), ym.lengthOfMonth());
+            LocalDate due = HolidayUtils.getNextBusinessDay(LocalDate.of(e.getDueYear(), e.getDueMonth(), cd).plusDays(e.getExpense().getCard().getDueDay()));
+            long days = ChronoUnit.DAYS.between(today, due);
+            return days >= 0 && days <= 7;
+        }).toList();
+
+        if (overdue.isEmpty() && upcoming.isEmpty()) {
+            sendMsg(chatId, "✅ Tüm ödemeler güncel. Geciken veya yaklaşan ödeme yok.");
+            return;
+        }
+
+        StringBuilder sb = new StringBuilder("<b>⚠️ Geciken ve Yaklaşan Ödemeler</b>\n\n");
+        if (!overdue.isEmpty()) {
+            sb.append("<b>🔴 GECİKMİŞ:</b>\n");
+            for (InstallmentEntry e : overdue) {
+                String cn = e.getExpense().getCard() != null ? e.getExpense().getCard().getName() : "-";
+                YearMonth ym = YearMonth.of(e.getDueYear(), e.getDueMonth());
+                int cd = Math.min(e.getExpense().getCard().getClosingDay(), ym.lengthOfMonth());
+                LocalDate due = HolidayUtils.getNextBusinessDay(LocalDate.of(e.getDueYear(), e.getDueMonth(), cd).plusDays(e.getExpense().getCard().getDueDay()));
+                long days = ChronoUnit.DAYS.between(due, today);
+                sb.append("• <b>").append(esc(cn)).append("</b> ").append(FormatUtils.formatNumber(e.getAmount())).append(" ₺ (").append(days).append(" gün)\n");
+            }
+            sb.append("\n");
+        }
+        if (!upcoming.isEmpty()) {
+            sb.append("<b>🟡 7 GÜN İÇİNDE:</b>\n");
+            for (InstallmentEntry e : upcoming) {
+                String cn = e.getExpense().getCard() != null ? e.getExpense().getCard().getName() : "-";
+                YearMonth ym = YearMonth.of(e.getDueYear(), e.getDueMonth());
+                int cd = Math.min(e.getExpense().getCard().getClosingDay(), ym.lengthOfMonth());
+                LocalDate due = HolidayUtils.getNextBusinessDay(LocalDate.of(e.getDueYear(), e.getDueMonth(), cd).plusDays(e.getExpense().getCard().getDueDay()));
+                long days = ChronoUnit.DAYS.between(today, due);
+                sb.append("• <b>").append(esc(cn)).append("</b> ").append(FormatUtils.formatNumber(e.getAmount())).append(" ₺ (").append(days).append(" gün kaldı)\n");
+            }
+        }
+        sendMsg(chatId, sb.toString());
+    }
+
+    // ── /cekler ──
+    private void sendCheques(Long chatId) {
+        var u = getUser(chatId); if (u.isEmpty()) { sendNotConnected(chatId); return; }
+        List<Cheque> cheques = chequeService.findAll();
+        List<Cheque> portfolio = cheques.stream().filter(c -> c.getStatus() == ChequeStatus.PORTFOLIO).toList();
+        if (portfolio.isEmpty()) { sendMsg(chatId, "Portföyde çek yok."); return; }
+
+        BigDecimal inTotal = BigDecimal.ZERO;
+        BigDecimal outTotal = BigDecimal.ZERO;
+        StringBuilder sbIn = new StringBuilder();
+        StringBuilder sbOut = new StringBuilder();
+
+        for (Cheque c : portfolio) {
+            String line = "• <b>" + esc(c.getChequeNumber()) + "</b> | " + esc(c.getBank()) + " | " +
+                    FormatUtils.formatNumber(c.getAmount()) + " ₺ | " +
+                    c.getMaturityDate().format(DateTimeFormatter.ofPattern("dd.MM.yyyy")) + "\n";
+            if (c.getType() == ChequeType.ENTERING) { inTotal = inTotal.add(c.getAmount()); sbIn.append(line); }
+            else { outTotal = outTotal.add(c.getAmount()); sbOut.append(line); }
+        }
+
+        StringBuilder sb = new StringBuilder("<b>📄 Portföy Çekleri</b>\n\n");
+        if (sbIn.length() > 0) {
+            sb.append("<b>📥 Giriş Çekleri (").append(FormatUtils.formatNumber(inTotal)).append(" ₺)</b>\n").append(sbIn).append("\n");
+        }
+        if (sbOut.length() > 0) {
+            sb.append("<b>📤 Çıkış Çekleri (").append(FormatUtils.formatNumber(outTotal)).append(" ₺)</b>\n").append(sbOut);
+        }
+        sendMsg(chatId, sb.toString());
+    }
+
+    // ── /sonharcamalar ──
+    private void sendRecent(Long chatId) {
+        var u = getUser(chatId); if (u.isEmpty()) { sendNotConnected(chatId); return; }
+        List<Expense> expenses = expenseService.findRecentByCreatedBy(u.get().getUsername(), 5);
+        if (expenses.isEmpty()) { sendMsg(chatId, "Henüz harcama yok."); return; }
 
         StringBuilder sb = new StringBuilder("<b>🛒 Son 5 Harcama</b>\n\n");
         for (Expense e : expenses) {
-            String date = e.getExpenseDate() != null ? e.getExpenseDate().format(DateTimeFormatter.ofPattern("dd.MM")) : "-";
-            String card = e.getCard() != null ? e.getCard().getName() : "-";
+            String dt = e.getExpenseDate() != null ? e.getExpenseDate().format(DateTimeFormatter.ofPattern("dd.MM")) : "-";
+            String cn = e.getCard() != null ? e.getCard().getName() : "-";
             String desc = e.getDescription() != null ? e.getDescription() : "";
             if (desc.length() > 20) desc = desc.substring(0, 20) + "...";
-            sb.append("• ").append(date).append(" | <b>").append(esc(card)).append("</b>\n");
-            sb.append("  ").append(esc(desc)).append(": ").append(FormatUtils.formatNumber(e.getTotalAmount())).append(" ₺\n\n");
+            sb.append("• ").append(dt).append(" | <b>").append(esc(cn)).append("</b>\n  ").append(esc(desc)).append(": ").append(FormatUtils.formatNumber(e.getTotalAmount())).append(" ₺\n\n");
         }
-        sendMessage(chatId, sb.toString());
+        sendMsg(chatId, sb.toString());
     }
 
-    private void sendDisconnectConfirmation(Long chatId) {
-        if (userService.disconnectTelegramByChatId(chatId)) {
-            sendMessage(chatId, "<b>🔌 Bağlantı Kesildi</b>\n\nTelegram bağlantınız kaldırıldı.\n\nTekrar bağlanmak için web panelden yeni bir kod alıp /start ile başlayabilirsiniz.");
-        } else {
-            sendMessage(chatId, "❌ Bu Telegram hesabı zaten bir kullanıcıya bağlı değil.");
-        }
+    // ── /baglantikes ──
+    private void sendDisconnect(Long chatId) {
+        if (userService.disconnectTelegramByChatId(chatId))
+            sendMsg(chatId, "<b>🔌 Bağlantı Kesildi</b>\n\nTekrar bağlanmak için web panelden yeni kod alıp /start yazın.");
+        else
+            sendMsg(chatId, "❌ Zaten bağlı değilsiniz.");
     }
 
-    private void handleVerificationCode(Long chatId, String code, String firstName) {
-        if (code.length() < 4 || code.length() > 20) {
-            sendMessage(chatId, "⚠️ Geçersiz kod. Lütfen web panelinden aldığınız 6 haneli doğrulama kodunu girin.");
+    // ── Kod doğrulama ──
+    private void handleCode(Long chatId, String code) {
+        if (code.length() < 4 || code.length() > 20) { sendMsg(chatId, "⚠️ Geçersiz kod. Web panelden 6 haneli kodu alın."); return; }
+        var u = userService.findByTelegramVerificationCode(code);
+        if (u.isEmpty()) { sendMsg(chatId, "❌ Kod bulunamadı. Web panelden yeni kod alın."); return; }
+        var existing = userService.findByTelegramChatId(chatId);
+        if (existing.isPresent() && !existing.get().getId().equals(u.get().getId())) {
+            sendMsg(chatId, "⚠️ Bu Telegram hesabı zaten <b>" + esc(existing.get().getUsername()) + "</b> kullanıcısına bağlı.");
             return;
         }
-
-        Optional<AppUser> userOpt = userService.findByTelegramVerificationCode(code);
-        if (userOpt.isEmpty()) {
-            sendMessage(chatId, "❌ Bu doğrulama kodu bulunamadı.\n\nKodun süresi dolmuş olabilir. Lütfen web panelinden <b>yeni bir kod</b> alın.");
-            return;
-        }
-
-        AppUser user = userOpt.get();
-        Optional<AppUser> existingChatUser = userService.findByTelegramChatId(chatId);
-        if (existingChatUser.isPresent() && !existingChatUser.get().getId().equals(user.getId())) {
-            sendMessage(chatId, "⚠️ Bu Telegram hesabı zaten <b>" + esc(existingChatUser.get().getUsername()) + "</b> kullanıcısına bağlı.");
-            return;
-        }
-
-        if (!userService.linkTelegramChatId(code, chatId)) {
-            sendMessage(chatId, "❌ Bağlantı kurulamadı. Lütfen tekrar deneyin.");
-            return;
-        }
-        log.info("Telegram bağlantısı kuruldu: {} -> chatId={}", user.getUsername(), chatId);
-
-        String msg = "<b>✅ Doğrulama Başarılı!</b>\n\n" +
-                "<b>\"" + esc(user.getUsername()) + "\"</b> hesabınıza bağlandınız.\n\n" +
-                "👤 " + esc(user.getUsername()) + "\n" +
-                "📝 " + esc(user.getFullName() != null ? user.getFullName() : "-") + "\n\n" +
-                "<i>Komutlar: /kartlar /bakiye /limit /odemeler /sonharcamalar</i>";
-        sendMessage(chatId, msg);
+        if (!userService.linkTelegramChatId(code, chatId)) { sendMsg(chatId, "❌ Bağlantı kurulamadı."); return; }
+        log.info("Telegram bağlandı: {} -> chatId={}", u.get().getUsername(), chatId);
+        sendMsg(chatId, "<b>✅ Bağlantı Kuruldu!</b>\n\n<b>" + esc(u.get().getUsername()) + "</b> hesabına bağlandınız.\n\n/ozet ile özet alabilirsiniz.");
     }
 
-    // --- Helpers ---
-
-    private void sendMessage(Long chatId, String text) {
-        SendMessage msg = new SendMessage(chatId.toString(), text);
-        msg.enableHtml(true);
-        msg.disableWebPagePreview();
-        try {
-            execute(msg);
-        } catch (TelegramApiException e) {
-            log.error("Telegram mesajı gönderilemedi: {}", e.getMessage());
-        }
+    // ── Yardımcılar ──
+    private Optional<AppUser> getUser(Long chatId) { return userService.findByTelegramChatId(chatId); }
+    private void sendNotConnected(Long chatId) { sendMsg(chatId, "⚠️ Hesabınız bağlı değil.\nWeb panel → Profilim → Telegram'a Bağlan → kodu gönderin."); }
+    private void sendMsg(Long chatId, String text) {
+        try { execute(SendMessage.builder().chatId(chatId.toString()).text(text).parseMode("HTML").disableWebPagePreview(true).build()); }
+        catch (TelegramApiException e) { log.error("Mesaj hatası: {}", e.getMessage()); }
     }
-
-    private void sendNotConnected(Long chatId) {
-        sendMessage(chatId, "⚠️ Hesabınız henüz bağlı değil.\n\nWeb panel → Profilim → Telegram'a Bağlan → kodu buraya gönderin.");
-    }
-
-    private String esc(String text) {
-        if (text == null) return "";
-        return text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;");
-    }
-
-    private String buildProgressBar(double percent) {
-        int filled = (int) (percent / 10);
-        StringBuilder bar = new StringBuilder();
-        for (int i = 0; i < 10; i++) {
-            bar.append(i < filled ? "█" : "░");
-        }
-        return bar.toString();
+    private String esc(String t) { return t == null ? "" : t.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"); }
+    private String progressBar(double pct) {
+        int n = (int)(pct / 10);
+        StringBuilder b = new StringBuilder();
+        for (int i = 0; i < 10; i++) b.append(i < n ? "█" : "░");
+        return b.toString();
     }
 }
