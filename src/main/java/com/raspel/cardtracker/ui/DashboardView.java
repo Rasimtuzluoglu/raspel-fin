@@ -148,18 +148,16 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
             "  window.scrollTo(0, window._dashScrollY);" +
             "  delete window._dashScrollY;" +
             "}" +
-            // Tum ApexCharts tooltip'lerine TL formati ekle
+            // Tum ApexCharts tooltip'lerine TL formati ekle (surekli calisir)
             "if(!window.__tooltipPatched){" +
             "window.__tooltipPatched=true;" +
-            "setTimeout(function(){" +
-            "  var fmt=new Intl.NumberFormat('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2});" +
-            "  document.querySelectorAll('.apexcharts-tooltip').forEach(function(t){" +
-            "    t.querySelectorAll('.apexcharts-tooltip-text-y-value').forEach(function(v){" +
-            "      var num=parseFloat(v.textContent.replace(/[^0-9.-]/g,''));" +
-            "      if(!isNaN(num)){v.textContent=fmt.format(num)+' ₺';}" +
-            "    });" +
+            "var fmt=new Intl.NumberFormat('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2});" +
+            "setInterval(function(){" +
+            "  document.querySelectorAll('.apexcharts-tooltip-text-y-value').forEach(function(v){" +
+            "    var num=parseFloat(v.textContent.replace(/[^0-9.-]/g,''));" +
+            "    if(!isNaN(num)){v.textContent=fmt.format(num)+' ₺';}" +
             "  });" +
-            "},200);" +
+            "},500);" +
             "}"
         );
     }
