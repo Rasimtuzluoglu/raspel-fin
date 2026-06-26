@@ -41,7 +41,7 @@ Tarayıcıda `http://localhost:8080` adresini açın.
 
 **Varsayılan hesap:**
 - Kullanıcı adı: `admin`
-- Şifre: `admin`
+- Şifre: `admin123`
 
 > İlk girişten sonra şifrenizi değiştirmeniz önerilir.
 
