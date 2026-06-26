@@ -153,11 +153,11 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
             "window.__tooltipPatched=true;" +
             "var fmt=new Intl.NumberFormat('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2});" +
             "setInterval(function(){" +
-            "  document.querySelectorAll('.apexcharts-tooltip-text-y-value').forEach(function(v){" +
+            "  document.querySelectorAll('.apexcharts-tooltip-text-y-value:not([data-fmt])').forEach(function(v){" +
             "    var num=parseFloat(v.textContent.replace(/[^0-9.-]/g,''));" +
-            "    if(!isNaN(num)){v.textContent=fmt.format(num)+' ₺';}" +
+            "    if(!isNaN(num)){v.textContent=fmt.format(num)+' ₺';v.setAttribute('data-fmt','1');}" +
             "  });" +
-            "},500);" +
+            "},300);" +
             "}"
         );
     }
