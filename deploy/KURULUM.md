@@ -1,13 +1,13 @@
 # RaspelCardTracker - Kurulum Kılavuzu
 
-Kredi kartı harcama takip ve finans yönetim sistemi.
+Kredi kartı harcama takip, bütçe yönetimi, çek takibi, cari hesaplar, personel görev yönetimi ve raporlama sistemi.
 
 ## Gereksinimler
 
 | Bileşen | Minimum Sürüm |
 |---------|---------------|
 | Docker Desktop | 20.10+ |
-| İnternet bağlantısı | İlk kurulum için gerekli |
+| İnternet bağlantısı | İlk kurulum + otomatik güncelleme için |
 | Boş Disk Alanı | ~3 GB |
 | RAM | 4 GB (önerilen) |
 
@@ -48,6 +48,33 @@ Tarayıcıda `http://localhost:8080` adresini açın.
 ## Firma Adını Değiştirme
 
 Admin hesabıyla giriş yapın → **Profilim** sayfası → "Firma Adı Değiştir" bölümünden firmanızın adını yazıp kaydedin. Uygulamanın her yerinde bu isim görünecektir.
+
+## Telegram Bot Bağlantısı (Opsiyonel)
+
+Uygulama, Telegram üzerinden bildirim almak için bot desteği sunar:
+
+1. **Profilim** sayfasına gidin
+2. "Telegram'a Bağlan" butonuna tıklayın
+3. Size verilen 6 haneli kodu kopyalayın
+4. Telegram'da [@raspel_fin_bot](https://t.me/raspel_fin_bot) bot'unu başlatın
+5. `/start` yazıp doğrulama kodunu gönderin
+6. Bağlantı kurulduğunda profil sayfanızda "Bağlı" gözükecektir
+
+Bot'un çalışması için `.env` dosyasında `TELEGRAM_BOT_TOKEN` tanımlı olmalıdır.
+
+## Ortam Değişkenleri (.env)
+
+`.env` dosyasındaki ayarlar:
+
+| Değişken | Açıklama | Zorunlu |
+|----------|----------|---------|
+| `DB_USER` | Veritabanı kullanıcı adı | Evet |
+| `DB_PASS` | Veritabanı şifresi | Evet |
+| `DB_URL` | Veritabanı bağlantı adresi | Evet |
+| `DOCKER_IMAGE` | Docker imaj adresi | Evet |
+| `TELEGRAM_BOT_TOKEN` | Telegram bot token'ı | Hayır |
+
+Bot token'ı yoksa bot devre dışı kalır, diğer tüm özellikler çalışmaya devam eder.
 
 ## Otomatik Güncelleme
 
@@ -122,4 +149,4 @@ C:\CardTracker\
 
 ---
 
-**Yazılım:** Rasim Tuzluoğlu | © 2026 RasPel
+**Yazılım:** Rasim Tuzluoğlu | © 2026 RasPel Co.
