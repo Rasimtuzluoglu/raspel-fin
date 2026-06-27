@@ -2,7 +2,6 @@ package com.raspel.cardtracker.domain.department;
 
 import com.raspel.cardtracker.domain.audit.AuditAction;
 import com.raspel.cardtracker.domain.audit.AuditLogService;
-import com.raspel.cardtracker.domain.budget.DepartmentBudgetRepository;
 import com.raspel.cardtracker.domain.card.Card;
 import com.raspel.cardtracker.domain.card.CardRepository;
 import org.junit.jupiter.api.Test;
@@ -24,7 +23,6 @@ class DepartmentServiceTest {
 
     @Mock private DepartmentRepository departmentRepository;
     @Mock private CardRepository cardRepository;
-    @Mock private DepartmentBudgetRepository budgetRepository;
     @Mock private AuditLogService auditLogService;
 
     @InjectMocks
@@ -143,7 +141,7 @@ class DepartmentServiceTest {
     }
 
     @Test
-    void delete_shouldDetachCardsDeleteBudgetAndSetInactive() {
+    void delete_shouldDetachCardsAndSetInactive() {
         Department dept = new Department();
         dept.setId(1L);
         dept.setName("Silinecek");
@@ -154,14 +152,12 @@ class DepartmentServiceTest {
 
         when(departmentRepository.findById(1L)).thenReturn(Optional.of(dept));
         when(cardRepository.findByDepartment(dept)).thenReturn(List.of(card));
-        when(budgetRepository.findByDepartmentIdOrderByBudgetYearDescBudgetMonthDesc(1L)).thenReturn(List.of());
 
         departmentService.delete(1L);
 
         assertThat(dept.getIsActive()).isFalse();
         assertThat(card.getDepartment()).isNull();
         verify(cardRepository).save(card);
-        verify(budgetRepository).deleteAll(anyList());
         verify(auditLogService).log(any(), eq("Departman"), eq(1L), contains("Departman silindi"));
     }
 }

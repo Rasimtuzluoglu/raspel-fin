@@ -27,9 +27,7 @@ import com.vaadin.flow.component.sidenav.SideNavItem;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.theme.lumo.LumoUtility;
 import com.raspel.cardtracker.config.TelegramBotService;
-import com.raspel.cardtracker.domain.budget.DepartmentBudget;
 import org.springframework.beans.factory.annotation.Autowired;
-import com.raspel.cardtracker.domain.budget.DepartmentBudgetService;
 import com.raspel.cardtracker.domain.card.Card;
 import com.raspel.cardtracker.domain.card.CardService;
 import com.raspel.cardtracker.domain.expense.ExpenseService;
@@ -60,7 +58,6 @@ public class MainLayout extends AppLayout {
     private final PaymentReminderService reminderService;
     private final UserService userService;
     private final NoteService noteService;
-    private final DepartmentBudgetService departmentBudgetService;
     private final AppSettingsService appSettingsService;
     @Autowired(required = false)
     private TelegramBotService telegramBotService;
@@ -69,13 +66,12 @@ public class MainLayout extends AppLayout {
     private Span alertBadge;
     private Icon bellIcon;
 
-    public MainLayout(CardService cardService, ExpenseService expenseService, PaymentReminderService reminderService, UserService userService, NoteService noteService, DepartmentBudgetService departmentBudgetService, AppSettingsService appSettingsService) {
+    public MainLayout(CardService cardService, ExpenseService expenseService, PaymentReminderService reminderService, UserService userService, NoteService noteService, AppSettingsService appSettingsService) {
         this.cardService = cardService;
         this.expenseService = expenseService;
         this.reminderService = reminderService;
         this.userService = userService;
         this.noteService = noteService;
-        this.departmentBudgetService = departmentBudgetService;
         this.appSettingsService = appSettingsService;
         
         setPrimarySection(Section.DRAWER);
@@ -631,7 +627,6 @@ public class MainLayout extends AppLayout {
         injectKeyboardShortcuts();
         injectFabButton();
         checkNoteReminders();
-        checkBudgetWarnings();
         updateBellBadge();
         updateCardDebtSection();
 
@@ -646,7 +641,6 @@ public class MainLayout extends AppLayout {
                 ui.addPollListener(e -> {
                     try {
                         checkNoteReminders();
-                        checkBudgetWarnings();
                         updateBellBadge();
                     } catch (Exception ignored) {}
                 });
@@ -794,77 +788,6 @@ public class MainLayout extends AppLayout {
             }
         } catch (Exception ignored) {
             // Expected: no reminders or data unavailable at this time
-        }
-    }
-
-    private void checkBudgetWarnings() {
-        try {
-            com.vaadin.flow.server.VaadinSession session = com.vaadin.flow.server.VaadinSession.getCurrent();
-            @SuppressWarnings("unchecked")
-            java.util.Set<String> warnedKeys = (java.util.Set<String>) session.getAttribute("warnedBudgetKeys");
-            if (warnedKeys == null) {
-                warnedKeys = new java.util.HashSet<>();
-                session.setAttribute("warnedBudgetKeys", warnedKeys);
-            }
-
-            LocalDate now = LocalDate.now();
-            int year = now.getYear();
-            int month = now.getMonthValue();
-
-            List<Card> activeCards = cardService.findAllActive();
-            Map<Long, BigDecimal> unpaidBalances = expenseService.getUnpaidBalancesGroupedByCard();
-            for (Card card : activeCards) {
-                BigDecimal unpaid = unpaidBalances.getOrDefault(card.getId(), BigDecimal.ZERO);
-                BigDecimal limit = card.getCardLimit();
-                if (limit != null && limit.compareTo(BigDecimal.ZERO) > 0) {
-                    double pct = unpaid.divide(limit, 4, RoundingMode.HALF_UP).doubleValue() * 100;
-                    String key = "card_" + card.getId();
-                    if (pct >= 90.0 && warnedKeys.add(key)) {
-                        BigDecimal kalan = limit.subtract(unpaid);
-                        if (kalan.compareTo(BigDecimal.ZERO) < 0) kalan = BigDecimal.ZERO;
-                        Dialog warnDlg = new Dialog();
-                        warnDlg.setHeaderTitle("Limit Uyarısı");
-                        warnDlg.setWidth("380px");
-                        Span msg = new Span(card.getName() + " kartının limiti dolmak üzere.\nKalan: " + FormatUtils.formatNumber(kalan) + " ₺ / " + FormatUtils.formatNumber(limit) + " ₺ (%" + (int) pct + " dolu)");
-                        msg.getStyle().set("white-space", "pre-wrap");
-                        warnDlg.add(msg);
-                        Button closeBtn = new Button("Tamam", ev -> warnDlg.close());
-                        closeBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-                        warnDlg.getFooter().add(closeBtn);
-                        warnDlg.open();
-                    }
-                }
-            }
-
-            List<DepartmentBudget> budgets = departmentBudgetService.findByYearAndMonth(year, month);
-            for (DepartmentBudget budget : budgets) {
-                String deptName = budget.getDepartment() != null ? budget.getDepartment().getName() : "";
-                BigDecimal spent = expenseService.getDepartmentSpentForMonth(deptName, year, month);
-                BigDecimal budgetLimit = budget.getBudgetLimit();
-                if (budgetLimit != null && budgetLimit.compareTo(BigDecimal.ZERO) > 0) {
-                    double pct = spent.divide(budgetLimit, 4, RoundingMode.HALF_UP).doubleValue() * 100;
-                    String key = "budget_" + budget.getId();
-                    if (pct >= 80.0 && warnedKeys.add(key)) {
-                        BigDecimal kalan = budgetLimit.subtract(spent);
-                        if (kalan.compareTo(BigDecimal.ZERO) < 0) kalan = BigDecimal.ZERO;
-                        Dialog warnDlg = new Dialog();
-                        warnDlg.setHeaderTitle("Bütçe Uyarısı");
-                        warnDlg.setWidth("380px");
-                        Span msg = new Span(deptName + " bütçesi dolmak üzere.\nKalan: " + FormatUtils.formatNumber(kalan) + " ₺ / " + FormatUtils.formatNumber(budgetLimit) + " ₺ (%" + (int) pct + " kullanıldı)");
-                        msg.getStyle().set("white-space", "pre-wrap");
-                        warnDlg.add(msg);
-                        Button closeBtn = new Button("Tamam", ev -> warnDlg.close());
-                        closeBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
-                        warnDlg.getFooter().add(closeBtn);
-                        warnDlg.open();
-                    }
-                }
-            }
-        } catch (Exception ignored) {
-            // Expected: data may not be available during initial navigation
-        }
-        if (telegramBotService != null) {
-            try { telegramBotService.checkAndNotifyLimits(); } catch (Exception ignored) {}
         }
     }
 

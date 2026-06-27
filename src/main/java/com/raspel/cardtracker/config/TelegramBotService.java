@@ -6,8 +6,6 @@ import com.raspel.cardtracker.domain.cheque.Cheque;
 import com.raspel.cardtracker.domain.cheque.ChequeService;
 import com.raspel.cardtracker.domain.cheque.ChequeStatus;
 import com.raspel.cardtracker.domain.cheque.ChequeType;
-import com.raspel.cardtracker.domain.budget.DepartmentBudget;
-import com.raspel.cardtracker.domain.budget.DepartmentBudgetService;
 import com.raspel.cardtracker.domain.employee.EmployeeService;
 import com.raspel.cardtracker.domain.employee.EmployeeTask;
 import com.raspel.cardtracker.domain.employee.TaskStatus;
@@ -16,6 +14,7 @@ import com.raspel.cardtracker.domain.expense.ExpenseService;
 import com.raspel.cardtracker.domain.expense.InstallmentEntry;
 import com.raspel.cardtracker.domain.user.AppUser;
 import com.raspel.cardtracker.domain.user.UserService;
+import com.raspel.cardtracker.domain.settings.AppSettingsService;
 import com.raspel.cardtracker.ui.utils.FormatUtils;
 import com.raspel.cardtracker.ui.utils.HolidayUtils;
 import jakarta.annotation.PostConstruct;
@@ -50,22 +49,23 @@ public class TelegramBotService extends TelegramLongPollingBot {
     private final ExpenseService expenseService;
     private final ChequeService chequeService;
     private final EmployeeService employeeService;
-    private final DepartmentBudgetService budgetService;
     private final Environment environment;
-    private final java.util.Set<String> sentAlerts = java.util.concurrent.ConcurrentHashMap.newKeySet();
+    private final AppSettingsService appSettingsService;
+    private final java.util.Set<String> sentAlerts;
 
     public TelegramBotService(UserService userService, CardService cardService,
                               ExpenseService expenseService, ChequeService chequeService,
-                              EmployeeService employeeService, DepartmentBudgetService budgetService,
-                              Environment environment) {
+                              EmployeeService employeeService,
+                              Environment environment, AppSettingsService appSettingsService) {
         super(environment.getProperty("TELEGRAM_BOT_TOKEN", ""));
         this.userService = userService;
         this.cardService = cardService;
         this.expenseService = expenseService;
         this.chequeService = chequeService;
         this.employeeService = employeeService;
-        this.budgetService = budgetService;
         this.environment = environment;
+        this.appSettingsService = appSettingsService;
+        this.sentAlerts = appSettingsService.getSentAlerts();
     }
 
     @PostConstruct
@@ -76,7 +76,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
             try {
                 new TelegramBotsApi(DefaultBotSession.class).registerBot(this);
                 registerCommands();
-                log.info("Telegram bot başlatıldı: @raspel_fin_bot (12 komut)");
+                log.info("Telegram bot başlatıldı: @raspel_fin_bot (15 komut)");
             } catch (TelegramApiException e) {
                 log.error("Bot kaydedilemedi: {}", e.getMessage());
             }
@@ -98,6 +98,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
                 new BotCommand("sonharcamalar", "Son 5 harcama"),
                 new BotCommand("ismegore", "İsme göre kart ara"),
                 new BotCommand("gorevler", "Bekleyen görevler"),
+                new BotCommand("hesapkesim", "Yaklaşan hesap kesim tarihleri"),
                 new BotCommand("baglantikes", "Bağlantıyı kes")
         );
         try { execute(new SetMyCommands(cmds, new BotCommandScopeDefault(), null)); }
@@ -126,6 +127,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
             case "/cekler" -> sendCheques(chatId);
             case "/sonharcamalar" -> sendRecent(chatId);
             case "/gorevler" -> sendTasks(chatId);
+            case "/hesapkesim" -> sendStatementDates(chatId);
             case "/baglantikes" -> sendDisconnect(chatId);
             default -> {
                 if (text.toLowerCase(java.util.Locale.ENGLISH).startsWith("/ismegore ")) {
@@ -158,7 +160,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
             if (c.getCardLimit() == null || c.getCardLimit().compareTo(BigDecimal.ZERO) <= 0) continue;
             double pct = unpaid.divide(c.getCardLimit(), 4, RoundingMode.HALF_UP).doubleValue() * 100;
             if (pct >= 80.0) {
-                String key = "limit_" + c.getId() + "_" + String.format("%.0f", pct);
+                String key = "limit_" + c.getId();
                 if (!sentAlerts.add(key)) continue;
                 String emoji = pct >= 95 ? "🔴" : pct >= 85 ? "🟠" : "🟡";
                 alerts.append(emoji).append(" <b>").append(esc(c.getName())).append("</b> limit %").append(String.format("%.0f", pct))
@@ -207,27 +209,36 @@ public class TelegramBotService extends TelegramLongPollingBot {
             }
         }
 
-        // 4. Budget warnings
-        List<DepartmentBudget> budgets = budgetService.findByYearAndMonth(ym.getYear(), ym.getMonthValue());
-        if (!budgets.isEmpty()) {
-            for (DepartmentBudget b : budgets) {
-                String deptName = b.getDepartment() != null ? b.getDepartment().getName() : "";
-                BigDecimal spent = expenseService.getDepartmentSpentForMonth(deptName, ym.getYear(), ym.getMonthValue());
-                BigDecimal limit = b.getBudgetLimit();
-                if (limit == null || limit.compareTo(BigDecimal.ZERO) <= 0) continue;
-                double pct = spent.divide(limit, 4, RoundingMode.HALF_UP).doubleValue() * 100;
-                if (pct >= 80.0) {
-                    String key = "budget_" + b.getId() + "_" + String.format("%.0f", pct);
-                    if (!sentAlerts.add(key)) continue;
-                    String emoji = pct >= 100 ? "🔴" : "🟡";
-                    alerts.append(emoji).append(" <b>").append(esc(deptName)).append("</b> bütçesi %").append(String.format("%.0f", pct))
-                            .append(" kullanıldı!\n  Harcama: ").append(FormatUtils.formatNumber(spent)).append(" ₺ / ")
-                            .append(FormatUtils.formatNumber(limit)).append(" ₺\n\n");
+        // 5. Statement (hesap kesim) dates approaching (within 3 days)
+        if (!cards.isEmpty()) {
+            boolean hasStatementWarning = false;
+            StringBuilder stmtAlerts = new StringBuilder();
+            for (Card c : cards) {
+                int cd = c.getClosingDay() != null ? c.getClosingDay() : 1;
+                LocalDate stmtDate = LocalDate.of(today.getYear(), today.getMonthValue(), Math.min(cd, today.lengthOfMonth()));
+                if (today.isAfter(stmtDate)) {
+                    stmtDate = stmtDate.plusMonths(1);
                 }
+                long daysToStmt = ChronoUnit.DAYS.between(today, stmtDate);
+                if (daysToStmt >= 0 && daysToStmt <= 3) {
+                    String key = "stmt_" + c.getId() + "_" + daysToStmt;
+                    if (!sentAlerts.add(key)) continue;
+                    if (!hasStatementWarning) {
+                        stmtAlerts.append("<b>📅 3 GÜN İÇİNDE HESAP KESİM:</b>\n");
+                        hasStatementWarning = true;
+                    }
+                    LocalDate dueDate = HolidayUtils.getNextBusinessDay(stmtDate.plusDays(c.getDueDay() != null ? c.getDueDay() : 10));
+                    stmtAlerts.append("• <b>").append(esc(c.getName())).append("</b> (").append(esc(c.getBank())).append(")\n")
+                              .append("  Hesap Kesim: ").append(stmtDate.format(DateTimeFormatter.ofPattern("dd.MM"))).append("\n")
+                              .append("  Son Ödeme: ").append(dueDate.format(DateTimeFormatter.ofPattern("dd.MM"))).append("\n\n");
+                }
+            }
+            if (hasStatementWarning) {
+                alerts.append(stmtAlerts);
             }
         }
 
-        // 5. Cheque maturity approaching (within 7 days)
+        // 6. Cheque maturity approaching (within 7 days)
         List<Cheque> cheques = chequeService.findAll().stream()
                 .filter(c -> c.getStatus() == ChequeStatus.PORTFOLIO)
                 .filter(c -> {
@@ -254,6 +265,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
                 sendMsg(u.getTelegramChatId(), msg);
             }
             log.info("Telegram bildirimi gönderildi: {} kullanıcı", connected.size());
+            try { appSettingsService.saveSentAlerts(sentAlerts); } catch (Exception ignored) {}
         }
     }
 
@@ -318,6 +330,46 @@ public class TelegramBotService extends TelegramLongPollingBot {
         sendMsg(chatId, sb.toString());
     }
 
+    private void sendStatementDates(Long chatId) {
+        var u = getUser(chatId);
+        if (u.isEmpty()) { sendNotConnected(chatId); return; }
+        List<Card> cards = cardService.findAllActive();
+        if (cards.isEmpty()) { sendMsg(chatId, "Aktif kart bulunamadı."); return; }
+
+        LocalDate today = LocalDate.now();
+        StringBuilder sb = new StringBuilder("<b>📅 Yaklaşan Hesap Kesim Tarihleri</b>\n\n");
+
+        for (Card card : cards) {
+            if (card.getClosingDay() == null) continue;
+            int closingDay = card.getClosingDay();
+            LocalDate statementDate = LocalDate.of(today.getYear(), today.getMonthValue(), Math.min(closingDay, today.lengthOfMonth()));
+            if (today.isAfter(statementDate)) {
+                statementDate = statementDate.plusMonths(1);
+            }
+            LocalDate originalDueDate = statementDate.plusDays(card.getDueDay() != null ? card.getDueDay() : 10);
+            LocalDate actualDueDate = HolidayUtils.getNextBusinessDay(originalDueDate);
+            long daysToStatement = ChronoUnit.DAYS.between(today, statementDate);
+            long daysToDue = ChronoUnit.DAYS.between(today, actualDueDate);
+
+            String statusEmoji = daysToStatement <= 3 ? "🔴" : daysToStatement <= 7 ? "🟡" : "🟢";
+            sb.append(statusEmoji).append(" <b>").append(esc(card.getName())).append("</b> (").append(esc(card.getBank())).append(")\n");
+            sb.append("  📊 Hesap Kesim: ").append(statementDate.format(DateTimeFormatter.ofPattern("dd MMMM EEEE", Locale.of("tr"))))
+              .append(" (").append(daysToStatement).append(" gün)\n");
+            sb.append("  💳 Son Ödeme:  ").append(actualDueDate.format(DateTimeFormatter.ofPattern("dd MMMM EEEE", Locale.of("tr"))))
+              .append(" (").append(daysToDue).append(" gün)\n");
+            if (!actualDueDate.equals(originalDueDate)) {
+                sb.append("  ⚠️ Tatil/haftasonu nedeniyle ertelendi\n");
+            }
+            sb.append("\n");
+        }
+
+        if (sb.toString().equals("<b>📅 Yaklaşan Hesap Kesim Tarihleri</b>\n\n")) {
+            sendMsg(chatId, "Hesap kesim bilgisi bulunamadı.");
+            return;
+        }
+        sendMsg(chatId, sb.toString());
+    }
+
     // ── Komutlar ──
 
     private void sendWelcome(Long chatId, String firstName) {
@@ -338,6 +390,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
                 "/odemeler - Bu ay taksitler\n/gecikmeler - <b>Geciken ödemeler</b>\n" +
                 "/cekler - Portföy çekleri\n/sonharcamalar - Son harcamalar\n" +
                 "/ismegore Visa - <b>İsme göre kart ara</b>\n/gorevler - <b>Bekleyen görevler</b>\n" +
+                "/hesapkesim - <b>Yaklaşan hesap kesim tarihleri</b>\n" +
                 "/baglantikes - Bağlantıyı kes\n\n<b>Bağlantı:</b> Web panel → Profilim → Telegram'a Bağlan → Kodu gönder");
     }
 

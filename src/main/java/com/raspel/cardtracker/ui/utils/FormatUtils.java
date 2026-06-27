@@ -83,6 +83,16 @@ public class FormatUtils {
         }
     }
 
+    public static String formatTL(BigDecimal value) {
+        if (value == null) return "0,00 TL";
+        return formatTurkishCurrency(value) + " TL";
+    }
+
+    public static String formatDecimal(BigDecimal value) {
+        if (value == null) return "0,00";
+        return formatTurkishCurrency(value);
+    }
+
     public static void attachCurrencyFormatting(TextField field) {
         field.getElement().executeJs(
             "var self = this;" +
@@ -94,44 +104,44 @@ public class FormatUtils {
             "el.setAttribute('inputmode','numeric');" +
             "var formatIt = function(){" +
             "  var v = el.value;" +
+            "  if(!v) { el.value = '0,00'; return; }" +
             "  var intPart, decPart = null;" +
             "  if(v.indexOf(',') >= 0) {" +
             "    var parts = v.split(',');" +
             "    intPart = parts[0];" +
-            "    decPart = parts[parts.length - 1];" +
+            "    decPart = parts[parts.length - 1].replace(/[^0-9]/g, '');" +
             "  } else if(v.indexOf('.') >= 0) {" +
             "    var lastDot = v.lastIndexOf('.');" +
             "    var afterDot = v.substring(lastDot + 1);" +
-            "    if(afterDot.length <= 2) {" +
+            "    if(afterDot.length <= 2 && /^[0-9]*$/.test(afterDot)) {" +
             "      intPart = v.substring(0, lastDot);" +
             "      decPart = afterDot;" +
             "    } else {" +
-            "      intPart = v;" +
+            "      intPart = v.replace(/[^0-9]/g, '');" +
             "    }" +
             "  } else {" +
-            "    intPart = v;" +
+            "    intPart = v.replace(/[^0-9]/g, '');" +
             "  }" +
-            "  intPart = (intPart || '').replace(/[^0-9]/g, '').replace(/^0+/, '') || '0';" +
+            "  intPart = intPart || '0';" +
+            "  intPart = intPart.replace(/^0+/, '') || '0';" +
             "  intPart = intPart.replace(/\\B(?=(\\d{3})+(?!\\d))/g, '.');" +
             "  if(decPart !== null) {" +
-            "    decPart = decPart.replace(/[^0-9]/g, '').substring(0, 2);" +
+            "    decPart = decPart.substring(0, 2);" +
             "    while(decPart.length < 2) decPart += '0';" +
             "    el.value = intPart + ',' + decPart;" +
             "  } else {" +
             "    el.value = intPart;" +
             "  }" +
             "};" +
-            "el.addEventListener('input', formatIt);" +
             "el.addEventListener('focus', function(){" +
             "  if(el.value === '0,00' || el.value === '0') el.value = '';" +
             "  setTimeout(function(){" +
             "    try { el.select(); } catch(e) {}" +
-            "    el.selectionStart = 0; el.selectionEnd = el.value.length;" +
+            "    if(el.value) { el.selectionStart = 0; el.selectionEnd = el.value.length; }" +
             "  }, 10);" +
             "}, true);" +
             "el.addEventListener('blur', function(){" +
             "  formatIt();" +
-            "  if(!el.value || el.value === '0') el.value = '0,00';" +
             "}, true);" +
             "if(el.value && el.value !== '0,00') formatIt();" +
             "};" +

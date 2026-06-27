@@ -1,6 +1,7 @@
 package com.raspel.cardtracker.domain.department;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.NotBlank;
 import lombok.*;
 import java.time.LocalDateTime;
 
@@ -23,6 +24,7 @@ public class Department {
     private Integer version;
 
     @Column(nullable = false, unique = true, length = 100)
+    @NotBlank
     private String name;
 
     @Column(nullable = false)

@@ -2,10 +2,11 @@ package com.raspel.cardtracker.domain.department;
 
 import com.raspel.cardtracker.domain.audit.AuditAction;
 import com.raspel.cardtracker.domain.audit.AuditLogService;
-import com.raspel.cardtracker.domain.budget.DepartmentBudgetRepository;
 import com.raspel.cardtracker.domain.card.Card;
 import com.raspel.cardtracker.domain.card.CardRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,9 +20,9 @@ public class DepartmentService {
 
     private final DepartmentRepository departmentRepository;
     private final CardRepository cardRepository;
-    private final DepartmentBudgetRepository budgetRepository;
     private final AuditLogService auditLogService;
 
+    @Cacheable("departments")
     public List<Department> findAllActive() {
         return departmentRepository.findAll().stream()
                 .filter(d -> d.getIsActive() != null && d.getIsActive())
@@ -32,6 +33,7 @@ public class DepartmentService {
         return departmentRepository.findAll();
     }
 
+    @CacheEvict(value = "departments", allEntries = true)
     public Department save(Department department) {
         if (department == null) throw new IllegalArgumentException("Departman bilgisi zorunludur");
         boolean isNew = department.getId() == null;
@@ -49,6 +51,7 @@ public class DepartmentService {
         return departmentRepository.findByNameIgnoreCase(name);
     }
 
+    @CacheEvict(value = "departments", allEntries = true)
     public void delete(Long id) {
         departmentRepository.findById(id).ifPresent(dept -> {
             List<Card> cards = cardRepository.findByDepartment(dept);
@@ -56,7 +59,6 @@ public class DepartmentService {
                 card.setDepartment(null);
                 cardRepository.save(card);
             }
-            budgetRepository.deleteAll(budgetRepository.findByDepartmentIdOrderByBudgetYearDescBudgetMonthDesc(id));
             dept.setIsActive(false);
             departmentRepository.save(dept);
             auditLogService.log(AuditAction.DELETE, "Departman", id, "Departman silindi: " + dept.getName());

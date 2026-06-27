@@ -1,6 +1,7 @@
 package com.raspel.cardtracker.domain.cheque;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
 import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -26,18 +27,22 @@ public class Cheque {
     private Integer version;
 
     @Column(name = "cheque_number", nullable = false, length = 100)
+    @NotBlank
     private String chequeNumber;
 
     @Column(nullable = false, length = 100)
+    @NotBlank
     private String bank;
 
     @Column(name = "maturity_date", nullable = false)
     private LocalDate maturityDate;
 
     @Column(nullable = false, precision = 15, scale = 2)
+    @Positive
     private BigDecimal amount;
 
     @Column(nullable = false, length = 100)
+    @NotBlank
     private String party;
 
     @ManyToOne(fetch = FetchType.LAZY)

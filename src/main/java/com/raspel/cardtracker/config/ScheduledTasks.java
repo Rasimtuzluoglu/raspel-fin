@@ -4,6 +4,7 @@ import com.raspel.cardtracker.domain.report.MonthlyReportService;
 import com.raspel.cardtracker.domain.settings.AppSettingsService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -61,13 +62,24 @@ public class ScheduledTasks {
         }
     }
 
-    @Scheduled(fixedDelay = 600_000, initialDelay = 30_000)
+    @Scheduled(fixedDelay = 60_000, initialDelay = 15_000)
     public void checkAndNotifyTelegram() {
         if (telegramBotService != null) {
             try {
                 telegramBotService.checkAndNotifyLimits();
             } catch (Exception e) {
                 log.error("Telegram limit bildirimi hatası", e);
+            }
+        }
+    }
+
+    @Async
+    public void triggerTelegramCheckAsync() {
+        if (telegramBotService != null) {
+            try {
+                telegramBotService.checkAndNotifyLimits();
+            } catch (Exception e) {
+                log.error("Telegram async bildirim hatası", e);
             }
         }
     }

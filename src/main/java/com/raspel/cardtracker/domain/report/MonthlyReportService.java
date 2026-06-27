@@ -2,8 +2,6 @@ package com.raspel.cardtracker.domain.report;
 
 import com.lowagie.text.*;
 import com.lowagie.text.pdf.*;
-import com.raspel.cardtracker.domain.budget.DepartmentBudget;
-import com.raspel.cardtracker.domain.budget.DepartmentBudgetService;
 import com.raspel.cardtracker.domain.card.Card;
 import com.raspel.cardtracker.domain.card.CardService;
 import com.raspel.cardtracker.domain.cheque.Cheque;
@@ -41,7 +39,6 @@ public class MonthlyReportService {
     private final ExpenseService expenseService;
     private final CardService cardService;
     private final ChequeService chequeService;
-    private final DepartmentBudgetService budgetService;
     private final AppSettingsService appSettingsService;
 
     private String formatTL(BigDecimal amount) {
@@ -89,8 +86,6 @@ public class MonthlyReportService {
             List<Cheque> monthlyCheques = chequeService.findAll().stream()
                     .filter(c -> c.getMaturityDate().getYear() == year && c.getMaturityDate().getMonthValue() == month)
                     .collect(Collectors.toList());
-
-            List<DepartmentBudget> budgets = budgetService.findByYearAndMonth(year, month);
 
             // Hesaplamalar
             BigDecimal totalSpent = installments.stream()
@@ -165,64 +160,9 @@ public class MonthlyReportService {
                 }
             }
 
-            // --- BÖLÜM 3: DEPARTMAN BÜTÇE DURUMU ---
-            if (!budgets.isEmpty()) {
-                Paragraph sec3 = new Paragraph("3. Departman Bütçe Durumları", sectionFont);
-                sec3.setSpacingBefore(15);
-                sec3.setSpacingAfter(10);
-                document.add(sec3);
-
-                PdfPTable budgetTable = new PdfPTable(4);
-                budgetTable.setWidthPercentage(100);
-                budgetTable.setWidths(new float[]{2f, 1.5f, 1.5f, 1f});
-
-                String[] bHeaders = {"Departman", "Bütçe Limiti", "Gerçekleşen", "Kullanım %"};
-                for (String bh : bHeaders) {
-                    PdfPCell hCell = new PdfPCell(new Phrase(bh, headerFont));
-                    hCell.setBackgroundColor(new java.awt.Color(0, 128, 128));
-                    hCell.setHorizontalAlignment(Element.ALIGN_CENTER);
-                    hCell.setPadding(5);
-                    hCell.getPhrase().getFont().setColor(java.awt.Color.WHITE);
-                    budgetTable.addCell(hCell);
-                }
-
-                for (DepartmentBudget budget : budgets) {
-                    String deptName = budget.getDepartment() != null ? budget.getDepartment().getName() : "";
-                    BigDecimal spent = expenseService.getDepartmentSpentForMonth(deptName, year, month);
-                    BigDecimal limit = budget.getBudgetLimit();
-                    double pct = limit.compareTo(BigDecimal.ZERO) > 0 
-                            ? spent.divide(limit, 4, RoundingMode.HALF_UP).doubleValue() * 100 
-                            : 0;
-
-                    budgetTable.addCell(createCell(deptName, cellFont));
-                    budgetTable.addCell(createCell(formatTL(limit), cellFont, Element.ALIGN_RIGHT));
-                    budgetTable.addCell(createCell(formatTL(spent), cellFont, Element.ALIGN_RIGHT));
-                    budgetTable.addCell(createCell(String.format("%%%.1f", pct), cellFont, Element.ALIGN_CENTER));
-                }
-                document.add(budgetTable);
-
-                try {
-                    java.util.LinkedHashMap<String, BigDecimal> budgetMap = new java.util.LinkedHashMap<>();
-                    for (DepartmentBudget budget : budgets) {
-                        String deptName = budget.getDepartment() != null ? budget.getDepartment().getName() : "";
-                        BigDecimal spent = expenseService.getDepartmentSpentForMonth(deptName, year, month);
-                        budgetMap.put(deptName, spent);
-                    }
-                    if (!budgetMap.isEmpty()) {
-                        BufferedImage chartImg = createBarChart("Departman Bütçe Kullanımı (TL)", budgetMap);
-                        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                        ImageIO.write(chartImg, "png", baos);
-                        com.lowagie.text.Image pdfImg = com.lowagie.text.Image.getInstance(baos.toByteArray());
-                        pdfImg.scaleToFit(500, 250);
-                        pdfImg.setSpacingBefore(10);
-                        document.add(pdfImg);
-                    }
-                } catch (Exception ignored) {}
-            }
-
-            // --- BÖLÜM 4: MEVCUT AY TAKSİT DETAYLARI ---
+            // --- BÖLÜM 3: MEVCUT AY TAKSİT DETAYLARI ---
             if (!installments.isEmpty()) {
-                Paragraph sec4 = new Paragraph("4. Kredi Kartı Taksit Detayları", sectionFont);
+                Paragraph sec4 = new Paragraph("3. Kredi Kartı Taksit Detayları", sectionFont);
                 sec4.setSpacingBefore(15);
                 sec4.setSpacingAfter(10);
                 document.add(sec4);

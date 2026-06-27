@@ -93,7 +93,13 @@ services:
     restart: unless-stopped
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-    command: --interval 300 --cleanup cardtracker-app
+    environment:
+      WATCHTOWER_SCHEDULE: "0 */5 * * * *"
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_INCLUDE_RESTARTING: "true"
+      WATCHTOWER_NO_STARTUP_MESSAGE: "true"
+      WATCHTOWER_WARN_ON_HEAD_FAILURE: "always"
+    command: cardtracker-app
     deploy:
       resources:
         limits:

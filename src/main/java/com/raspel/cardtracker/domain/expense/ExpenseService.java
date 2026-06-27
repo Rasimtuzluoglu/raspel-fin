@@ -35,6 +35,7 @@ public class ExpenseService {
      */
     public Expense createExpense(Expense expense) {
         if (expense.getExpenseDate() == null) throw new IllegalArgumentException("Harcama tarihi zorunludur");
+        if (expense.getCard() == null) throw new IllegalArgumentException("Kart zorunludur");
         if (expense.getOriginalAmount() != null && expense.getOriginalAmount().compareTo(BigDecimal.ZERO) <= 0)
             throw new IllegalArgumentException("Tutar 0'dan büyük olmalıdır");
 
@@ -332,16 +333,6 @@ public class ExpenseService {
     }
 
     /**
-     * Belirli bir departmanın belirli bir ay/yıldaki toplam harcama tutarını hesaplar.
-     */
-    public BigDecimal getDepartmentSpentForMonth(String department, int year, int month) {
-        if (department == null) return BigDecimal.ZERO;
-        LocalDate start = LocalDate.of(year, month, 1);
-        LocalDate end = start.plusMonths(1);
-        return expenseRepository.sumAmountByDeptAndMonth(department, start, end);
-    }
-
-    /**
      * Açıklama metnine göre en olası kategoriyi önerir.
      * Benzer açıklamaya sahip geçmiş harcamalardaki en yaygın kategoriyi döner.
      */
@@ -374,5 +365,9 @@ public class ExpenseService {
 
     public List<Expense> findRecentByCreatedBy(String createdBy, int limit) {
         return expenseRepository.findRecentByCreatedBy(createdBy, org.springframework.data.domain.PageRequest.of(0, limit));
+    }
+
+    public BigDecimal getDepartmentSpentForMonth(Long deptId, int year, int month) {
+        return installmentEntryRepository.sumAmountByDepartmentAndYearMonth(deptId, year, month);
     }
 }

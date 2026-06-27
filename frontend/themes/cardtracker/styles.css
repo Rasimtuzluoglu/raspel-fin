@@ -145,7 +145,7 @@ html {
 
     /* Tüm view sayfaları için padding */
     .dashboard-view, .card-list-view, .expense-view, .cheque-view,
-    .budget-view, .contact-view, .audit-log-view,
+    .contact-view, .audit-log-view,
     .note-view, .user-management-view {
         padding: 8px 10px 80px 10px !important;
     }
@@ -374,7 +374,7 @@ html.dark .empty-state-text {
     }
 
     /* Paddingleri daralt */
-    .dashboard-view, .card-list-view, .expense-view, .cheque-view, .budget-view, .contact-view, .audit-log-view,
+    .dashboard-view, .card-list-view, .expense-view, .cheque-view, .contact-view, .audit-log-view,
     .note-view, .user-management-view {
         padding: 8px !important;
         padding-top: 16px !important;
@@ -426,7 +426,6 @@ html, body, vaadin-app-layout, [slot="content"], [content] {
 .expense-view,
 .cheque-view,
 .contact-view,
-.budget-view,
 .audit-log-view,
 .note-view,
 .user-management-view {
@@ -440,7 +439,6 @@ html, body, vaadin-app-layout, [slot="content"], [content] {
 .expense-view .view-toolbar,
 .cheque-view .view-toolbar,
 .contact-view .view-toolbar,
-.budget-view .view-toolbar,
 .audit-log-view .view-toolbar {
     margin-bottom: 32px !important;
     padding-bottom: 0 !important;

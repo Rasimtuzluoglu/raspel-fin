@@ -1,6 +1,7 @@
 package com.raspel.cardtracker.domain.expense;
 
 import com.raspel.cardtracker.domain.audit.AuditLogService;
+import com.raspel.cardtracker.domain.card.Card;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -125,7 +126,9 @@ class ExpenseServiceTest {
 
     @Test
     void createExpense_shouldThrowWhenAmountIsNegative() {
+        Card card = new Card(); card.setId(1L);
         Expense expense = Expense.builder()
+                .card(card)
                 .expenseDate(LocalDate.of(2026, 1, 15))
                 .originalAmount(new BigDecimal("-100.00"))
                 .installments(1)
@@ -138,7 +141,9 @@ class ExpenseServiceTest {
 
     @Test
     void createExpense_shouldThrowWhenAmountIsZero() {
+        Card card = new Card(); card.setId(1L);
         Expense expense = Expense.builder()
+                .card(card)
                 .expenseDate(LocalDate.of(2026, 1, 15))
                 .originalAmount(BigDecimal.ZERO)
                 .installments(1)
@@ -151,7 +156,9 @@ class ExpenseServiceTest {
 
     @Test
     void createExpense_shouldThrowWhenBothOriginalAndTotalAmountAreNull() {
+        Card card = new Card(); card.setId(1L);
         Expense expense = Expense.builder()
+                .card(card)
                 .expenseDate(LocalDate.of(2026, 1, 15))
                 .installments(1)
                 .build();
@@ -163,7 +170,10 @@ class ExpenseServiceTest {
 
     @Test
     void createExpense_shouldSucceedWithValidData() {
+        Card card = new Card();
+        card.setId(1L);
         Expense expense = Expense.builder()
+                .card(card)
                 .expenseDate(LocalDate.of(2026, 1, 15))
                 .originalAmount(new BigDecimal("500.00"))
                 .installments(1)

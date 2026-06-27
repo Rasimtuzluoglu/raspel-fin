@@ -21,8 +21,6 @@ import com.raspel.cardtracker.domain.card.Card;
 import com.raspel.cardtracker.domain.card.CardService;
 import com.raspel.cardtracker.domain.expense.ExpenseService;
 import com.raspel.cardtracker.domain.expense.TcmbCurrencyService;
-import com.raspel.cardtracker.domain.budget.DepartmentBudget;
-import com.raspel.cardtracker.domain.budget.DepartmentBudgetService;
 import com.raspel.cardtracker.domain.cheque.Cheque;
 import com.raspel.cardtracker.domain.cheque.ChequeService;
 import com.raspel.cardtracker.domain.cheque.ChequeType;
@@ -69,7 +67,6 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
     private final ExpenseService expenseService;
     private final CardService cardService;
     private final TcmbCurrencyService currencyService;
-    private final DepartmentBudgetService budgetService;
     private final ChequeService chequeService;
     private final UserService userService;
     private final PaymentReminderService reminderService;
@@ -80,13 +77,12 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
     private VerticalLayout dashboardContent;
 
     public DashboardView(ExpenseService expenseService, CardService cardService,
-                         TcmbCurrencyService currencyService, DepartmentBudgetService budgetService,
+                         TcmbCurrencyService currencyService,
                          ChequeService chequeService, UserService userService, PaymentReminderService reminderService,
                          EmployeeService employeeService) {
         this.expenseService = expenseService;
         this.cardService = cardService;
         this.currencyService = currencyService;
-        this.budgetService = budgetService;
         this.chequeService = chequeService;
         this.userService = userService;
         this.reminderService = reminderService;
@@ -209,7 +205,23 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
                 .filter(t -> t.getStatus() != TaskStatus.COMPLETED)
                 .count();
 
-        Span summary = new Span("Bugün sistemde " + (unpaidPayments + pendingTasks) + " adet kritik uyarı bulunuyor.");
+        List<Card> activeCards = cardService.findAllActive();
+        Map<Long, BigDecimal> unpaidMap = expenseService.getUnpaidBalancesGroupedByCard();
+        long limitWarnings = activeCards.stream()
+                .filter(c -> c.getCardLimit() != null && c.getCardLimit().compareTo(BigDecimal.ZERO) > 0)
+                .filter(c -> {
+                    BigDecimal unpaid = unpaidMap.getOrDefault(c.getId(), BigDecimal.ZERO);
+                    return unpaid.divide(c.getCardLimit(), 4, RoundingMode.HALF_UP).doubleValue() >= 0.80;
+                })
+                .count();
+
+        long totalWarnings = unpaidPayments + pendingTasks + limitWarnings;
+        String warningText = "Bugün sistemde " + totalWarnings + " adet kritik uyarı bulunuyor.";
+        if (limitWarnings > 0) {
+            warningText += " (" + limitWarnings + " limit uyarısı)";
+        }
+
+        Span summary = new Span(warningText);
         summary.getStyle()
                 .set("font-size", "0.9em")
                 .set("color", "var(--lumo-body-text-color)")
@@ -498,14 +510,12 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
         row.setSpacing(true);
 
         Div yearlyComparisonContainer = createYearlyComparisonPanel();
-        Div budgetsContainer = createDepartmentBudgetsPanel();
         Div cashFlowContainer = createChartContainer("6 Aylık Nakit Akış Analizi (Çek ve Harcamalar)", createCashFlowChart());
 
         yearlyComparisonContainer.getStyle().set("flex", "1").set("min-width", "0");
-        budgetsContainer.getStyle().set("flex", "1").set("min-width", "0");
         cashFlowContainer.getStyle().set("flex", "1").set("min-width", "0");
 
-        row.add(yearlyComparisonContainer, budgetsContainer, cashFlowContainer);
+        row.add(yearlyComparisonContainer, cashFlowContainer);
         return row;
     }
 
@@ -618,107 +628,6 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
         chart.setHeight("350px");
 
         container.add(titleEl, chart);
-        return container;
-    }
-
-    private Div createDepartmentBudgetsPanel() {
-        Div container = new Div();
-        container.getStyle()
-                .set("background", "var(--lumo-base-color)")
-                .set("border-radius", "12px")
-                .set("padding", "1.5em")
-                .set("box-shadow", "0 2px 8px rgba(0,0,0,0.1)")
-                .set("height", "420px")
-                .set("overflow-y", "auto");
-
-        H3 titleEl = new H3("Departman Bütçe Durumları (Bu Ay)");
-        titleEl.getStyle().set("margin", "0 0 1.5em 0").set("font-size", "1.1em");
-        container.add(titleEl);
-
-        VerticalLayout list = new VerticalLayout();
-        list.setPadding(false);
-        list.setSpacing(true);
-
-        LocalDate today = LocalDate.now();
-        List<DepartmentBudget> budgets = budgetService.findByYearAndMonth(today.getYear(), today.getMonthValue());
-
-        if (budgets.isEmpty()) {
-            Span noBudgets = new Span("Bu ay için tanımlanmış departman bütçesi bulunmuyor.");
-            noBudgets.getStyle().set("color", "var(--lumo-secondary-text-color)").set("font-size", "0.9em");
-            list.add(noBudgets);
-        } else {
-            for (DepartmentBudget budget : budgets) {
-                String deptName = budget.getDepartment() != null ? budget.getDepartment().getName() : "";
-                BigDecimal spent = expenseService.getDepartmentSpentForMonth(deptName, today.getYear(), today.getMonthValue());
-                BigDecimal limit = budget.getBudgetLimit();
-
-                double pct = 0.0;
-                if (limit.compareTo(BigDecimal.ZERO) > 0) {
-                    pct = spent.divide(limit, 4, RoundingMode.HALF_UP).doubleValue();
-                }
-                BigDecimal remaining = limit.subtract(spent);
-
-                String statusIcon;
-                String statusColor;
-                if (remaining.compareTo(BigDecimal.ZERO) <= 0) {
-                    statusIcon = "🔴";
-                    statusColor = "var(--lumo-error-color)";
-                } else if (pct >= 0.8) {
-                    statusIcon = "🟡";
-                    statusColor = "var(--lumo-warning-text-color)";
-                } else {
-                    statusIcon = "🟢";
-                    statusColor = "var(--lumo-success-text-color)";
-                }
-
-                VerticalLayout item = new VerticalLayout();
-                item.setPadding(false);
-                item.setSpacing(false);
-
-                HorizontalLayout labels = new HorizontalLayout();
-                labels.setWidthFull();
-                Span deptLabel = new Span(statusIcon + " " + deptName);
-                deptLabel.getStyle().set("font-weight", "bold");
-                
-                Span amountLabel = new Span(String.format("%s / %s (%%%s)",
-                        currencyFormat.format(spent),
-                        currencyFormat.format(limit),
-                        Math.round(pct * 100)));
-                amountLabel.getStyle().set("font-size", "0.85em");
-                if (pct >= 1.0) {
-                    amountLabel.getStyle().set("color", "var(--lumo-error-color)").set("font-weight", "bold");
-                } else if (pct >= 0.8) {
-                    amountLabel.getStyle().set("color", "var(--lumo-warning-text-color)").set("font-weight", "bold");
-                } else {
-                    amountLabel.getStyle().set("color", "var(--lumo-success-text-color)");
-                }
-
-                labels.add(deptLabel, amountLabel);
-                labels.expand(deptLabel);
-
-                Span remainingSpan = new Span("Kalan: " + currencyFormat.format(remaining));
-                remainingSpan.getStyle()
-                        .set("font-size", "0.8em")
-                        .set("color", remaining.compareTo(BigDecimal.ZERO) <= 0 ? "var(--lumo-error-color)" : "var(--lumo-success-text-color)")
-                        .set("margin-top", "0.2em");
-
-                ProgressBar pb = new ProgressBar();
-                pb.setValue(Math.min(pct, 1.0));
-                
-                if (pct >= 1.0) {
-                    pb.getElement().setAttribute("theme", "error");
-                } else if (pct >= 0.8) {
-                    pb.getElement().setAttribute("theme", "contrast");
-                } else {
-                    pb.getElement().setAttribute("theme", "success");
-                }
-
-                item.add(labels, pb, remainingSpan);
-                list.add(item);
-            }
-        }
-
-        container.add(list);
         return container;
     }
 

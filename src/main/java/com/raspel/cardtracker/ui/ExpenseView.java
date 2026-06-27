@@ -37,11 +37,13 @@ import com.raspel.cardtracker.domain.expense.ExpenseService;
 import com.raspel.cardtracker.domain.expense.ExcelImportService;
 import com.raspel.cardtracker.domain.expense.ExcelExportService;
 import com.raspel.cardtracker.domain.expense.PdfExportService;
+import com.raspel.cardtracker.domain.expense.BankStatementImportService;
 import com.raspel.cardtracker.domain.expense.InstallmentEntry;
 import com.raspel.cardtracker.domain.contact.Contact;
 import com.raspel.cardtracker.domain.contact.ContactService;
 import com.raspel.cardtracker.domain.department.Department;
 import com.raspel.cardtracker.domain.department.DepartmentService;
+import com.raspel.cardtracker.config.ScheduledTasks;
 import com.vaadin.flow.component.html.Anchor;
 import com.vaadin.flow.server.StreamResource;
 import jakarta.annotation.security.PermitAll;
@@ -65,6 +67,8 @@ public class ExpenseView extends VerticalLayout {
     private final ExcelExportService excelExportService;
     private final PdfExportService pdfExportService;
     private final DepartmentService departmentService;
+    private final ScheduledTasks scheduledTasks;
+    private final BankStatementImportService bankImportService;
 
     private final Grid<InstallmentEntry> grid = new Grid<>(InstallmentEntry.class, false);
     private final ComboBox<Integer> yearFilter = new ComboBox<>("Yıl");
@@ -76,7 +80,8 @@ public class ExpenseView extends VerticalLayout {
 
     public ExpenseView(ExpenseService expenseService, CardService cardService, ContactService contactService,
                        ExcelImportService excelImportService, ExcelExportService excelExportService,
-                       PdfExportService pdfExportService, DepartmentService departmentService) {
+                       PdfExportService pdfExportService, DepartmentService departmentService,
+                       ScheduledTasks scheduledTasks, BankStatementImportService bankImportService) {
         this.expenseService = expenseService;
         this.cardService = cardService;
         this.contactService = contactService;
@@ -84,6 +89,8 @@ public class ExpenseView extends VerticalLayout {
         this.excelExportService = excelExportService;
         this.pdfExportService = pdfExportService;
         this.departmentService = departmentService;
+        this.scheduledTasks = scheduledTasks;
+        this.bankImportService = bankImportService;
 
         addClassName("expense-view");
         setSizeFull();
@@ -332,7 +339,10 @@ public class ExpenseView extends VerticalLayout {
         );
         pdfExportAnchor.setHref(pdfExportResource);
 
-        HorizontalLayout toolbar = new HorizontalLayout(title, addBtn, importBtn, templateAnchor, exportAnchor, pdfExportAnchor);
+        Button bankImportBtn = new Button("Banka Ekstresi", new Icon(VaadinIcon.UPLOAD), e -> openBankImportDialog());
+        bankImportBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+
+        HorizontalLayout toolbar = new HorizontalLayout(title, addBtn, importBtn, bankImportBtn, templateAnchor, exportAnchor, pdfExportAnchor);
         toolbar.setAlignItems(Alignment.CENTER);
         toolbar.setWidthFull();
         toolbar.expand(title);
@@ -513,7 +523,12 @@ public class ExpenseView extends VerticalLayout {
         formContainer.setPadding(false);
 
         Button saveBtn = new Button("Kaydet", e -> {
-            if (cardField.getValue() == null || descField.getValue().isEmpty() || amountField.getValue().trim().isEmpty() || FormatUtils.parseTurkishCurrency(amountField.getValue()).compareTo(BigDecimal.ZERO) <= 0) {
+            if (cardField.getValue() == null) {
+                Notification.show("Lütfen bir kart seçin", 3000, Notification.Position.BOTTOM_CENTER)
+                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                return;
+            }
+            if (descField.getValue().isEmpty() || amountField.getValue().trim().isEmpty() || FormatUtils.parseTurkishCurrency(amountField.getValue()).compareTo(BigDecimal.ZERO) <= 0) {
                 Notification.show("Lütfen geçerli bir tutar girin", 3000, Notification.Position.BOTTOM_CENTER)
                         .addThemeVariants(NotificationVariant.LUMO_ERROR);
                 return;
@@ -578,6 +593,7 @@ public class ExpenseView extends VerticalLayout {
 
             dialog.close();
             refreshGrid();
+            scheduledTasks.triggerTelegramCheckAsync();
         });
         saveBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
         saveBtn.addClickShortcut(com.vaadin.flow.component.Key.ENTER);
@@ -675,6 +691,97 @@ public class ExpenseView extends VerticalLayout {
         });
 
         content.add(info, upload, resultDiv);
+        dialog.add(content);
+
+        Button closeBtn = new Button("Kapat", e -> dialog.close());
+        closeBtn.addClickShortcut(com.vaadin.flow.component.Key.ESCAPE);
+        dialog.getFooter().add(closeBtn);
+        dialog.open();
+        dialog.getElement().getStyle().set("overflow", "hidden");
+    }
+
+    private void openBankImportDialog() {
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle("Banka Ekstresi İçe Aktar");
+        dialog.setWidth("550px");
+
+        VerticalLayout content = new VerticalLayout();
+        content.setPadding(false);
+        content.setSpacing(true);
+
+        Paragraph info = new Paragraph("CSV formatındaki banka ekstresini yükleyin. Sütunlar otomatik algılanır. (Tarih, Açıklama, Tutar)");
+        info.getStyle().set("color", "var(--lumo-secondary-text-color)").set("font-size", "0.9em");
+
+        ComboBox<Card> cardField = new ComboBox<>("Kart Seçin");
+        cardField.setItems(cardService.findAllActive());
+        cardField.setItemLabelGenerator(c -> c.getName() + " (" + c.getBank() + ")");
+        cardField.setWidthFull();
+
+        MemoryBuffer buffer = new MemoryBuffer();
+        Upload upload = new Upload(buffer);
+        upload.setAcceptedFileTypes(".csv", ".txt");
+        upload.setMaxFiles(1);
+        upload.setMaxFileSize(5 * 1024 * 1024);
+
+        Div resultDiv = new Div();
+        resultDiv.getStyle().set("white-space", "pre-wrap").set("font-size", "0.85em");
+
+        Div previewDiv = new Div();
+        previewDiv.getStyle().set("white-space", "pre-wrap").set("font-size", "0.8em")
+                .set("color", "var(--lumo-secondary-text-color)").set("max-height", "200px").set("overflow-y", "auto");
+
+        upload.addSucceededListener(event -> {
+            if (cardField.isEmpty()) {
+                Notification.show("Lütfen bir kart seçin", 3000, Notification.Position.MIDDLE)
+                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                return;
+            }
+
+            java.util.List<BankStatementImportService.ImportRow> rows =
+                    bankImportService.parseCsv(buffer.getInputStream());
+
+            if (rows.isEmpty()) {
+                previewDiv.setText("Hiçbir işlem bulunamadı. Dosya formatını kontrol edin.");
+                return;
+            }
+
+            int previewCount = Math.min(20, rows.size());
+            StringBuilder sb = new StringBuilder("📋 " + rows.size() + " işlem bulundu (ilk " + previewCount + " gösteriliyor):\n\n");
+            for (int i = 0; i < previewCount; i++) {
+                BankStatementImportService.ImportRow row = rows.get(i);
+                sb.append(i + 1).append(". ").append(row.date()).append(" | ")
+                  .append(row.description()).append(" | ")
+                  .append(row.amount()).append(" ₺\n");
+            }
+            previewDiv.setText(sb.toString());
+
+            resultDiv.setText("");
+            resultDiv.getStyle().set("margin-top", "8px");
+
+            Button confirmBtn = new Button("✔ " + rows.size() + " Harcamayı Aktar", ev -> {
+                Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+                String username = auth != null ? auth.getName() : "unknown";
+
+                BankStatementImportService.ImportResult result =
+                        bankImportService.importRows(rows, cardField.getValue().getId(), username);
+
+                String res = "✔ Başarılı: " + result.successCount() + " kayıt\n" +
+                             "❌ Hatalı: " + result.errorCount() + " kayıt";
+                if (!result.errors().isEmpty()) {
+                    res += "\n\nHatalar:\n" + String.join("\n", result.errors());
+                }
+                resultDiv.setText(res);
+                previewDiv.setText("");
+                Notification.show("Aktarım tamamlandı: " + result.successCount() + " başarılı",
+                        4000, Notification.Position.BOTTOM_CENTER)
+                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                refreshGrid();
+            });
+            confirmBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+            content.add(confirmBtn);
+        });
+
+        content.add(info, cardField, upload, previewDiv, resultDiv);
         dialog.add(content);
 
         Button closeBtn = new Button("Kapat", e -> dialog.close());

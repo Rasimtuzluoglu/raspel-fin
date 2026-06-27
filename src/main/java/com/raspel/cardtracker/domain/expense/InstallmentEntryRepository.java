@@ -102,4 +102,7 @@ public interface InstallmentEntryRepository extends JpaRepository<InstallmentEnt
     BigDecimal sumAmountByYearMonthRange(@Param("startYear") Integer startYear, @Param("startMonth") Integer startMonth,
             @Param("endYear") Integer endYear, @Param("endMonth") Integer endMonth,
             @Param("cardId") Long cardId, @Param("term") String term);
+
+    @Query("SELECT COALESCE(SUM(ie.amount), 0) FROM InstallmentEntry ie JOIN ie.expense e JOIN e.card c WHERE ie.dueYear = :year AND ie.dueMonth = :month AND c.department.id = :deptId")
+    BigDecimal sumAmountByDepartmentAndYearMonth(@Param("deptId") Long deptId, @Param("year") Integer year, @Param("month") Integer month);
 }

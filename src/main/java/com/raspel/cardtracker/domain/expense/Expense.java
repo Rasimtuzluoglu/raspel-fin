@@ -3,6 +3,7 @@ package com.raspel.cardtracker.domain.expense;
 import com.raspel.cardtracker.domain.card.Card;
 import com.raspel.cardtracker.domain.contact.Contact;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
 import lombok.*;
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -37,13 +38,17 @@ public class Expense {
     private Contact contact;
 
     @Column(nullable = false)
+    @NotBlank(message = "Açıklama zorunludur")
     private String description;
 
     @Column(name = "total_amount", nullable = false, precision = 15, scale = 2)
+    @Positive(message = "Tutar pozitif olmalıdır")
     private BigDecimal totalAmount;
 
     @Column(nullable = false)
     @Builder.Default
+    @Min(value = 1, message = "En az 1 taksit")
+    @Max(value = 48, message = "En fazla 48 taksit")
     private Integer installments = 1;
 
     @Column(name = "expense_date", nullable = false)

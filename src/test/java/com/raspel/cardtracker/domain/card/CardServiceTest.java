@@ -77,14 +77,13 @@ class CardServiceTest {
 
         when(cardRepository.findById(1L)).thenReturn(Optional.of(card));
         when(expenseRepository.findByCardId(1L)).thenReturn(List.of(expense));
-        when(expenseRepository.saveAll(any())).thenReturn(List.of(expense));
         when(cardRepository.save(any())).thenReturn(card);
 
         cardService.delete(1L);
 
         assertThat(card.getActive()).isFalse();
-        assertThat(expense.getCard()).isNull();
         verify(cardRepository).save(card);
+        verify(expenseRepository).deleteAllByCardId(1L);
         verify(auditLogService).log(any(), eq("Kart"), any(), contains("Kart silindi"));
     }
 
@@ -120,17 +119,23 @@ class CardServiceTest {
     }
 
     @Test
-    void hardDelete_shouldDeleteInstallmentsAndExpenses() {
-        Expense expense = new Expense();
-        expense.setId(10L);
-
-        when(expenseRepository.findByCardId(1L)).thenReturn(List.of(expense));
+    void hardDelete_shouldSucceedWhenNoExpenses() {
+        when(expenseRepository.findByCardId(1L)).thenReturn(List.of());
 
         cardService.hardDelete(1L);
 
-        verify(installmentEntryRepository).deleteByExpenseId(10L);
-        verify(expenseRepository).deleteAllByCardId(1L);
         verify(cardRepository).deleteById(1L);
+    }
+
+    @Test
+    void hardDelete_shouldThrowWhenExpensesExist() {
+        Expense expense = new Expense();
+        expense.setId(10L);
+        when(expenseRepository.findByCardId(1L)).thenReturn(List.of(expense));
+
+        assertThatThrownBy(() -> cardService.hardDelete(1L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("harcama");
     }
 
     @Test
