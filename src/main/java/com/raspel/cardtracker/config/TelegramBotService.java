@@ -6,6 +6,8 @@ import com.raspel.cardtracker.domain.cheque.Cheque;
 import com.raspel.cardtracker.domain.cheque.ChequeService;
 import com.raspel.cardtracker.domain.cheque.ChequeStatus;
 import com.raspel.cardtracker.domain.cheque.ChequeType;
+import com.raspel.cardtracker.domain.budget.DepartmentBudget;
+import com.raspel.cardtracker.domain.budget.DepartmentBudgetService;
 import com.raspel.cardtracker.domain.employee.EmployeeService;
 import com.raspel.cardtracker.domain.employee.EmployeeTask;
 import com.raspel.cardtracker.domain.employee.TaskStatus;
@@ -48,17 +50,20 @@ public class TelegramBotService extends TelegramLongPollingBot {
     private final ExpenseService expenseService;
     private final ChequeService chequeService;
     private final EmployeeService employeeService;
+    private final DepartmentBudgetService budgetService;
     private final Environment environment;
 
     public TelegramBotService(UserService userService, CardService cardService,
                               ExpenseService expenseService, ChequeService chequeService,
-                              EmployeeService employeeService, Environment environment) {
+                              EmployeeService employeeService, DepartmentBudgetService budgetService,
+                              Environment environment) {
         super(environment.getProperty("TELEGRAM_BOT_TOKEN", ""));
         this.userService = userService;
         this.cardService = cardService;
         this.expenseService = expenseService;
         this.chequeService = chequeService;
         this.employeeService = employeeService;
+        this.budgetService = budgetService;
         this.environment = environment;
     }
 
@@ -137,16 +142,16 @@ public class TelegramBotService extends TelegramLongPollingBot {
 
     public void checkAndNotifyLimits() {
         List<Card> cards = cardService.findAllActive();
-        if (cards.isEmpty()) return;
-
-        Map<Long, BigDecimal> unpaidMap = expenseService.getUnpaidBalancesGroupedByCard();
         List<AppUser> connected = userService.findAllActive().stream()
                 .filter(u -> u.getTelegramChatId() != null).toList();
         if (connected.isEmpty()) return;
 
+        Map<Long, BigDecimal> unpaidMap = cards.isEmpty() ? Map.of() : expenseService.getUnpaidBalancesGroupedByCard();
+        LocalDate today = LocalDate.now();
+        YearMonth ym = YearMonth.now();
         StringBuilder alerts = new StringBuilder();
 
-        // Limit warnings
+        // 1. Limit warnings
         for (Card c : cards) {
             BigDecimal unpaid = unpaidMap.getOrDefault(c.getId(), BigDecimal.ZERO);
             if (c.getCardLimit() == null || c.getCardLimit().compareTo(BigDecimal.ZERO) <= 0) continue;
@@ -159,29 +164,75 @@ public class TelegramBotService extends TelegramLongPollingBot {
             }
         }
 
-        // Overdue payments
-        LocalDate today = LocalDate.now();
-        YearMonth ym = YearMonth.now();
+        // 2. Overdue payments
         List<InstallmentEntry> entries = expenseService.getInstallmentsForMonth(ym.getYear(), ym.getMonthValue());
-        List<InstallmentEntry> overdue = entries.stream().filter(e -> !e.getIsPaid()).filter(e -> {
-            YearMonth ym2 = YearMonth.of(e.getDueYear(), e.getDueMonth());
-            int cd = Math.min(e.getExpense().getCard().getClosingDay(), ym2.lengthOfMonth());
-            LocalDate due = HolidayUtils.getNextBusinessDay(
-                    LocalDate.of(e.getDueYear(), e.getDueMonth(), cd).plusDays(e.getExpense().getCard().getDueDay()));
-            return due.isBefore(today.plusDays(1));
-        }).toList();
+        if (!entries.isEmpty()) {
+            List<InstallmentEntry> overdue = entries.stream().filter(e -> !e.getIsPaid()).filter(e -> {
+                LocalDate due = calcDueDate(e);
+                return due.isBefore(today.plusDays(1));
+            }).toList();
+            if (!overdue.isEmpty()) {
+                alerts.append("<b>🔴 GECİKMİŞ ÖDEMELER:</b>\n");
+                for (InstallmentEntry e : overdue) {
+                    String cn = e.getExpense().getCard() != null ? e.getExpense().getCard().getName() : "-";
+                    long days = ChronoUnit.DAYS.between(calcDueDate(e), today);
+                    alerts.append("• <b>").append(esc(cn)).append("</b> ").append(FormatUtils.formatNumber(e.getAmount()))
+                            .append(" ₺ (").append(days).append(" gün gecikti)\n");
+                }
+                alerts.append("\n");
+            }
 
-        if (!overdue.isEmpty()) {
-            alerts.append("<b>🔴 GECİKMİŞ ÖDEMELER:</b>\n");
-            for (InstallmentEntry e : overdue) {
-                String cn = e.getExpense().getCard() != null ? e.getExpense().getCard().getName() : "-";
-                YearMonth ym2 = YearMonth.of(e.getDueYear(), e.getDueMonth());
-                int cd = Math.min(e.getExpense().getCard().getClosingDay(), ym2.lengthOfMonth());
-                LocalDate due = HolidayUtils.getNextBusinessDay(
-                        LocalDate.of(e.getDueYear(), e.getDueMonth(), cd).plusDays(e.getExpense().getCard().getDueDay()));
-                long days = ChronoUnit.DAYS.between(due, today);
-                alerts.append("• <b>").append(esc(cn)).append("</b> ").append(FormatUtils.formatNumber(e.getAmount()))
-                        .append(" ₺ (").append(days).append(" gün gecikti)\n");
+            // 3. Upcoming payments (within 3 days)
+            List<InstallmentEntry> upcoming = entries.stream().filter(e -> !e.getIsPaid()).filter(e -> {
+                LocalDate due = calcDueDate(e);
+                long days = ChronoUnit.DAYS.between(today, due);
+                return days >= 0 && days <= 3;
+            }).toList();
+            if (!upcoming.isEmpty()) {
+                alerts.append("<b>🟡 3 GÜN İÇİNDE ÖDENECEK:</b>\n");
+                for (InstallmentEntry e : upcoming) {
+                    String cn = e.getExpense().getCard() != null ? e.getExpense().getCard().getName() : "-";
+                    long days = ChronoUnit.DAYS.between(today, calcDueDate(e));
+                    alerts.append("• <b>").append(esc(cn)).append("</b> ").append(FormatUtils.formatNumber(e.getAmount()))
+                            .append(" ₺ (").append(days).append(" gün kaldı)\n");
+                }
+                alerts.append("\n");
+            }
+        }
+
+        // 4. Budget warnings
+        List<DepartmentBudget> budgets = budgetService.findByYearAndMonth(ym.getYear(), ym.getMonthValue());
+        if (!budgets.isEmpty()) {
+            for (DepartmentBudget b : budgets) {
+                String deptName = b.getDepartment() != null ? b.getDepartment().getName() : "";
+                BigDecimal spent = expenseService.getDepartmentSpentForMonth(deptName, ym.getYear(), ym.getMonthValue());
+                BigDecimal limit = b.getBudgetLimit();
+                if (limit == null || limit.compareTo(BigDecimal.ZERO) <= 0) continue;
+                double pct = spent.divide(limit, 4, RoundingMode.HALF_UP).doubleValue() * 100;
+                if (pct >= 80.0) {
+                    String emoji = pct >= 100 ? "🔴" : "🟡";
+                    alerts.append(emoji).append(" <b>").append(esc(deptName)).append("</b> bütçesi %").append(String.format("%.0f", pct))
+                            .append(" kullanıldı!\n  Harcama: ").append(FormatUtils.formatNumber(spent)).append(" ₺ / ")
+                            .append(FormatUtils.formatNumber(limit)).append(" ₺\n\n");
+                }
+            }
+        }
+
+        // 5. Cheque maturity approaching (within 7 days)
+        List<Cheque> cheques = chequeService.findAll().stream()
+                .filter(c -> c.getStatus() == ChequeStatus.PORTFOLIO)
+                .filter(c -> {
+                    long days = ChronoUnit.DAYS.between(today, c.getMaturityDate());
+                    return days >= 0 && days <= 7;
+                }).toList();
+        if (!cheques.isEmpty()) {
+            alerts.append("<b>📄 7 GÜN İÇİNDE VADESİ DOLACAK ÇEKLER:</b>\n");
+            for (Cheque c : cheques) {
+                String type = c.getType() == ChequeType.ENTERING ? "📥 Giriş" : "📤 Çıkış";
+                long days = ChronoUnit.DAYS.between(today, c.getMaturityDate());
+                alerts.append("• ").append(type).append(" <b>").append(esc(c.getChequeNumber())).append("</b> ")
+                        .append(FormatUtils.formatNumber(c.getAmount())).append(" ₺ (")
+                        .append(c.getMaturityDate().format(DateTimeFormatter.ofPattern("dd.MM"))).append(", ").append(days).append(" gün)\n");
             }
             alerts.append("\n");
         }
@@ -191,13 +242,15 @@ public class TelegramBotService extends TelegramLongPollingBot {
             for (AppUser u : connected) {
                 sendMsg(u.getTelegramChatId(), msg);
             }
-            log.info("Telegram bildirimi gönderildi: {} kullanıcı, {} limit/gecikme", connected.size(),
-                    cards.stream().filter(c -> {
-                        BigDecimal unpaid = unpaidMap.getOrDefault(c.getId(), BigDecimal.ZERO);
-                        return c.getCardLimit() != null && c.getCardLimit().compareTo(BigDecimal.ZERO) > 0 &&
-                                unpaid.divide(c.getCardLimit(), 4, RoundingMode.HALF_UP).doubleValue() >= 0.8;
-                    }).count());
+            log.info("Telegram bildirimi gönderildi: {} kullanıcı", connected.size());
         }
+    }
+
+    private LocalDate calcDueDate(InstallmentEntry e) {
+        YearMonth ym = YearMonth.of(e.getDueYear(), e.getDueMonth());
+        int cd = Math.min(e.getExpense().getCard().getClosingDay(), ym.lengthOfMonth());
+        return HolidayUtils.getNextBusinessDay(
+                LocalDate.of(e.getDueYear(), e.getDueMonth(), cd).plusDays(e.getExpense().getCard().getDueDay()));
     }
 
     // ── /ismegore ──
