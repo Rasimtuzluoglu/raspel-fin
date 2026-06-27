@@ -135,10 +135,22 @@ public class BudgetView extends VerticalLayout {
             return bar;
         }).setHeader("Durum");
         grid.addComponentColumn(row -> {
-            Button editBtn = new Button("Düzenle", e -> openEditDialog(row.getBudget()));
-            Button deleteBtn = new Button("Sil", e -> deleteBudget(row.getBudget()));
-            deleteBtn.addThemeVariants(ButtonVariant.LUMO_ERROR);
-            return new HorizontalLayout(editBtn, deleteBtn);
+            if (row.getBudget().getId() != null) {
+                Button editBtn = new Button("Düzenle", e -> openEditDialog(row.getBudget()));
+                Button deleteBtn = new Button("Sil", e -> deleteBudget(row.getBudget()));
+                deleteBtn.addThemeVariants(ButtonVariant.LUMO_ERROR);
+                return new HorizontalLayout(editBtn, deleteBtn);
+            } else {
+                Button addBtn = new Button("Bütçe Ekle", e -> {
+                    Budget b = new Budget();
+                    b.setDepartment(row.getDepartment());
+                    b.setYear(currentYear);
+                    b.setMonth(currentMonth);
+                    openEditDialog(b);
+                });
+                addBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_SMALL);
+                return new HorizontalLayout(addBtn);
+            }
         }).setHeader("İşlemler");
 
         grid.addThemeVariants(GridVariant.LUMO_ROW_STRIPES);
@@ -204,9 +216,11 @@ public class BudgetView extends VerticalLayout {
             monthCombo.setValue(existing.getMonth());
             amountField.setValue(FormatUtils.formatDecimal(existing.getLimitAmount()));
             descriptionField.setValue(existing.getDescription() != null ? existing.getDescription() : "");
-            departmentCombo.setEnabled(false);
-            yearCombo.setEnabled(false);
-            monthCombo.setEnabled(false);
+            if (existing.getId() != null) {
+                departmentCombo.setEnabled(false);
+                yearCombo.setEnabled(false);
+                monthCombo.setEnabled(false);
+            }
         }
 
         FormLayout form = new FormLayout(departmentCombo, yearCombo, monthCombo, amountField, descriptionField);
