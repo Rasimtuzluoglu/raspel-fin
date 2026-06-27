@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.util.List;
@@ -21,6 +22,7 @@ public class DataArchiveTask {
     }
 
     @Scheduled(cron = "0 0 3 1 * *")
+    @Transactional
     public void archiveOldExpenses() {
         try {
             LocalDate cutoff = LocalDate.now().minusYears(2);

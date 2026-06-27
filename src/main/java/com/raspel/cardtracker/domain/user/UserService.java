@@ -145,27 +145,27 @@ public class UserService implements UserDetailsService {
 
     public void updatePassword(Long userId, String newPassword) {
         validatePassword(newPassword);
-        userRepository.findById(userId).ifPresent(user -> {
-            user.setPassword(passwordEncoder.encode(newPassword));
-            userRepository.save(user);
-        });
+        AppUser user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Kullanıcı bulunamadı: " + userId));
+        user.setPassword(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
     }
 
     public void deactivateUser(Long userId) {
-        userRepository.findById(userId).ifPresent(user -> {
-            if (Role.ADMIN.equals(user.getRole())) {
-                throw new IllegalStateException("Yönetici (ADMIN) rolündeki kullanıcılar devre dışı bırakılamaz!");
-            }
-            user.setActive(false);
-            userRepository.save(user);
-        });
+        AppUser user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Kullanıcı bulunamadı: " + userId));
+        if (Role.ADMIN.equals(user.getRole())) {
+            throw new IllegalStateException("Yönetici (ADMIN) rolündeki kullanıcılar devre dışı bırakılamaz!");
+        }
+        user.setActive(false);
+        userRepository.save(user);
     }
 
     public void activateUser(Long userId) {
-        userRepository.findById(userId).ifPresent(user -> {
-            user.setActive(true);
-            userRepository.save(user);
-        });
+        AppUser user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("Kullanıcı bulunamadı: " + userId));
+        user.setActive(true);
+        userRepository.save(user);
     }
 
     @Transactional(readOnly = true)
@@ -185,7 +185,7 @@ public class UserService implements UserDetailsService {
     public String generateTelegramVerificationCode(String username) {
         AppUser user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("Kullanıcı bulunamadı"));
-        String code = String.format("%06d", new java.util.Random().nextInt(999999));
+        String code = String.format("%06d", new java.security.SecureRandom().nextInt(999999));
         user.setTelegramVerificationCode(code);
         userRepository.save(user);
         return code;

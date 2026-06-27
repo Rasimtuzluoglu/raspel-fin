@@ -2,16 +2,22 @@ package com.raspel.cardtracker.config;
 
 import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
-import com.vaadin.flow.server.ErrorEvent;
-import com.vaadin.flow.server.ErrorHandler;
+import com.vaadin.flow.server.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Component;
 
 @Component
-public class GlobalExceptionHandler implements ErrorHandler {
+public class GlobalExceptionHandler implements ErrorHandler, VaadinServiceInitListener {
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @Override
+    public void serviceInit(ServiceInitEvent event) {
+        event.getSource().addSessionInitListener(sessionInitEvent ->
+            sessionInitEvent.getSession().setErrorHandler(this)
+        );
+    }
 
     @Override
     public void error(ErrorEvent event) {

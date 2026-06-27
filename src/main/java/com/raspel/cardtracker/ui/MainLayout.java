@@ -638,7 +638,6 @@ public class MainLayout extends AppLayout {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null) {
             userService.updateLastLogin(auth.getName());
-            userService.recordSuccessfulLogin(auth.getName());
         }
 
         getUI().ifPresent(ui -> {
@@ -657,9 +656,7 @@ public class MainLayout extends AppLayout {
 
         getElement().executeJs(
             "if(!window.__reminderPoll){" +
-            "window.__reminderPoll=setInterval(function(){" +
-            "  fetch('/actuator/health').catch(function(){})" +
-            "},10000);" +
+            "window.__reminderPoll=true;" +
             "}");
 
         Boolean sessionDarkInitialized = (Boolean) com.vaadin.flow.server.VaadinSession.getCurrent().getAttribute("darkModeInitialized");

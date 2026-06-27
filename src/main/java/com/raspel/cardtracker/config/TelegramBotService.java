@@ -18,7 +18,6 @@ import com.raspel.cardtracker.ui.utils.FormatUtils;
 import com.raspel.cardtracker.ui.utils.HolidayUtils;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.bots.TelegramLongPollingBot;
@@ -41,7 +40,6 @@ import java.time.temporal.ChronoUnit;
 import java.util.*;
 
 @Component
-@Lazy(false)
 @Slf4j
 public class TelegramBotService extends TelegramLongPollingBot {
 

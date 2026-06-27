@@ -1,0 +1,1 @@
+ALTER TABLE expense ALTER COLUMN card_id DROP NOT NULL;

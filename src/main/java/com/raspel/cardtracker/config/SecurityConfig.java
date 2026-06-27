@@ -1,6 +1,7 @@
 package com.raspel.cardtracker.config;
 
 import com.vaadin.flow.spring.security.VaadinWebSecurity;
+import com.raspel.cardtracker.domain.user.Role;
 import com.raspel.cardtracker.ui.LoginView;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
