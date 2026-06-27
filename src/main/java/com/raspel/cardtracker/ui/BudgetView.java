@@ -27,7 +27,6 @@ import com.raspel.cardtracker.domain.department.Department;
 import com.raspel.cardtracker.domain.department.DepartmentService;
 import com.raspel.cardtracker.domain.employee.Employee;
 import com.raspel.cardtracker.domain.employee.EmployeeService;
-import com.raspel.cardtracker.domain.expense.Expense;
 import com.raspel.cardtracker.domain.expense.ExpenseService;
 import com.raspel.cardtracker.ui.utils.FormatUtils;
 import jakarta.annotation.security.PermitAll;
@@ -197,9 +196,9 @@ public class BudgetView extends VerticalLayout {
 
     private void refreshAll() {
         cardsContainer.removeAll();
-        int mn = selectedYear == LocalDate.now().getYear() ? LocalDate.now().getMonthValue() : 12;
+        int currentMonth = LocalDate.now().getMonthValue();
+        int mn = selectedYear == LocalDate.now().getYear() ? currentMonth : 12;
 
-        // Load budgets for either all months or just current month
         List<DepartmentBudget> allBudgets = new ArrayList<>();
         for (int m = 1; m <= mn; m++) {
             allBudgets.addAll(budgetService.findByYearAndMonth(selectedYear, m));
@@ -216,28 +215,51 @@ public class BudgetView extends VerticalLayout {
         emptyState.getStyle().set("display", "none");
         cardsContainer.setVisible(true);
 
-        // Build department summary cards (aggregated by department)
-        Map<Department, List<DepartmentBudget>> grouped = new LinkedHashMap<>();
+        // Pre-cache ALL department spending by (deptName, year, month)
+        Map<String, BigDecimal> spentCache = new HashMap<>();
         for (DepartmentBudget b : allBudgets) {
-            grouped.computeIfAbsent(b.getDepartment(), k -> new ArrayList<>()).add(b);
+            String key = b.getDepartment() != null ? b.getDepartment().getName() + "_" + b.getBudgetMonth() : "";
+            if (!spentCache.containsKey(key)) {
+                spentCache.put(key, expenseService.getDepartmentSpentForMonth(
+                        b.getDepartment() != null ? b.getDepartment().getName() : "",
+                        b.getBudgetYear(), b.getBudgetMonth()));
+            }
         }
 
-        Map<String, BigDecimal> spentCache = new HashMap<>();
-        for (Department dept : grouped.keySet()) {
-            String dn = dept.getName();
-            if (!spentCache.containsKey(dn)) {
-                BigDecimal total = BigDecimal.ZERO;
-                for (DepartmentBudget b : grouped.get(dept)) {
-                    total = total.add(expenseService.getDepartmentSpentForMonth(dn, b.getBudgetYear(), b.getBudgetMonth()));
-                }
-                spentCache.put(dn, total);
+        // Group by department
+        Map<Department, List<DepartmentBudget>> grouped = new LinkedHashMap<>();
+        for (DepartmentBudget b : allBudgets) {
+            if (b.getDepartment() != null)
+                grouped.computeIfAbsent(b.getDepartment(), k -> new ArrayList<>()).add(b);
+        }
+
+        List<Card> activeCards = cardService.findAllActive();
+
+        for (Map.Entry<Department, List<DepartmentBudget>> entry : grouped.entrySet()) {
+            Department dept = entry.getKey();
+            List<DepartmentBudget> budgets = entry.getValue();
+
+            BigDecimal totalLimit = BigDecimal.ZERO;
+            BigDecimal ytdSpent = BigDecimal.ZERO;
+            for (DepartmentBudget b : budgets) {
+                totalLimit = totalLimit.add(b.getBudgetLimit());
+                String key = dept.getName() + "_" + b.getBudgetMonth();
+                ytdSpent = ytdSpent.add(spentCache.getOrDefault(key, BigDecimal.ZERO));
             }
-            cardsContainer.add(buildDeptSummaryCard(dept, grouped.get(dept), spentCache.get(dn)));
+
+            int cardCount = (int) activeCards.stream()
+                    .filter(c -> c.getDepartment() != null && c.getDepartment().getId().equals(dept.getId())).count();
+
+            List<Employee> deptEmployees = employeeService.findAllActiveEmployees().stream()
+                    .filter(e -> e.getDepartmentId() != null && e.getDepartmentId().equals(dept.getId())).toList();
+
+            cardsContainer.add(buildDeptSummaryCard(dept, budgets, totalLimit, ytdSpent, cardCount, deptEmployees, spentCache));
         }
     }
 
-    private VerticalLayout buildDeptSummaryCard(Department dept, List<DepartmentBudget> budgets, BigDecimal ytdSpent) {
-        BigDecimal totalLimit = budgets.stream().map(DepartmentBudget::getBudgetLimit).reduce(BigDecimal.ZERO, BigDecimal::add);
+    private VerticalLayout buildDeptSummaryCard(Department dept, List<DepartmentBudget> budgets,
+                                                 BigDecimal totalLimit, BigDecimal ytdSpent, int cardCount,
+                                                 List<Employee> deptEmployees, Map<String, BigDecimal> spentCache) {
         BigDecimal remaining = totalLimit.subtract(ytdSpent);
         boolean over = remaining.compareTo(BigDecimal.ZERO) < 0;
         double pct = totalLimit.compareTo(BigDecimal.ZERO) > 0 ? Math.min(100, ytdSpent.doubleValue() / totalLimit.doubleValue() * 100) : 0;
@@ -265,7 +287,7 @@ public class BudgetView extends VerticalLayout {
         stats.add(statBox("Toplam Bütçe", FormatUtils.formatNumber(totalLimit) + " ₺", "#2196F3"));
         stats.add(statBox("Kullanılan", FormatUtils.formatNumber(ytdSpent) + " ₺", over ? "var(--lumo-error-color)" : "#FF9800"));
         stats.add(statBox("Kalan", FormatUtils.formatNumber(remaining.abs()) + " ₺", over ? "var(--lumo-error-color)" : "#4CAF50"));
-        stats.add(statBox("Kart", String.valueOf(cardService.findAllActive().stream().filter(c -> c.getDepartment() != null && c.getDepartment().getId().equals(dept.getId())).count()), "#9C27B0"));
+        stats.add(statBox("Kart", String.valueOf(cardCount), "#9C27B0"));
 
         // Progress bar
         Div bar = new Div();
@@ -281,7 +303,8 @@ public class BudgetView extends VerticalLayout {
         Div monthlyBars = new Div();
         monthlyBars.getStyle().set("display", "flex").set("gap", "4px").set("margin-top", "12px").set("align-items", "flex-end").set("height", "40px");
         for (DepartmentBudget b : budgets) {
-            BigDecimal spent = expenseService.getDepartmentSpentForMonth(dept.getName(), b.getBudgetYear(), b.getBudgetMonth());
+            String key = dept.getName() + "_" + b.getBudgetMonth();
+            BigDecimal spent = spentCache.getOrDefault(key, BigDecimal.ZERO);
             double mpct = b.getBudgetLimit().compareTo(BigDecimal.ZERO) > 0 ? Math.min(100, spent.doubleValue() / b.getBudgetLimit().doubleValue() * 100) : 0;
             Div mBar = new Div();
             mBar.getStyle().set("flex", "1").set("height", mpct + "%").set("min-height", "3px").set("background", mpct > 100 ? "var(--lumo-error-color)" : mpct > 80 ? "var(--lumo-warning-color)" : "var(--lumo-success-color)").set("border-radius", "3px 3px 0 0");
@@ -290,8 +313,6 @@ public class BudgetView extends VerticalLayout {
         }
 
         // Employees
-        List<Employee> deptEmployees = employeeService.findAllActiveEmployees().stream()
-                .filter(e -> e.getDepartmentId() != null && e.getDepartmentId().equals(dept.getId())).toList();
         HorizontalLayout empRow = null;
         if (!deptEmployees.isEmpty()) {
             empRow = new HorizontalLayout();
