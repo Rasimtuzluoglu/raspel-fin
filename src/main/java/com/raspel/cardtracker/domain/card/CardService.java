@@ -57,11 +57,11 @@ public class CardService {
             List<Expense> expenses = expenseRepository.findByCardId(id);
             if (!expenses.isEmpty()) {
                 for (Expense e : expenses) {
-                    e.setCard(null);
+                    installmentEntryRepository.deleteByExpenseId(e.getId());
                 }
-                expenseRepository.saveAll(expenses);
+                expenseRepository.deleteAllByCardId(id);
                 auditLogService.log(AuditAction.DELETE, "Kart", id,
-                        "Kart silindi (yumuşak): " + card.getName() + " - " + expenses.size() + " harcamanın kart bağlantısı kaldırıldı");
+                        "Kart silindi: " + card.getName() + " - " + expenses.size() + " harcama ve tüm taksitleri silindi");
             } else {
                 auditLogService.log(AuditAction.DELETE, "Kart", id, "Kart silindi: " + card.getName());
             }

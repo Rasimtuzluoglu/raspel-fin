@@ -15,6 +15,7 @@ import com.vaadin.flow.component.notification.Notification;
 import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.progressbar.ProgressBar;
 import com.vaadin.flow.component.textfield.TextArea;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
@@ -52,6 +53,7 @@ public class BudgetView extends VerticalLayout {
 
     private final VerticalLayout cardsContainer = new VerticalLayout();
     private final Div emptyState = new Div();
+    private final ProgressBar loadingBar = new ProgressBar();
     private int selectedYear = LocalDate.now().getYear();
     private final H3 titleEl = new H3("Bütçe Yönetimi");
 
@@ -68,6 +70,11 @@ public class BudgetView extends VerticalLayout {
         setSizeFull();
         setPadding(true);
         setSpacing(true);
+
+        loadingBar.setIndeterminate(true);
+        loadingBar.setVisible(true);
+        loadingBar.setWidthFull();
+        add(loadingBar);
 
         titleEl.getStyle().set("margin-top", "0");
 
@@ -86,7 +93,13 @@ public class BudgetView extends VerticalLayout {
         chartSection.setVisible(false);
 
         add(toolbar, chartSection, cardsContainer, emptyState);
-        refreshAll();
+
+        addAttachListener(e -> {
+            getUI().ifPresent(ui -> ui.access(() -> {
+                refreshAll();
+                loadingBar.setVisible(false);
+            }));
+        });
     }
 
     private ComboBox<Integer> createYearSelector() {
