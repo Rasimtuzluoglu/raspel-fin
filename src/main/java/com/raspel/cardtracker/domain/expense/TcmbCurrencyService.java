@@ -47,7 +47,7 @@ public class TcmbCurrencyService {
             return BigDecimal.ONE;
         }
 
-        String targetCurrency = currencyCode.trim().toUpperCase();
+        String targetCurrency = currencyCode.trim().toUpperCase(java.util.Locale.ENGLISH);
         
         // Gelecek tarihli aramaları bugüne eşitle
         if (date.isAfter(LocalDate.now())) {
@@ -188,7 +188,7 @@ public class TcmbCurrencyService {
                         if (forexBuyingList.getLength() > 0) {
                             String forexBuyingStr = forexBuyingList.item(0).getTextContent();
                             if (forexBuyingStr != null && !forexBuyingStr.trim().isEmpty()) {
-                                rates.put(currencyCode.toUpperCase(), new BigDecimal(forexBuyingStr.trim()));
+                                rates.put(currencyCode.toUpperCase(java.util.Locale.ENGLISH), new BigDecimal(forexBuyingStr.trim()));
                             }
                         }
                     }
@@ -204,7 +204,7 @@ public class TcmbCurrencyService {
         HttpURLConnection conn = null;
         try {
             String dateStr = date.equals(LocalDate.now()) ? "latest" : date.toString();
-            String urlStr = "https://api.frankfurter.app/" + dateStr + "?symbols=TRY&base=" + currency.toUpperCase();
+            String urlStr = "https://api.frankfurter.app/" + dateStr + "?symbols=TRY&base=" + currency.toUpperCase(java.util.Locale.ENGLISH);
             
             URL url = new URL(urlStr);
             conn = (HttpURLConnection) url.openConnection();

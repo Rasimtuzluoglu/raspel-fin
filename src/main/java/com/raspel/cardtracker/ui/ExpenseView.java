@@ -707,12 +707,12 @@ public class ExpenseView extends VerticalLayout {
             entries = expenseService.getInstallmentsForMonth(startYear, startMonth);
         }
         if (term != null && !term.isEmpty()) {
-            String lowerTerm = term.toLowerCase();
+            String lowerTerm = term.toLowerCase(java.util.Locale.forLanguageTag("tr-TR"));
             entries = entries.stream().filter(e ->
-                (e.getExpense().getDescription() != null && e.getExpense().getDescription().toLowerCase().contains(lowerTerm)) ||
-                (e.getExpense().getCategory() != null && e.getExpense().getCategory().toLowerCase().contains(lowerTerm)) ||
-                (e.getExpense().getCard().getName() != null && e.getExpense().getCard().getName().toLowerCase().contains(lowerTerm)) ||
-                (e.getExpense().getCard().getDepartment() != null && e.getExpense().getCard().getDepartment().getName().toLowerCase().contains(lowerTerm))
+                (e.getExpense().getDescription() != null && e.getExpense().getDescription().toLowerCase(java.util.Locale.forLanguageTag("tr-TR")).contains(lowerTerm)) ||
+                (e.getExpense().getCategory() != null && e.getExpense().getCategory().toLowerCase(java.util.Locale.forLanguageTag("tr-TR")).contains(lowerTerm)) ||
+                (e.getExpense().getCard().getName() != null && e.getExpense().getCard().getName().toLowerCase(java.util.Locale.forLanguageTag("tr-TR")).contains(lowerTerm)) ||
+                (e.getExpense().getCard().getDepartment() != null && e.getExpense().getCard().getDepartment().getName().toLowerCase(java.util.Locale.forLanguageTag("tr-TR")).contains(lowerTerm))
             ).collect(java.util.stream.Collectors.toList());
         }
 

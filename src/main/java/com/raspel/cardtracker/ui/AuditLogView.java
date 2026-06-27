@@ -185,11 +185,11 @@ public class AuditLogView extends VerticalLayout {
 
         List<AuditLog> logs = auditLogService.findFiltered(null, action, entityType, startDate, endDate);
         
-        String term = searchField.getValue() != null ? searchField.getValue().trim().toLowerCase() : "";
+        String term = searchField.getValue() != null ? searchField.getValue().trim().toLowerCase(java.util.Locale.forLanguageTag("tr-TR")) : "";
         if (!term.isEmpty()) {
             logs = logs.stream().filter(log -> {
-                boolean matchUser = log.getUsername() != null && log.getUsername().toLowerCase().contains(term);
-                boolean matchDesc = log.getDescription() != null && log.getDescription().toLowerCase().contains(term);
+                boolean matchUser = log.getUsername() != null && log.getUsername().toLowerCase(java.util.Locale.forLanguageTag("tr-TR")).contains(term);
+                boolean matchDesc = log.getDescription() != null && log.getDescription().toLowerCase(java.util.Locale.forLanguageTag("tr-TR")).contains(term);
                 return matchUser || matchDesc;
             }).toList();
         }

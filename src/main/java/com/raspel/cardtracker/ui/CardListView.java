@@ -492,14 +492,14 @@ public class CardListView extends VerticalLayout {
         loadingBar.setVisible(true);
         unpaidBalanceCache = expenseService.getUnpaidBalancesGroupedByCard();
         List<Card> allCards = showInactive.getValue() ? cardService.findAll() : cardService.findAllActive();
-        String term = searchField.getValue() != null ? searchField.getValue().trim().toLowerCase() : "";
+        String term = searchField.getValue() != null ? searchField.getValue().trim().toLowerCase(java.util.Locale.forLanguageTag("tr-TR")) : "";
 
         if (!term.isEmpty()) {
             allCards = allCards.stream().filter(card -> {
-                boolean matchName = card.getName() != null && card.getName().toLowerCase().contains(term);
-                boolean matchBank = card.getBank() != null && card.getBank().toLowerCase().contains(term);
-                boolean matchDept = card.getDepartment() != null && card.getDepartment().getName().toLowerCase().contains(term);
-                boolean matchHolder = card.getHolderName() != null && card.getHolderName().toLowerCase().contains(term);
+                boolean matchName = card.getName() != null && card.getName().toLowerCase(java.util.Locale.forLanguageTag("tr-TR")).contains(term);
+                boolean matchBank = card.getBank() != null && card.getBank().toLowerCase(java.util.Locale.forLanguageTag("tr-TR")).contains(term);
+                boolean matchDept = card.getDepartment() != null && card.getDepartment().getName().toLowerCase(java.util.Locale.forLanguageTag("tr-TR")).contains(term);
+                boolean matchHolder = card.getHolderName() != null && card.getHolderName().toLowerCase(java.util.Locale.forLanguageTag("tr-TR")).contains(term);
                 return matchName || matchBank || matchDept || matchHolder;
             }).collect(java.util.stream.Collectors.toList());
         }

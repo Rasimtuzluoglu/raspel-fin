@@ -32,7 +32,7 @@ public class VadeController {
         if (dosya.getSize() > MAX_FILE_SIZE) {
             return ResponseEntity.badRequest().body(java.util.Map.of("hata", "Dosya boyutu 10 MB'dan büyük olamaz."));
         }
-        if (dosya.getOriginalFilename() != null && !dosya.getOriginalFilename().toLowerCase().endsWith(".csv")) {
+        if (dosya.getOriginalFilename() != null && !dosya.getOriginalFilename().toLowerCase(java.util.Locale.ENGLISH).endsWith(".csv")) {
             return ResponseEntity.badRequest().body(java.util.Map.of("hata", "Sadece CSV dosyaları kabul edilir."));
         }
 

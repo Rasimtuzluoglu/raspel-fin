@@ -542,7 +542,7 @@ public class ChequeView extends VerticalLayout {
         } else {
             DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm");
             for (AuditLog log : logs) {
-                Span entry = new Span(log.getCreatedAt().format(dtf) + " - " + log.getAction().getLabel().toUpperCase());
+                Span entry = new Span(log.getCreatedAt().format(dtf) + " - " + log.getAction().getLabel().toUpperCase(java.util.Locale.forLanguageTag("tr-TR")));
                 entry.getStyle()
                         .set("font-weight", "600")
                         .set("font-size", "0.9em")

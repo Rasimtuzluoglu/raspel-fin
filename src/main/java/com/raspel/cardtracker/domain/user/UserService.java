@@ -39,7 +39,7 @@ public class UserService implements UserDetailsService {
     @Override
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        AppUser appUser = userRepository.findByUsername(username)
+        AppUser appUser = userRepository.findByUsername(username.toLowerCase(java.util.Locale.ENGLISH))
                 .orElseThrow(() -> new UsernameNotFoundException("Geçersiz kullanıcı adı veya şifre"));
 
         if (!appUser.getActive()) {
@@ -103,12 +103,13 @@ public class UserService implements UserDetailsService {
 
     public AppUser createUser(String username, String rawPassword, String fullName, Role role) {
         validatePassword(rawPassword);
-        if (userRepository.existsByUsername(username)) {
-            throw new IllegalArgumentException("Bu kullanıcı adı zaten kullanılıyor: " + username);
+        String normalizedUsername = username.toLowerCase(java.util.Locale.ENGLISH);
+        if (userRepository.existsByUsername(normalizedUsername)) {
+            throw new IllegalArgumentException("Bu kullanıcı adı zaten kullanılıyor: " + normalizedUsername);
         }
 
         AppUser user = AppUser.builder()
-                .username(username)
+                .username(normalizedUsername)
                 .password(passwordEncoder.encode(rawPassword))
                 .fullName(fullName)
                 .role(role)

@@ -201,10 +201,10 @@ public class ContactView extends VerticalLayout {
         loadingBar.setVisible(true);
         List<Contact> contacts = contactService.findAll();
         
-        String searchTerm = searchFilter.getValue() != null ? searchFilter.getValue().trim().toLowerCase() : "";
+        String searchTerm = searchFilter.getValue() != null ? searchFilter.getValue().trim().toLowerCase(java.util.Locale.forLanguageTag("tr-TR")) : "";
         if (!searchTerm.isEmpty()) {
             contacts = contacts.stream()
-                .filter(c -> c.getName().toLowerCase().contains(searchTerm))
+                .filter(c -> c.getName().toLowerCase(java.util.Locale.forLanguageTag("tr-TR")).contains(searchTerm))
                 .collect(java.util.stream.Collectors.toList());
         }
         

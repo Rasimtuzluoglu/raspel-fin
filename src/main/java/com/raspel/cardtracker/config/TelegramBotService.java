@@ -109,7 +109,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
         Long chatId = update.getMessage().getChatId();
         String fn = update.getMessage().getFrom().getFirstName();
 
-        switch (text.toLowerCase()) {
+        switch (text.toLowerCase(java.util.Locale.ENGLISH)) {
             case "/start" -> sendWelcome(chatId, fn);
             case "/help" -> sendHelp(chatId);
             case "/durum" -> sendStatus(chatId);
@@ -124,7 +124,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
             case "/gorevler" -> sendTasks(chatId);
             case "/baglantikes" -> sendDisconnect(chatId);
             default -> {
-                if (text.toLowerCase().startsWith("/ismegore ")) {
+                if (text.toLowerCase(java.util.Locale.ENGLISH).startsWith("/ismegore ")) {
                     sendCardsByName(chatId, text.substring(10).trim());
                 } else if (text.startsWith("/")) {
                     sendMsg(chatId, "❌ Bilinmeyen komut. /help yazın.");
@@ -164,7 +164,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
         if (nameFilter.isEmpty()) { sendMsg(chatId, "Kullanım: /ismegore KartAdı\nÖrnek: /ismegore Visa"); return; }
 
         List<Card> cards = cardService.findAllActive().stream()
-                .filter(c -> c.getName().toLowerCase().contains(nameFilter.toLowerCase()))
+                .filter(c -> c.getName().toLowerCase(java.util.Locale.forLanguageTag("tr-TR")).contains(nameFilter.toLowerCase(java.util.Locale.forLanguageTag("tr-TR"))))
                 .toList();
         if (cards.isEmpty()) { sendMsg(chatId, "\"" + esc(nameFilter) + "\" ile eşleşen kart bulunamadı."); return; }
 
