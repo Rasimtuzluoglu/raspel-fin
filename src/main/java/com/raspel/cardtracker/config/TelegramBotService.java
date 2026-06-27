@@ -137,21 +137,66 @@ public class TelegramBotService extends TelegramLongPollingBot {
 
     public void checkAndNotifyLimits() {
         List<Card> cards = cardService.findAllActive();
+        if (cards.isEmpty()) return;
+
         Map<Long, BigDecimal> unpaidMap = expenseService.getUnpaidBalancesGroupedByCard();
+        List<AppUser> connected = userService.findAllActive().stream()
+                .filter(u -> u.getTelegramChatId() != null).toList();
+        if (connected.isEmpty()) return;
+
+        StringBuilder alerts = new StringBuilder();
+
+        // Limit warnings
         for (Card c : cards) {
             BigDecimal unpaid = unpaidMap.getOrDefault(c.getId(), BigDecimal.ZERO);
             if (c.getCardLimit() == null || c.getCardLimit().compareTo(BigDecimal.ZERO) <= 0) continue;
             double pct = unpaid.divide(c.getCardLimit(), 4, RoundingMode.HALF_UP).doubleValue() * 100;
-            if (pct >= 90.0) {
-                List<AppUser> connected = userService.findAllActive().stream()
-                        .filter(u -> u.getTelegramChatId() != null).toList();
-                for (AppUser u : connected) {
-                    sendMsg(u.getTelegramChatId(), "<b>🔴 LİMİT UYARISI</b>\n\n" +
-                            "<b>" + esc(c.getName()) + "</b> kart limiti %" + String.format("%.0f", pct) +
-                            " dolu!\nBorç: " + FormatUtils.formatNumber(unpaid) + " ₺ / Limit: " +
-                            FormatUtils.formatNumber(c.getCardLimit()) + " ₺");
-                }
+            if (pct >= 80.0) {
+                String emoji = pct >= 95 ? "🔴" : pct >= 85 ? "🟠" : "🟡";
+                alerts.append(emoji).append(" <b>").append(esc(c.getName())).append("</b> limit %").append(String.format("%.0f", pct))
+                        .append(" dolu!\n  Borç: ").append(FormatUtils.formatNumber(unpaid)).append(" ₺ / ")
+                        .append(FormatUtils.formatNumber(c.getCardLimit())).append(" ₺\n\n");
             }
+        }
+
+        // Overdue payments
+        LocalDate today = LocalDate.now();
+        YearMonth ym = YearMonth.now();
+        List<InstallmentEntry> entries = expenseService.getInstallmentsForMonth(ym.getYear(), ym.getMonthValue());
+        List<InstallmentEntry> overdue = entries.stream().filter(e -> !e.getIsPaid()).filter(e -> {
+            YearMonth ym2 = YearMonth.of(e.getDueYear(), e.getDueMonth());
+            int cd = Math.min(e.getExpense().getCard().getClosingDay(), ym2.lengthOfMonth());
+            LocalDate due = HolidayUtils.getNextBusinessDay(
+                    LocalDate.of(e.getDueYear(), e.getDueMonth(), cd).plusDays(e.getExpense().getCard().getDueDay()));
+            return due.isBefore(today.plusDays(1));
+        }).toList();
+
+        if (!overdue.isEmpty()) {
+            alerts.append("<b>🔴 GECİKMİŞ ÖDEMELER:</b>\n");
+            for (InstallmentEntry e : overdue) {
+                String cn = e.getExpense().getCard() != null ? e.getExpense().getCard().getName() : "-";
+                YearMonth ym2 = YearMonth.of(e.getDueYear(), e.getDueMonth());
+                int cd = Math.min(e.getExpense().getCard().getClosingDay(), ym2.lengthOfMonth());
+                LocalDate due = HolidayUtils.getNextBusinessDay(
+                        LocalDate.of(e.getDueYear(), e.getDueMonth(), cd).plusDays(e.getExpense().getCard().getDueDay()));
+                long days = ChronoUnit.DAYS.between(due, today);
+                alerts.append("• <b>").append(esc(cn)).append("</b> ").append(FormatUtils.formatNumber(e.getAmount()))
+                        .append(" ₺ (").append(days).append(" gün gecikti)\n");
+            }
+            alerts.append("\n");
+        }
+
+        if (alerts.length() > 0) {
+            String msg = "<b>⚠️ Raspel Finans Uyarısı</b>\n\n" + alerts;
+            for (AppUser u : connected) {
+                sendMsg(u.getTelegramChatId(), msg);
+            }
+            log.info("Telegram bildirimi gönderildi: {} kullanıcı, {} limit/gecikme", connected.size(),
+                    cards.stream().filter(c -> {
+                        BigDecimal unpaid = unpaidMap.getOrDefault(c.getId(), BigDecimal.ZERO);
+                        return c.getCardLimit() != null && c.getCardLimit().compareTo(BigDecimal.ZERO) > 0 &&
+                                unpaid.divide(c.getCardLimit(), 4, RoundingMode.HALF_UP).doubleValue() >= 0.8;
+                    }).count());
         }
     }
 

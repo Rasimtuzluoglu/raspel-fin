@@ -3,6 +3,7 @@ package com.raspel.cardtracker.config;
 import com.raspel.cardtracker.domain.report.MonthlyReportService;
 import com.raspel.cardtracker.domain.settings.AppSettingsService;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -19,6 +20,8 @@ import java.time.format.DateTimeFormatter;
 public class ScheduledTasks {
     private final MonthlyReportService reportService;
     private final AppSettingsService appSettingsService;
+    @Autowired(required = false)
+    private TelegramBotService telegramBotService;
 
     public ScheduledTasks(MonthlyReportService reportService, AppSettingsService appSettingsService) {
         this.reportService = reportService;
@@ -55,6 +58,17 @@ public class ScheduledTasks {
             log.info("Aylık rapor oluşturuldu: {}", targetPath.toAbsolutePath());
         } catch (Exception e) {
             log.error("Aylık rapor oluşturulamadı", e);
+        }
+    }
+
+    @Scheduled(fixedDelay = 600_000, initialDelay = 30_000)
+    public void checkAndNotifyTelegram() {
+        if (telegramBotService != null) {
+            try {
+                telegramBotService.checkAndNotifyLimits();
+            } catch (Exception e) {
+                log.error("Telegram limit bildirimi hatası", e);
+            }
         }
     }
 }
