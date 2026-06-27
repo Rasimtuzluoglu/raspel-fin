@@ -29,6 +29,9 @@ public class Department {
     @Builder.Default
     private Boolean isActive = true;
 
+    @Column(length = 255)
+    private String description;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();

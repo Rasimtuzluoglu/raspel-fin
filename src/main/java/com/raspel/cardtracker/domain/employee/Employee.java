@@ -37,6 +37,9 @@ public class Employee {
     @Column(length = 100)
     private String department; // String field, not a FK reference to departments table
 
+    @Column(name = "department_id")
+    private Long departmentId;
+
     @Column(name = "user_id")
     private Long userId;
 

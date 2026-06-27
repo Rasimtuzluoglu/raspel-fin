@@ -44,6 +44,9 @@ public class DepartmentBudget {
     @Column(name = "budget_limit", nullable = false, precision = 15, scale = 2)
     private BigDecimal budgetLimit;
 
+    @Column(length = 100)
+    private String category;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
