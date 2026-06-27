@@ -111,7 +111,14 @@ public class UserManagementView extends VerticalLayout {
             Button resetPwdBtn = new Button("Şifre Sıfırla", e -> openPasswordResetDialog(user));
             resetPwdBtn.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY);
 
-            return new HorizontalLayout(toggleBtn, resetPwdBtn);
+            Button deleteBtn = new Button("Sil", new Icon(VaadinIcon.TRASH), e -> deleteUser(user));
+            deleteBtn.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_ERROR);
+            if (Role.ADMIN.equals(user.getRole())) {
+                deleteBtn.setEnabled(false);
+                deleteBtn.setTooltipText("Yöneticiler silinemez.");
+            }
+
+            return new HorizontalLayout(toggleBtn, resetPwdBtn, deleteBtn);
         }).setHeader("İşlemler").setAutoWidth(true);
     }
 
@@ -276,5 +283,29 @@ public class UserManagementView extends VerticalLayout {
             emptyState.getStyle().set("display", "none");
         }
         loadingBar.setVisible(false);
+    }
+
+    private void deleteUser(AppUser user) {
+        Dialog confirm = new Dialog();
+        confirm.setHeaderTitle("Kullanıcı Sil");
+        confirm.add(new Span("\"" + user.getUsername() + "\" kullanıcısını kalıcı olarak silmek istediğinize emin misiniz? Bu işlem geri alınamaz!"));
+
+        Button yesBtn = new Button("Evet, Sil", e -> {
+            try {
+                userService.deleteUser(user.getId());
+                Notification.show("Kullanıcı silindi.", 3000, Notification.Position.BOTTOM_CENTER)
+                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                confirm.close();
+                refreshGrid();
+            } catch (Exception ex) {
+                Notification.show(ex.getMessage() != null ? ex.getMessage() : "Silme başarısız.", 3000, Notification.Position.BOTTOM_CENTER)
+                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
+            }
+        });
+        yesBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_ERROR);
+
+        Button noBtn = new Button("Vazgeç", ev -> confirm.close());
+        confirm.getFooter().add(noBtn, yesBtn);
+        confirm.open();
     }
 }

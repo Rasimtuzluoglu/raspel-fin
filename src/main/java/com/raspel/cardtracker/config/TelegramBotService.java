@@ -6,6 +6,9 @@ import com.raspel.cardtracker.domain.cheque.Cheque;
 import com.raspel.cardtracker.domain.cheque.ChequeService;
 import com.raspel.cardtracker.domain.cheque.ChequeStatus;
 import com.raspel.cardtracker.domain.cheque.ChequeType;
+import com.raspel.cardtracker.domain.employee.EmployeeService;
+import com.raspel.cardtracker.domain.employee.EmployeeTask;
+import com.raspel.cardtracker.domain.employee.TaskStatus;
 import com.raspel.cardtracker.domain.expense.Expense;
 import com.raspel.cardtracker.domain.expense.ExpenseService;
 import com.raspel.cardtracker.domain.expense.InstallmentEntry;
@@ -46,16 +49,18 @@ public class TelegramBotService extends TelegramLongPollingBot {
     private final CardService cardService;
     private final ExpenseService expenseService;
     private final ChequeService chequeService;
+    private final EmployeeService employeeService;
     private final Environment environment;
 
     public TelegramBotService(UserService userService, CardService cardService,
                               ExpenseService expenseService, ChequeService chequeService,
-                              Environment environment) {
+                              EmployeeService employeeService, Environment environment) {
         super(environment.getProperty("TELEGRAM_BOT_TOKEN", ""));
         this.userService = userService;
         this.cardService = cardService;
         this.expenseService = expenseService;
         this.chequeService = chequeService;
+        this.employeeService = employeeService;
         this.environment = environment;
     }
 
@@ -87,6 +92,8 @@ public class TelegramBotService extends TelegramLongPollingBot {
                 new BotCommand("gecikmeler", "Vadesi geçmiş ödemeler"),
                 new BotCommand("cekler", "Portföydeki çekler"),
                 new BotCommand("sonharcamalar", "Son 5 harcama"),
+                new BotCommand("ismegore", "İsme göre kart ara"),
+                new BotCommand("gorevler", "Bekleyen görevler"),
                 new BotCommand("baglantikes", "Bağlantıyı kes")
         );
         try { execute(new SetMyCommands(cmds, new BotCommandScopeDefault(), null)); }
@@ -114,15 +121,95 @@ public class TelegramBotService extends TelegramLongPollingBot {
             case "/gecikmeler" -> sendOverdue(chatId);
             case "/cekler" -> sendCheques(chatId);
             case "/sonharcamalar" -> sendRecent(chatId);
+            case "/gorevler" -> sendTasks(chatId);
             case "/baglantikes" -> sendDisconnect(chatId);
             default -> {
-                if (text.startsWith("/")) sendMsg(chatId, "❌ Bilinmeyen komut. /help yazın.");
-                else handleCode(chatId, text);
+                if (text.toLowerCase().startsWith("/ismegore ")) {
+                    sendCardsByName(chatId, text.substring(10).trim());
+                } else if (text.startsWith("/")) {
+                    sendMsg(chatId, "❌ Bilinmeyen komut. /help yazın.");
+                } else {
+                    handleCode(chatId, text);
+                }
             }
         }
     }
 
     public void notifyUser(Long chatId, String message) { sendMsg(chatId, message); }
+
+    public void checkAndNotifyLimits() {
+        List<Card> cards = cardService.findAllActive();
+        Map<Long, BigDecimal> unpaidMap = expenseService.getUnpaidBalancesGroupedByCard();
+        for (Card c : cards) {
+            BigDecimal unpaid = unpaidMap.getOrDefault(c.getId(), BigDecimal.ZERO);
+            if (c.getCardLimit() == null || c.getCardLimit().compareTo(BigDecimal.ZERO) <= 0) continue;
+            double pct = unpaid.divide(c.getCardLimit(), 4, RoundingMode.HALF_UP).doubleValue() * 100;
+            if (pct >= 90.0) {
+                List<AppUser> connected = userService.findAllActive().stream()
+                        .filter(u -> u.getTelegramChatId() != null).toList();
+                for (AppUser u : connected) {
+                    sendMsg(u.getTelegramChatId(), "<b>🔴 LİMİT UYARISI</b>\n\n" +
+                            "<b>" + esc(c.getName()) + "</b> kart limiti %" + String.format("%.0f", pct) +
+                            " dolu!\nBorç: " + FormatUtils.formatNumber(unpaid) + " ₺ / Limit: " +
+                            FormatUtils.formatNumber(c.getCardLimit()) + " ₺");
+                }
+            }
+        }
+    }
+
+    // ── /ismegore ──
+    private void sendCardsByName(Long chatId, String nameFilter) {
+        var u = getUser(chatId);
+        if (u.isEmpty()) { sendNotConnected(chatId); return; }
+        if (nameFilter.isEmpty()) { sendMsg(chatId, "Kullanım: /ismegore KartAdı\nÖrnek: /ismegore Visa"); return; }
+
+        List<Card> cards = cardService.findAllActive().stream()
+                .filter(c -> c.getName().toLowerCase().contains(nameFilter.toLowerCase()))
+                .toList();
+        if (cards.isEmpty()) { sendMsg(chatId, "\"" + esc(nameFilter) + "\" ile eşleşen kart bulunamadı."); return; }
+
+        Map<Long, BigDecimal> unpaidMap = expenseService.getUnpaidBalancesGroupedByCard();
+        LocalDate today = LocalDate.now();
+        StringBuilder sb = new StringBuilder("<b>🔍 \"" + esc(nameFilter) + "\" Sonuçları</b>\n\n");
+
+        for (Card card : cards) {
+            BigDecimal unpaid = unpaidMap.getOrDefault(card.getId(), BigDecimal.ZERO);
+            YearMonth ym = YearMonth.from(today);
+            int cd = Math.min(card.getClosingDay() != null ? card.getClosingDay() : 1, ym.lengthOfMonth());
+            LocalDate stmt = LocalDate.of(ym.getYear(), ym.getMonthValue(), cd);
+            if (today.isAfter(stmt)) stmt = stmt.plusMonths(1);
+            LocalDate due = HolidayUtils.getNextBusinessDay(stmt.plusDays(card.getDueDay() != null ? card.getDueDay() : 10));
+
+            sb.append("• <b>").append(esc(card.getName())).append("</b> (").append(esc(card.getBank())).append(")\n");
+            sb.append("  Borç: ").append(FormatUtils.formatNumber(unpaid)).append(" ₺");
+            if (card.getCardLimit() != null && card.getCardLimit().compareTo(BigDecimal.ZERO) > 0)
+                sb.append(" / ").append(FormatUtils.formatNumber(card.getCardLimit())).append(" ₺");
+            sb.append("\n  Son Ödeme: ").append(due.format(DateTimeFormatter.ofPattern("dd MMMM EEEE", Locale.of("tr")))).append("\n\n");
+        }
+        sendMsg(chatId, sb.toString());
+    }
+
+    // ── /gorevler ──
+    private void sendTasks(Long chatId) {
+        var u = getUser(chatId);
+        if (u.isEmpty()) { sendNotConnected(chatId); return; }
+        List<EmployeeTask> tasks = employeeService.findAllTasks().stream()
+                .filter(t -> t.getStatus() != TaskStatus.COMPLETED)
+                .toList();
+        if (tasks.isEmpty()) { sendMsg(chatId, "✅ Bekleyen görev yok."); return; }
+
+        StringBuilder sb = new StringBuilder("<b>📋 Bekleyen Görevler</b>\n\n");
+        for (EmployeeTask t : tasks) {
+            String statusEmoji = t.getStatus() == TaskStatus.IN_PROGRESS ? "🔄" : t.getStatus() == TaskStatus.TODO ? "📌" : "✅";
+            sb.append(statusEmoji).append(" <b>").append(esc(t.getTitle())).append("</b>\n");
+            if (t.getAssignedTo() != null)
+                sb.append("  👤 ").append(esc(t.getAssignedTo().getFullName())).append("\n");
+            if (t.getDueDate() != null)
+                sb.append("  📅 ").append(t.getDueDate().format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))).append("\n");
+            sb.append("\n");
+        }
+        sendMsg(chatId, sb.toString());
+    }
 
     // ── Komutlar ──
 
@@ -143,6 +230,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
                 "/bakiye - Borç durumu\n/limit - Limit kullanımı\n" +
                 "/odemeler - Bu ay taksitler\n/gecikmeler - <b>Geciken ödemeler</b>\n" +
                 "/cekler - Portföy çekleri\n/sonharcamalar - Son harcamalar\n" +
+                "/ismegore Visa - <b>İsme göre kart ara</b>\n/gorevler - <b>Bekleyen görevler</b>\n" +
                 "/baglantikes - Bağlantıyı kes\n\n<b>Bağlantı:</b> Web panel → Profilim → Telegram'a Bağlan → Kodu gönder");
     }
 

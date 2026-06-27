@@ -153,7 +153,7 @@ public class CardListView extends VerticalLayout {
             return pctSpan;
         }).setHeader("Kullanım %").setAutoWidth(true);
 
-        grid.addColumn(card -> "Ayın " + card.getClosingDay() + ". günü +" + card.getDueDay())
+        grid.addColumn(card -> String.format("Ayın %02d. günü +%d", card.getClosingDay(), card.getDueDay()))
                 .setHeader("Kesim / Vade").setSortable(true).setAutoWidth(true);
         grid.addColumn(card -> {
             int closingDay = card.getClosingDay() != null ? card.getClosingDay() : 1;

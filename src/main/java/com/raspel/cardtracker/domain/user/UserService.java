@@ -231,4 +231,13 @@ public class UserService implements UserDetailsService {
         userRepository.save(user);
         return true;
     }
+
+    public void deleteUser(Long userId) {
+        userRepository.findById(userId).ifPresent(user -> {
+            if (Role.ADMIN.equals(user.getRole())) {
+                throw new IllegalArgumentException("Yönetici (ADMIN) rolündeki kullanıcılar silinemez!");
+            }
+            userRepository.delete(user);
+        });
+    }
 }

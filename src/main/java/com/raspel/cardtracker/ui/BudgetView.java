@@ -155,9 +155,13 @@ public class BudgetView extends VerticalLayout {
             }
             DepartmentBudget b = edit != null ? edit : new DepartmentBudget();
             b.setDepartment(dept); b.setBudgetYear(yearCb.getValue()); b.setBudgetMonth(monthCb.getValue()); b.setBudgetLimit(lim);
-            budgetService.save(b);
-            Notification.show("Kaydedildi", 2000, Notification.Position.MIDDLE).addThemeVariants(NotificationVariant.LUMO_SUCCESS);
-            d.close(); refreshAll();
+            try {
+                budgetService.save(b);
+                Notification.show("Kaydedildi", 2000, Notification.Position.MIDDLE).addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                d.close(); refreshAll();
+            } catch (Exception exc) {
+                Notification.show("Kayıt başarısız: " + (exc.getMessage() != null ? exc.getMessage() : "Bilinmeyen hata"), 4000, Notification.Position.MIDDLE).addThemeVariants(NotificationVariant.LUMO_ERROR);
+            }
         });
         save.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
         Button cancel = new Button("İptal", ev -> d.close());
@@ -329,7 +333,7 @@ public class BudgetView extends VerticalLayout {
     }
 
     private void configureEmptyState() {
-        emptyState.getStyle().set("display", "none").set("flex-direction", "column").set("align-items", "center").set("justify-content", "center").set("text-align", "center").set("padding", "3em");
+        emptyState.getStyle().set("display", "none").set("flex-direction", "column").set("align-items", "center").set("justify-content", "center").set("text-align", "center").set("padding", "3em").set("position", "absolute").set("inset", "0").set("margin", "auto");
         emptyState.add(new Span("💰") {{ getStyle().set("font-size", "2.5em").set("display","block"); }}, new Span("Bu ay için bütçe tanımlanmamış.") {{ getStyle().set("color","var(--lumo-secondary-text-color)").set("margin-top","0.5em"); }});
     }
 }

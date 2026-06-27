@@ -26,7 +26,9 @@ import com.vaadin.flow.component.sidenav.SideNav;
 import com.vaadin.flow.component.sidenav.SideNavItem;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.theme.lumo.LumoUtility;
+import com.raspel.cardtracker.config.TelegramBotService;
 import com.raspel.cardtracker.domain.budget.DepartmentBudget;
+import org.springframework.beans.factory.annotation.Autowired;
 import com.raspel.cardtracker.domain.budget.DepartmentBudgetService;
 import com.raspel.cardtracker.domain.card.Card;
 import com.raspel.cardtracker.domain.card.CardService;
@@ -60,6 +62,8 @@ public class MainLayout extends AppLayout {
     private final NoteService noteService;
     private final DepartmentBudgetService departmentBudgetService;
     private final AppSettingsService appSettingsService;
+    @Autowired(required = false)
+    private TelegramBotService telegramBotService;
     private H2 viewTitle;
     private VerticalLayout cardDebtList;
     private Span alertBadge;
@@ -861,6 +865,9 @@ public class MainLayout extends AppLayout {
             }
         } catch (Exception ignored) {
             // Expected: data may not be available during initial navigation
+        }
+        if (telegramBotService != null) {
+            try { telegramBotService.checkAndNotifyLimits(); } catch (Exception ignored) {}
         }
     }
 
