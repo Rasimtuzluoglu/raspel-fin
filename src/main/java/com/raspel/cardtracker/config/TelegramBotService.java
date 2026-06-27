@@ -52,6 +52,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
     private final EmployeeService employeeService;
     private final DepartmentBudgetService budgetService;
     private final Environment environment;
+    private final java.util.Set<String> sentAlerts = java.util.concurrent.ConcurrentHashMap.newKeySet();
 
     public TelegramBotService(UserService userService, CardService cardService,
                               ExpenseService expenseService, ChequeService chequeService,
@@ -157,6 +158,8 @@ public class TelegramBotService extends TelegramLongPollingBot {
             if (c.getCardLimit() == null || c.getCardLimit().compareTo(BigDecimal.ZERO) <= 0) continue;
             double pct = unpaid.divide(c.getCardLimit(), 4, RoundingMode.HALF_UP).doubleValue() * 100;
             if (pct >= 80.0) {
+                String key = "limit_" + c.getId() + "_" + String.format("%.0f", pct);
+                if (!sentAlerts.add(key)) continue;
                 String emoji = pct >= 95 ? "🔴" : pct >= 85 ? "🟠" : "🟡";
                 alerts.append(emoji).append(" <b>").append(esc(c.getName())).append("</b> limit %").append(String.format("%.0f", pct))
                         .append(" dolu!\n  Borç: ").append(FormatUtils.formatNumber(unpaid)).append(" ₺ / ")
@@ -174,6 +177,8 @@ public class TelegramBotService extends TelegramLongPollingBot {
             if (!overdue.isEmpty()) {
                 alerts.append("<b>🔴 GECİKMİŞ ÖDEMELER:</b>\n");
                 for (InstallmentEntry e : overdue) {
+                    String key = "overdue_" + e.getId();
+                    if (!sentAlerts.add(key)) continue;
                     String cn = e.getExpense().getCard() != null ? e.getExpense().getCard().getName() : "-";
                     long days = ChronoUnit.DAYS.between(calcDueDate(e), today);
                     alerts.append("• <b>").append(esc(cn)).append("</b> ").append(FormatUtils.formatNumber(e.getAmount()))
@@ -191,6 +196,8 @@ public class TelegramBotService extends TelegramLongPollingBot {
             if (!upcoming.isEmpty()) {
                 alerts.append("<b>🟡 3 GÜN İÇİNDE ÖDENECEK:</b>\n");
                 for (InstallmentEntry e : upcoming) {
+                    String key = "upcoming_" + e.getId() + "_" + ChronoUnit.DAYS.between(today, calcDueDate(e));
+                    if (!sentAlerts.add(key)) continue;
                     String cn = e.getExpense().getCard() != null ? e.getExpense().getCard().getName() : "-";
                     long days = ChronoUnit.DAYS.between(today, calcDueDate(e));
                     alerts.append("• <b>").append(esc(cn)).append("</b> ").append(FormatUtils.formatNumber(e.getAmount()))
@@ -210,6 +217,8 @@ public class TelegramBotService extends TelegramLongPollingBot {
                 if (limit == null || limit.compareTo(BigDecimal.ZERO) <= 0) continue;
                 double pct = spent.divide(limit, 4, RoundingMode.HALF_UP).doubleValue() * 100;
                 if (pct >= 80.0) {
+                    String key = "budget_" + b.getId() + "_" + String.format("%.0f", pct);
+                    if (!sentAlerts.add(key)) continue;
                     String emoji = pct >= 100 ? "🔴" : "🟡";
                     alerts.append(emoji).append(" <b>").append(esc(deptName)).append("</b> bütçesi %").append(String.format("%.0f", pct))
                             .append(" kullanıldı!\n  Harcama: ").append(FormatUtils.formatNumber(spent)).append(" ₺ / ")
@@ -228,6 +237,8 @@ public class TelegramBotService extends TelegramLongPollingBot {
         if (!cheques.isEmpty()) {
             alerts.append("<b>📄 7 GÜN İÇİNDE VADESİ DOLACAK ÇEKLER:</b>\n");
             for (Cheque c : cheques) {
+                String key = "cheque_" + c.getId() + "_" + ChronoUnit.DAYS.between(today, c.getMaturityDate());
+                if (!sentAlerts.add(key)) continue;
                 String type = c.getType() == ChequeType.ENTERING ? "📥 Giriş" : "📤 Çıkış";
                 long days = ChronoUnit.DAYS.between(today, c.getMaturityDate());
                 alerts.append("• ").append(type).append(" <b>").append(esc(c.getChequeNumber())).append("</b> ")

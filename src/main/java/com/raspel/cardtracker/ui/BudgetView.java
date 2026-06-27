@@ -34,6 +34,8 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
 @Route(value = "budgets", layout = MainLayout.class)
 @PageTitle("Bütçe Yönetimi")
@@ -176,15 +178,21 @@ public class BudgetView extends VerticalLayout {
         List<DepartmentBudget> budgets = budgetService.findByYearAndMonth(yr, mn);
         if (budgets.isEmpty()) { emptyState.getStyle().set("display", "flex"); cardsContainer.setVisible(false); return; }
         emptyState.getStyle().set("display", "none"); cardsContainer.setVisible(true);
+
+        Map<String, BigDecimal> spentCache = new HashMap<>();
         for (DepartmentBudget b : budgets) {
-            cardsContainer.add(buildDeptCard(b));
+            String deptName = b.getDepartment() != null ? b.getDepartment().getName() : "";
+            if (!spentCache.containsKey(deptName)) {
+                spentCache.put(deptName, expenseService.getDepartmentSpentForMonth(deptName, yr, mn));
+            }
+            cardsContainer.add(buildDeptCard(b, spentCache.get(deptName)));
         }
     }
 
-    private VerticalLayout buildDeptCard(DepartmentBudget budget) {
+    private VerticalLayout buildDeptCard(DepartmentBudget budget, BigDecimal spent) {
         String deptName = budget.getDepartment() != null ? budget.getDepartment().getName() : "Bilinmeyen";
         BigDecimal limit = budget.getBudgetLimit();
-        BigDecimal spent = expenseService.getDepartmentSpentForMonth(deptName, budget.getBudgetYear(), budget.getBudgetMonth());
+        if (spent == null) spent = BigDecimal.ZERO;
         BigDecimal remaining = limit.subtract(spent);
         boolean over = remaining.compareTo(BigDecimal.ZERO) < 0;
 
