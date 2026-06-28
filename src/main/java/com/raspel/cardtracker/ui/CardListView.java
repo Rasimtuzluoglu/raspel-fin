@@ -29,6 +29,7 @@ import com.raspel.cardtracker.domain.card.Card;
 import com.raspel.cardtracker.domain.card.CardType;
 import com.raspel.cardtracker.domain.card.CardService;
 import com.raspel.cardtracker.domain.expense.Expense;
+import com.raspel.cardtracker.domain.department.Department;
 import com.raspel.cardtracker.domain.department.DepartmentService;
 import jakarta.annotation.security.PermitAll;
 import org.springframework.security.core.Authentication;
@@ -277,6 +278,12 @@ public class CardListView extends VerticalLayout {
         cardTypeField.setRequired(true);
 
         TextField holderNameField = new TextField("Kart Sahibi");
+
+        ComboBox<Department> deptField = new ComboBox<>("Departman");
+        deptField.setItems(departmentService.findAllActive());
+        deptField.setItemLabelGenerator(Department::getName);
+        deptField.setClearButtonVisible(true);
+
         TextField limitField = new TextField("Limit (TL)");
         limitField.setRequired(true);
         limitField.setValue("0,00");
@@ -334,7 +341,7 @@ public class CardListView extends VerticalLayout {
         dueDayField.setValue(10);
         dueDayField.setStepButtonsVisible(true);
 
-        form.add(nameField, bankField, cardTypeField, holderNameField, limitField, monthlyAssignmentField, categoryField, colorField, closingDayField, dueDayField);
+        form.add(nameField, bankField, cardTypeField, holderNameField, deptField, limitField, monthlyAssignmentField, categoryField, colorField, closingDayField, dueDayField);
 
         if (card != null) {
             nameField.setValue(card.getName() != null ? card.getName() : "");
@@ -354,6 +361,7 @@ public class CardListView extends VerticalLayout {
             
             closingDayField.setValue(card.getClosingDay() != null ? card.getClosingDay() : 1);
             dueDayField.setValue(card.getDueDay() != null ? card.getDueDay() : 10);
+            deptField.setValue(card.getDepartment());
         } else {
             colorField.setValue(colorOptions.get(0)); // Default to first
             cardTypeField.setValue(CardType.CREDIT_CARD);
@@ -379,6 +387,7 @@ public class CardListView extends VerticalLayout {
             editCard.setBank(bankField.getValue());
             editCard.setCardType(cardTypeField.getValue());
             editCard.setHolderName(holderNameField.getValue());
+            editCard.setDepartment(deptField.getValue());
             editCard.setCardLimit(FormatUtils.parseTurkishCurrency(limitField.getValue()));
             
             String assignmentVal = monthlyAssignmentField.getValue();

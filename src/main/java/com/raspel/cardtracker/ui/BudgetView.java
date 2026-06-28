@@ -65,7 +65,10 @@ public class BudgetView extends VerticalLayout {
         Button addDeptButton = new Button("Departman Ekle", e -> openDeptDialog());
         addDeptButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
 
-        HorizontalLayout toolbar = new HorizontalLayout(yearFilter, monthFilter, addButton, addDeptButton);
+        Button delDeptButton = new Button("Departman Sil", e -> openDeleteDeptDialog());
+        delDeptButton.addThemeVariants(ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_ERROR);
+
+        HorizontalLayout toolbar = new HorizontalLayout(yearFilter, monthFilter, addButton, addDeptButton, delDeptButton);
         toolbar.setAlignItems(Alignment.BASELINE);
 
         add(toolbar, grid);
@@ -297,6 +300,46 @@ public class BudgetView extends VerticalLayout {
 
         dialog.add(nameField);
         dialog.getFooter().add(cancelBtn, saveBtn);
+        dialog.open();
+    }
+
+    private void openDeleteDeptDialog() {
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle("Departman Sil");
+        dialog.setWidth("400px");
+
+        ComboBox<Department> deptCombo = new ComboBox<>("Departman");
+        deptCombo.setItems(departmentService.findAllActive());
+        deptCombo.setItemLabelGenerator(Department::getName);
+        deptCombo.setWidthFull();
+
+        Span warning = new Span("Departman silindiğinde o departmana ait bütçeler de silinir. Bu işlem geri alınamaz.");
+        warning.getStyle().set("font-size", "0.85em").set("color", "var(--lumo-error-color)");
+
+        Button confirmBtn = new Button("Sil", ev -> {
+            if (deptCombo.isEmpty()) {
+                Notification.show("Lütfen bir departman seçin", 3000, Notification.Position.MIDDLE)
+                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                return;
+            }
+            Department dept = deptCombo.getValue();
+            try {
+                departmentService.delete(dept.getId());
+                Notification.show("\"" + dept.getName() + "\" silindi", 2000, Notification.Position.MIDDLE)
+                        .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+                dialog.close();
+                refreshGrid();
+            } catch (Exception ex) {
+                Notification.show("Hata: " + ex.getMessage(), 5000, Notification.Position.MIDDLE)
+                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
+            }
+        });
+        confirmBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_ERROR);
+
+        Button cancelBtn = new Button("İptal", ev -> dialog.close());
+
+        dialog.add(warning, deptCombo);
+        dialog.getFooter().add(cancelBtn, confirmBtn);
         dialog.open();
     }
 
