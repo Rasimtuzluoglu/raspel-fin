@@ -65,10 +65,16 @@ public class AverageMaturityView extends VerticalLayout {
 
     public AverageMaturityView() {
         setSizeFull(); setPadding(true); setSpacing(false);
-        getStyle().set("overflow", "auto").set("max-width","100vw");
+        getStyle().set("overflow", "hidden");
 
         add(buildHeader());
-        add(buildColumns());
+
+        HorizontalLayout mainLayout = new HorizontalLayout(buildCsvPanel(), buildManualPanel());
+        mainLayout.setSizeFull(); mainLayout.setPadding(false);
+        mainLayout.setSpacing(true);
+        mainLayout.getStyle().set("gap","1rem").set("align-items","flex-start").set("overflow","hidden");
+        add(mainLayout);
+        expand(mainLayout);
     }
 
     // ==================== HEADER ====================
@@ -92,21 +98,14 @@ public class AverageMaturityView extends VerticalLayout {
         return h;
     }
 
-    // ==================== COLUMNS ====================
-    private HorizontalLayout buildColumns() {
-        HorizontalLayout cols = new HorizontalLayout(buildCsvPanel(), buildManualPanel());
-        cols.setWidthFull(); cols.setSpacing(true);
-        cols.getStyle().set("gap","20px").set("align-items","flex-start").set("flex-wrap","wrap");
-        expand(cols);
-        return cols;
-    }
-
-    // ==================== CSV PANEL ====================
+    // Left panel — full remaining width
     private VerticalLayout buildCsvPanel() {
         VerticalLayout p = new VerticalLayout();
         p.addClassName("maturity-card");
+        p.setSizeFull();
         p.setPadding(false); p.setSpacing(false);
-        p.getStyle().set("flex","1").set("min-width","380px").set("max-width","100%");
+        p.getStyle().set("min-width","0").set("overflow","hidden");
+        setFlexGrow(1, p);
 
         // Header
         Div header = new Div(); header.addClassName("maturity-card-header");
@@ -125,6 +124,7 @@ public class AverageMaturityView extends VerticalLayout {
         MemoryBuffer buf = new MemoryBuffer();
         Upload up = new Upload(buf);
         up.setAcceptedFileTypes(".csv"); up.setMaxFiles(1);
+        up.setWidthFull();
         up.setDropLabel(new Span("Dosya seç ya da buraya sürükle"));
         up.addClassName("upload-zone");
 
@@ -163,9 +163,10 @@ public class AverageMaturityView extends VerticalLayout {
         HorizontalLayout colHdr = new HorizontalLayout();
         colHdr.setWidthFull(); colHdr.setAlignItems(Alignment.CENTER);
         colHdr.getStyle().set("gap","8px");
-        colHdr.add(new Span("Başlangıç") {{ addClassName("col-label"); getStyle().set("width","130px"); }});
-        colHdr.add(new Span("Bitiş") {{ addClassName("col-label"); getStyle().set("width","130px"); }});
-        colHdr.add(new Span("Tutar (₺)") {{ addClassName("col-label"); getStyle().set("width","110px"); }});
+        Span s1 = new Span("Başlangıç"); s1.addClassName("col-label"); s1.getStyle().set("flex-grow","1");
+        Span s2 = new Span("Bitiş"); s2.addClassName("col-label"); s2.getStyle().set("flex-grow","1");
+        Span s3 = new Span("Tutar (₺)"); s3.addClassName("col-label"); s3.getStyle().set("width","110px").set("flex-shrink","0");
+        colHdr.add(s1, s2, s3);
         csvRowsContainer.add(colHdr);
 
         // Initial row
@@ -192,9 +193,12 @@ public class AverageMaturityView extends VerticalLayout {
     private void addCsvRow() {
         int idx = csvRowsContainer.getComponentCount();
 
-        DatePicker from = new DatePicker(); from.setWidth("130px"); from.setClearButtonVisible(true);
-        DatePicker to = new DatePicker(); to.setWidth("130px"); to.setClearButtonVisible(true);
-        TextField amtF = new TextField(); amtF.setValue("0,00"); amtF.setWidth("110px");
+        DatePicker from = new DatePicker(); from.setClearButtonVisible(true);
+        from.setWidthFull(); from.getStyle().set("flex-grow","1").set("min-width","120px");
+        DatePicker to = new DatePicker(); to.setClearButtonVisible(true);
+        to.setWidthFull(); to.getStyle().set("flex-grow","1").set("min-width","120px");
+        TextField amtF = new TextField(); amtF.setValue("0,00");
+        amtF.setWidth("110px"); amtF.getStyle().set("flex-shrink","0");
         FormatUtils.attachCurrencyFormatting(amtF);
 
         Span num = new Span(String.valueOf(idx));
@@ -209,6 +213,7 @@ public class AverageMaturityView extends VerticalLayout {
             recalcCsv();
         });
         delBtn.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_ERROR);
+        delBtn.setWidth("36px"); delBtn.getStyle().set("flex-shrink","0");
 
         row.add(num, from, to, amtF, delBtn);
 
@@ -361,7 +366,8 @@ public class AverageMaturityView extends VerticalLayout {
         VerticalLayout p = new VerticalLayout();
         p.addClassName("maturity-card");
         p.setPadding(false); p.setSpacing(false);
-        p.getStyle().set("width","310px").set("flex-shrink","0");
+        p.setWidth("360px"); p.setMinWidth("360px"); p.setMaxWidth("360px");
+        p.getStyle().set("flex-shrink","0").set("overflow","hidden");
 
         // Header
         Div header = new Div(); header.addClassName("maturity-card-header");
@@ -427,34 +433,43 @@ public class AverageMaturityView extends VerticalLayout {
         for (int i = 0; i < n; i++) {
             HorizontalLayout row = new HorizontalLayout();
             row.addClassName("manual-row");
-            row.setWidthFull(); row.setAlignItems(Alignment.END);
+            row.setWidthFull(); row.setAlignItems(Alignment.BASELINE);
+            row.getStyle().set("gap","6px").set("overflow","hidden");
 
-            Span num = new Span(String.valueOf(i+1)); num.addClassName("row-num");
+            Span num = new Span(String.valueOf(i+1));
+            num.addClassName("row-num");
+            num.setWidth("22px"); num.getStyle().set("flex-shrink","0");
             row.add(num);
 
             if (dateMode) {
                 ComboBox<Integer> day = new ComboBox<>();
                 day.setItems(java.util.stream.IntStream.rangeClosed(1,31).boxed().toList());
-                day.setValue(15); day.setWidth("55px");
+                day.setValue(15); day.setWidth("58px"); day.getStyle().set("flex-shrink","0");
                 ComboBox<Integer> mon = new ComboBox<>();
                 mon.setItems(1,2,3,4,5,6,7,8,9,10,11,12);
-                mon.setItemLabelGenerator(m -> AYLAR[m-1]); mon.setValue(6); mon.setWidth("100px");
+                mon.setItemLabelGenerator(m -> AYLAR[m-1]); mon.setValue(6);
+                mon.setWidth("90px"); mon.getStyle().set("flex-shrink","0");
                 IntegerField yr = new IntegerField();
-                yr.setValue(LocalDate.now().getYear()); yr.setWidth("75px");
+                yr.setValue(LocalDate.now().getYear());
+                yr.setWidth("68px"); yr.getStyle().set("flex-shrink","0");
                 row.add(day, mon, yr);
                 manDays.add(day); manMonths.add(mon); manYears.add(yr);
             } else {
                 IntegerField gun = new IntegerField();
-                gun.setMin(1); gun.setValue(30); gun.setWidth("80px");
-                Span gl = new Span("gün"); gl.getStyle().set("font-size","0.78em").set("color","var(--lumo-tertiary-text-color)");
+                gun.setMin(1); gun.setValue(30);
+                gun.setWidth("60px"); gun.getStyle().set("flex-shrink","0");
+                Span gl = new Span("gün");
+                gl.getStyle().set("font-size","0.75em").set("color","var(--lumo-tertiary-text-color)").set("flex-shrink","0");
                 row.add(gun, gl);
                 manGuns.add(gun);
             }
 
             TextField amtF = new TextField();
-            amtF.setValue("0,00"); amtF.setWidth("110px");
+            amtF.setValue("0,00"); amtF.setWidth("90px");
+            amtF.getStyle().set("flex-shrink","0");
             FormatUtils.attachCurrencyFormatting(amtF);
-            Span tl = new Span("₺"); tl.getStyle().set("font-size","0.8em").set("color","var(--lumo-tertiary-text-color)");
+            Span tl = new Span("₺");
+            tl.getStyle().set("font-size","0.8em").set("color","var(--lumo-tertiary-text-color)").set("flex-shrink","0");
             row.add(amtF, tl);
             manAmt.add(amtF);
 

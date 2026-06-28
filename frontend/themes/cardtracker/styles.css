@@ -607,3 +607,24 @@ apex-charts {
     margin-top: 8px;
 }
 
+/* Overflow and sizing fixes */
+.manual-row vaadin-date-picker,
+.manual-row vaadin-number-field,
+.manual-row vaadin-text-field,
+.manual-row vaadin-integer-field,
+.manual-row vaadin-combo-box {
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+.upload-zone {
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.maturity-card {
+    width: 100%;
+    box-sizing: border-box;
+    min-width: 0;
+}
+
