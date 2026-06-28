@@ -628,3 +628,20 @@ apex-charts {
     min-width: 0;
 }
 
+/* Tablo hücresi taşmasını önle */
+.left-panel vaadin-grid {
+    --lumo-font-size-m: 11px;
+    max-height: 220px;
+    overflow-y: auto;
+}
+
+/* Tüm flex child'larda taşma önlemi */
+.main-layout,
+.left-panel,
+.right-panel,
+.card {
+    min-width: 0;
+    box-sizing: border-box;
+    overflow: hidden;
+}
+
