@@ -48,114 +48,227 @@ public class AverageMaturityView extends VerticalLayout {
     private static final DateTimeFormatter DISPLAY_FMT = DateTimeFormatter.ofPattern("dd MMMM yyyy", Locale.of("tr"));
     private static final String[] AYLAR = {"Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"};
 
-    // CSV
+    // --- CSV ---
     private final Grid<VadeRow> grid = new Grid<>(VadeRow.class, false);
     private List<VadeRow> allRows = new ArrayList<>(), filteredRows = new ArrayList<>();
-    private List<BigDecimal> nakitList = new ArrayList<>();
-    private VerticalLayout nakitContainer, csvContent;
+    private VerticalLayout csvRowsContainer;
     private Div csvResultBox, csvChartBox;
 
-    // Manual
+    // --- Manual ---
     private RadioButtonGroup<String> modeGroup;
     private ComboBox<Integer> countSelect;
-    private VerticalLayout rowsContainer;
-    private Div manualResult;
-    private List<TextField> manAmt = new ArrayList<>();
-    private List<ComboBox<Integer>> manDays = new ArrayList<>(), manMonths = new ArrayList<>();
-    private List<IntegerField> manYears = new ArrayList<>(), manGuns = new ArrayList<>();
+    private VerticalLayout manRowsContainer;
+    private Div manualResultBox;
+    private final List<TextField> manAmt = new ArrayList<>();
+    private final List<ComboBox<Integer>> manDays = new ArrayList<>(), manMonths = new ArrayList<>();
+    private final List<IntegerField> manYears = new ArrayList<>(), manGuns = new ArrayList<>();
 
     public AverageMaturityView() {
         setSizeFull(); setPadding(true); setSpacing(true);
         getStyle().set("overflow", "auto");
 
-        // Header
-        HorizontalLayout header = new HorizontalLayout();
-        header.setWidthFull(); header.setAlignItems(Alignment.CENTER);
-        H2 title = new H2("📊 Ortalama Vade Hesaplama");
-        title.getStyle().set("margin","0").set("font-size","1.4em");
-        Span subtitle = new Span("CSV toplu hesaplama veya manuel giriş");
-        subtitle.getStyle().set("color","var(--lumo-secondary-text-color)").set("font-size","0.85em");
-        VerticalLayout headerText = new VerticalLayout(title, subtitle);
-        headerText.setPadding(false); headerText.setSpacing(false);
-        header.add(headerText);
-        header.expand(headerText);
-        add(header);
-
-        HorizontalLayout columns = new HorizontalLayout(buildCsvCard(), buildManualCard());
-        columns.setWidthFull(); columns.setSpacing(true);
-        columns.getStyle().set("gap","20px").set("align-items","flex-start").set("flex-wrap","wrap");
-        add(columns);
-        expand(columns);
+        add(buildHeader());
+        add(buildColumns());
     }
 
-    // ==================== CSV CARD ====================
-    private Div buildCsvCard() {
-        Div card = sectionCard(null);
-        card.getStyle().set("flex","1").set("min-width","420px");
+    // ==================== HEADER ====================
+    private HorizontalLayout buildHeader() {
+        Div icon = new Div();
+        icon.addClassName("header-icon");
+        icon.add(VaadinIcon.CALC.create());
 
-        H4 t = new H4("📁 CSV ile Toplu Hesaplama");
-        t.getStyle().set("margin","0 0 4px 0");
+        H2 title = new H2("Ortalama vade hesaplama");
+        title.getStyle().set("margin","0").set("font-size","1.3em");
 
-        Span desc = new Span("Banka POS raporunu yükleyin, otomatik ayrıştırılsın");
-        desc.getStyle().set("font-size","0.78em").set("color","var(--lumo-tertiary-text-color)");
+        Paragraph sub = new Paragraph("CSV ile toplu hesaplama veya manuel giriş");
+        sub.getStyle().set("font-size","0.8em").set("color","var(--lumo-tertiary-text-color)").set("margin","0");
 
+        VerticalLayout texts = new VerticalLayout(title, sub);
+        texts.setPadding(false); texts.setSpacing(false);
+
+        HorizontalLayout h = new HorizontalLayout(icon, texts);
+        h.setAlignItems(Alignment.CENTER); h.setSpacing(true);
+        h.getStyle().set("margin-bottom","16px");
+        return h;
+    }
+
+    // ==================== COLUMNS ====================
+    private HorizontalLayout buildColumns() {
+        HorizontalLayout cols = new HorizontalLayout(buildCsvPanel(), buildManualPanel());
+        cols.setWidthFull(); cols.setSpacing(true);
+        cols.getStyle().set("gap","20px").set("align-items","flex-start").set("flex-wrap","wrap");
+        expand(cols);
+        return cols;
+    }
+
+    // ==================== CSV PANEL ====================
+    private VerticalLayout buildCsvPanel() {
+        VerticalLayout p = new VerticalLayout();
+        p.addClassName("maturity-card");
+        p.setPadding(false); p.setSpacing(false);
+        p.getStyle().set("flex","1").set("min-width","420px");
+
+        // Header
+        Div header = new Div(); header.addClassName("maturity-card-header");
+        Div hIcon = new Div(); hIcon.addClassName("header-icon"); hIcon.add(VaadinIcon.FILE_TABLE.create());
+        VerticalLayout hTexts = new VerticalLayout(
+                new H4("CSV ile toplu hesaplama"),
+                new Span("Banka POS raporunu yükleyin, otomatik ayrıştırılsın") {{
+                    getStyle().set("font-size","0.72em").set("color","var(--lumo-tertiary-text-color)");
+                }}
+        );
+        hTexts.setPadding(false); hTexts.setSpacing(false);
+        header.add(hIcon, hTexts);
+        p.add(header);
+
+        // Upload
         MemoryBuffer buf = new MemoryBuffer();
         Upload up = new Upload(buf);
         up.setAcceptedFileTypes(".csv"); up.setMaxFiles(1);
-        up.setDropLabel(new Span("CSV dosyasını sürükleyin veya seçin"));
-        up.getStyle().set("margin-top","8px");
+        up.setDropLabel(new Span("Dosya seç ya da buraya sürükle"));
+        up.addClassName("upload-zone");
 
         up.addSucceededListener(e -> {
             try (InputStream is = buf.getInputStream()) {
                 allRows = parseCSV(is);
                 if (allRows.isEmpty()) { notifyErr("Geçerli satır bulunamadı."); return; }
                 filteredRows = new ArrayList<>(allRows);
-                refreshCsv();
+                refreshCsvGrid();
                 notifyOk(allRows.size() + " işlem okundu");
             } catch (Exception ex) { notifyErr("Dosya okunamadı."); }
         });
 
+        VerticalLayout upWrap = new VerticalLayout(up);
+        upWrap.setPadding(false); upWrap.setSpacing(false);
+        upWrap.getStyle().set("margin","12px 0");
+        p.add(upWrap);
+
+        // Divider
+        Span divider = new Span("veya manuel giriş");
+        divider.addClassName("divider-label");
+        p.add(divider);
+
+        // Grid
         configureGrid();
+        grid.setVisible(false);
+        p.add(grid);
 
-        DatePicker from = new DatePicker("Başlangıç"); from.setClearButtonVisible(true); from.setWidth("140px");
-        DatePicker to = new DatePicker("Bitiş"); to.setClearButtonVisible(true); to.setWidth("140px");
-        from.addValueChangeListener(e -> { filterCsv(from.getValue(), to.getValue()); });
-        to.addValueChangeListener(e -> { filterCsv(from.getValue(), to.getValue()); });
+        // Manual rows container (date + nakit)
+        csvRowsContainer = new VerticalLayout();
+        csvRowsContainer.setPadding(false); csvRowsContainer.setSpacing(false);
+        csvRowsContainer.getStyle().set("gap","6px");
+        p.add(csvRowsContainer);
 
-        TextField nakitF = new TextField("Nakit (₺)"); nakitF.setWidth("130px");
-        FormatUtils.attachCurrencyFormatting(nakitF);
-        Button nakitAdd = new Button("Ekle", ev -> {
-            BigDecimal amt = FormatUtils.parseTurkishCurrency(nakitF.getValue());
-            if (amt == null || amt.compareTo(BigDecimal.ZERO) <= 0) { notifyErr("Tutar > 0 olmalı"); return; }
-            nakitList.add(amt); refreshNakit(); nakitF.clear();
-            if (!filteredRows.isEmpty() || !nakitList.isEmpty()) showCsvResult();
-        });
-        nakitAdd.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_SMALL);
-        Button resetCSV = new Button("Sıfırla", ev -> resetCsv());
-        resetCSV.addThemeVariants(ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_SMALL);
+        // Column headers
+        HorizontalLayout colHdr = new HorizontalLayout();
+        colHdr.setWidthFull(); colHdr.setAlignItems(Alignment.CENTER);
+        colHdr.getStyle().set("gap","8px");
+        colHdr.add(new Span("Başlangıç") {{ addClassName("col-label"); getStyle().set("width","130px"); }});
+        colHdr.add(new Span("Bitiş") {{ addClassName("col-label"); getStyle().set("width","130px"); }});
+        colHdr.add(new Span("Tutar (₺)") {{ addClassName("col-label"); getStyle().set("width","110px"); }});
+        csvRowsContainer.add(colHdr);
 
-        HorizontalLayout flt = new HorizontalLayout(from, to, nakitF, nakitAdd, resetCSV);
-        flt.setWidthFull(); flt.setAlignItems(Alignment.END); flt.setSpacing(true);
-        flt.getStyle().set("flex-wrap","wrap").set("gap","6px").set("margin-top","8px");
+        // Initial row
+        addCsvRow();
 
-        nakitContainer = new VerticalLayout();
-        nakitContainer.setPadding(false); nakitContainer.setSpacing(false);
-        nakitContainer.getStyle().set("max-height","50px").set("overflow-y","auto");
+        // Buttons
+        Button addRowBtn = new Button("+ Satır ekle", ev -> addCsvRow());
+        addRowBtn.addClassName("btn-add-row");
+        Button resetBtn = new Button("Sıfırla", ev -> resetCsv());
+        resetBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_SMALL);
 
+        HorizontalLayout btns = new HorizontalLayout(addRowBtn, resetBtn);
+        btns.setSpacing(true); btns.getStyle().set("margin-top","8px");
+        p.add(btns);
+
+        // Result
         csvResultBox = new Div(); csvResultBox.setVisible(false);
         csvChartBox = new Div(); csvChartBox.setVisible(false);
-        grid.setVisible(false);
+        p.add(csvResultBox, csvChartBox);
 
-        csvContent = new VerticalLayout(t, desc, up, flt, nakitContainer, csvResultBox, csvChartBox, grid);
-        csvContent.setPadding(false); csvContent.setSpacing(false);
-        csvContent.getStyle().set("gap","4px");
+        return p;
+    }
 
-        card.add(csvContent);
-        return card;
+    private void addCsvRow() {
+        int idx = csvRowsContainer.getComponentCount();
+
+        DatePicker from = new DatePicker(); from.setWidth("130px"); from.setClearButtonVisible(true);
+        DatePicker to = new DatePicker(); to.setWidth("130px"); to.setClearButtonVisible(true);
+        TextField amtF = new TextField(); amtF.setValue("0,00"); amtF.setWidth("110px");
+        FormatUtils.attachCurrencyFormatting(amtF);
+
+        Span num = new Span(String.valueOf(idx));
+        num.addClassName("row-num");
+
+        HorizontalLayout row = new HorizontalLayout();
+        row.setWidthFull(); row.setAlignItems(Alignment.END);
+        row.getStyle().set("gap","6px");
+
+        Button delBtn = new Button(new Icon(VaadinIcon.TRASH), ev -> {
+            csvRowsContainer.remove(row);
+            recalcCsv();
+        });
+        delBtn.addThemeVariants(ButtonVariant.LUMO_SMALL, ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_ERROR);
+
+        row.add(num, from, to, amtF, delBtn);
+
+        from.addValueChangeListener(e -> recalcCsv());
+        to.addValueChangeListener(e -> recalcCsv());
+        amtF.addValueChangeListener(e -> recalcCsv());
+
+        csvRowsContainer.add(row);
+    }
+
+    private void recalcCsv() {
+        BigDecimal total = BigDecimal.ZERO, weighted = BigDecimal.ZERO;
+        LocalDate today = LocalDate.now();
+        int count = 0;
+
+        for (int i = 1; i < csvRowsContainer.getComponentCount(); i++) {
+            HorizontalLayout row = (HorizontalLayout) csvRowsContainer.getComponentAt(i);
+            DatePicker from = (DatePicker) row.getComponentAt(1);
+            DatePicker to = (DatePicker) row.getComponentAt(2);
+            TextField amtF = (TextField) row.getComponentAt(3);
+
+            BigDecimal amt = FormatUtils.parseTurkishCurrency(amtF.getValue());
+            if (amt.compareTo(BigDecimal.ZERO) <= 0) continue;
+            total = total.add(amt); count++;
+
+            if (from.getValue() != null && to.getValue() != null) {
+                long days = Math.max(0, ChronoUnit.DAYS.between(today, to.getValue()));
+                weighted = weighted.add(amt.multiply(BigDecimal.valueOf(days)));
+            } else if (to.getValue() != null) {
+                long days = Math.max(0, ChronoUnit.DAYS.between(today, to.getValue()));
+                weighted = weighted.add(amt.multiply(BigDecimal.valueOf(days)));
+            }
+        }
+
+        // Combine with parsed CSV rows
+        for (VadeRow r : filteredRows) {
+            total = total.add(r.tutar); count++;
+            long days = Math.max(0, ChronoUnit.DAYS.between(today, r.tarih));
+            weighted = weighted.add(r.tutar.multiply(BigDecimal.valueOf(days)));
+        }
+
+        if (count == 0 || total.compareTo(BigDecimal.ZERO) <= 0) {
+            csvResultBox.setVisible(false); csvChartBox.setVisible(false);
+            return;
+        }
+
+        long avgD = weighted.divide(total, 0, RoundingMode.HALF_UP).longValue();
+        BigDecimal avgM = BigDecimal.valueOf(avgD).divide(BigDecimal.valueOf(30), 1, RoundingMode.HALF_UP);
+
+        csvResultBox.removeAll(); csvResultBox.setVisible(true);
+        csvResultBox.addClassName("maturity-result");
+        csvResultBox.getClassNames().remove("error");
+        csvResultBox.addClassName("success");
+        csvResultBox.setText("📋 " + count + " işlem · 💰 " + FormatUtils.formatNumber(total) + " ₺\n📅 Ortalama vade: " + avgD + " gün (~" + avgM.stripTrailingZeros().toPlainString() + " ay)\n🗓️ Vade tarihi: " + today.plusDays(avgD).format(DISPLAY_FMT));
+
+        showCsvChart();
     }
 
     private void configureGrid() {
-        grid.setWidthFull(); grid.getStyle().set("margin-top","6px");
+        grid.setWidthFull();
         grid.addColumn(VadeRow::sira).setHeader("#").setWidth("40px").setFlexGrow(0);
         grid.addColumn(r -> r.tarih.format(DATE_FMT)).setHeader("Tarih").setAutoWidth(true);
         grid.addColumn(r -> FormatUtils.formatNumber(r.tutar) + " ₺").setHeader("Tutar").setAutoWidth(true);
@@ -164,218 +277,192 @@ public class AverageMaturityView extends VerticalLayout {
         grid.addColumn(VadeRow::kartAciklama).setHeader("Açıklama").setAutoWidth(true).setFlexGrow(1);
     }
 
-    private void filterCsv(LocalDate from, LocalDate to) {
-        filteredRows = allRows.stream()
-                .filter(r -> from == null || !r.tarih.isBefore(from))
-                .filter(r -> to == null || !r.tarih.isAfter(to))
-                .collect(java.util.stream.Collectors.toList());
-        refreshCsv();
+    private void refreshCsvGrid() {
+        grid.setItems(filteredRows);
+        grid.setVisible(!filteredRows.isEmpty());
+        recalcCsv();
     }
 
-    private void refreshCsv() {
-        grid.setItems(filteredRows); grid.setVisible(!filteredRows.isEmpty());
-        if (!filteredRows.isEmpty() || !nakitList.isEmpty()) showCsvResult();
-        else { csvResultBox.setVisible(false); csvChartBox.setVisible(false); }
+    private void showCsvChart() {
+        csvChartBox.removeAll(); csvChartBox.setVisible(true);
+        csvChartBox.getStyle().set("margin-top","8px");
+
+        LocalDate today = LocalDate.now();
+        int[] buckets = new int[8];
+        String[] bl = {"0-15","16-30","31-60","61-90","91-120","121-180","181-365","365+"};
+        for (VadeRow r : filteredRows) {
+            long g = Math.max(0, ChronoUnit.DAYS.between(today, r.tarih));
+            if (g<=15)buckets[0]++; else if(g<=30)buckets[1]++; else if(g<=60)buckets[2]++;
+            else if(g<=90)buckets[3]++; else if(g<=120)buckets[4]++; else if(g<=180)buckets[5]++;
+            else if(g<=365)buckets[6]++; else buckets[7]++;
+        }
+
+        List<String> lbs = new ArrayList<>(); List<Double> dat = new ArrayList<>();
+        for (int i = 0; i < buckets.length; i++) { if (buckets[i] > 0) { lbs.add(bl[i]); dat.add((double)buckets[i]); } }
+
+        if (!lbs.isEmpty()) {
+            Div chWrap = new Div();
+            chWrap.addClassName("maturity-card");
+            chWrap.getStyle().set("padding","12px 16px");
+
+            H4 chT = new H4("Vade Dağılımı"); chT.getStyle().set("margin","0 0 6px 0").set("font-size","0.9em");
+            chWrap.add(chT);
+
+            ApexCharts ch = ApexChartsBuilder.get()
+                    .withChart(ChartBuilder.get().withType(Type.BAR).withBackground("transparent").withHeight("180px").build())
+                    .withPlotOptions(PlotOptionsBuilder.get()
+                            .withBar(com.github.appreciated.apexcharts.config.plotoptions.builder.BarBuilder.get()
+                                    .withHorizontal(false).withColumnWidth("60%").build()).build())
+                    .withDataLabels(DataLabelsBuilder.get().withEnabled(true).build())
+                    .withSeries(new Series<>("İşlem", dat.toArray(new Double[0])))
+                    .withXaxis(XAxisBuilder.get().withCategories(lbs).build()).withColors("#2196F3").build();
+            ch.setWidth("100%");
+            chWrap.add(ch);
+            csvChartBox.add(chWrap);
+        }
     }
 
     private List<VadeRow> parseCSV(InputStream is) throws Exception {
         List<VadeRow> rows = new ArrayList<>();
         byte[] bytes = is.readAllBytes();
         byte[] t = bytes;
-        if (bytes.length >= 3 && bytes[0]==(byte)0xEF && bytes[1]==(byte)0xBB && bytes[2]==(byte)0xBF)
+        if (bytes.length>=3 && bytes[0]==(byte)0xEF && bytes[1]==(byte)0xBB && bytes[2]==(byte)0xBF)
             t = java.util.Arrays.copyOfRange(bytes,3,bytes.length);
-        String c = new String(t, StandardCharsets.UTF_8);
-        if (c.contains("\uFFFD")) c = new String(t, java.nio.charset.Charset.forName("Windows-1254"));
-        String[] lines = c.split("\\r?\\n"); if (lines.length < 2) return rows;
+        String c = new String(t,StandardCharsets.UTF_8);
+        if(c.contains("\uFFFD")) c = new String(t,java.nio.charset.Charset.forName("Windows-1254"));
+        String[] lines = c.split("\\r?\\n"); if(lines.length<2) return rows;
         String delim = lines[0].contains(";")?";":lines[0].contains("\t")?"\t":",";
-        int sira = 0;
-        for (int i=1; i<lines.length; i++) {
-            String line = lines[i].trim(); if(line.isEmpty()) continue;
-            String[] cols = line.split(delim,-1); if(cols.length<12) continue;
-            try {
-                if(!cols[10].trim().equalsIgnoreCase("Basarili") && !cols[10].trim().equalsIgnoreCase("Başarılı")) continue;
-                LocalDate d = LocalDate.parse(cols[9].trim(), DATE_FMT);
-                BigDecimal amt = parseAmt(cols[5].trim()); if(amt.compareTo(BigDecimal.ZERO)<=0) continue;
-                rows.add(new VadeRow(++sira, d, amt, cols[3].trim(), cols[7].trim(), cols[10].trim(), pInt(cols[6].trim())));
-            } catch (Exception ignored){}
+        int sira=0;
+        for(int i=1;i<lines.length;i++){
+            String line=lines[i].trim();if(line.isEmpty())continue;
+            String[] cols=line.split(delim,-1);if(cols.length<12)continue;
+            try{
+                if(!cols[10].trim().equalsIgnoreCase("Basarili")&&!cols[10].trim().equalsIgnoreCase("Başarılı"))continue;
+                LocalDate d=LocalDate.parse(cols[9].trim(),DATE_FMT);
+                BigDecimal amt=parseAmt(cols[5].trim());if(amt.compareTo(BigDecimal.ZERO)<=0)continue;
+                rows.add(new VadeRow(++sira,d,amt,cols[3].trim(),cols[7].trim(),cols[10].trim(),pInt(cols[6].trim())));
+            }catch(Exception ignored){}
         }
         return rows;
     }
-    private BigDecimal parseAmt(String v) { if(v==null||v.trim().isEmpty()) return BigDecimal.ZERO; v=v.trim().replace("\"","").replace("₺","").replace("TL","").replace(" ",""); try{return new BigDecimal(v.replace(",","."));}catch(Exception e){return BigDecimal.ZERO;} }
-    private int pInt(String v) { v=(v!=null?v:"").replaceAll("[^0-9]",""); try{return v.isEmpty()?0:Integer.parseInt(v);}catch(Exception e){return 0;} }
-
-    private void showCsvResult() {
-        grid.setVisible(true); BigDecimal total=BigDecimal.ZERO, weighted=BigDecimal.ZERO;
-        LocalDate today = LocalDate.now();
-        for (VadeRow r : filteredRows) {
-            total = total.add(r.tutar);
-            long d = Math.max(0, ChronoUnit.DAYS.between(today, r.tarih));
-            weighted = weighted.add(r.tutar.multiply(BigDecimal.valueOf(d)));
-        }
-        int cashCount = nakitList.size();
-        for (BigDecimal n : nakitList) total = total.add(n);
-        long avgD = 0; if(total.compareTo(BigDecimal.ZERO)>0) avgD = weighted.divide(total,0,RoundingMode.HALF_UP).longValue();
-        BigDecimal avgM = BigDecimal.valueOf(avgD).divide(BigDecimal.valueOf(30),1,RoundingMode.HALF_UP);
-
-        csvResultBox.removeAll(); csvResultBox.setVisible(true);
-        csvResultBox.getStyle().clear();
-        csvResultBox.getStyle().set("background", "linear-gradient(135deg, var(--lumo-primary-color-10pct), var(--lumo-base-color))")
-                .set("border-radius","12px").set("padding","16px 20px").set("margin-top","8px")
-                .set("border","1px solid var(--lumo-contrast-10pct)");
-
-        H4 rt = new H4("📋 Sonuç"); rt.getStyle().set("margin","0 0 10px 0").set("font-size","0.95em");
-        csvResultBox.add(rt);
-
-        FlexLayout stats = new FlexLayout();
-        stats.setWidthFull(); stats.getStyle().set("gap","10px").set("flex-wrap","wrap");
-        stats.add(csvStatCard("📋",(filteredRows.size()+cashCount)+" işlem","#2196F3"));
-        stats.add(csvStatCard("💰",FormatUtils.formatNumber(total)+" ₺","#4CAF50"));
-        stats.add(csvStatCard("📅",avgD+" gün (~"+avgM.stripTrailingZeros().toPlainString()+" ay)","#FF9800"));
-        stats.add(csvStatCard("🗓️","Vade: "+LocalDate.now().plusDays(avgD).format(DISPLAY_FMT),"#9C27B0"));
-        csvResultBox.add(stats);
-
-        // Chart
-        int[] buckets = new int[8]; String[] bl = {"0-15 gün","16-30","31-60","61-90","91-120","121-180","181-365","365+"};
-        for (VadeRow r : filteredRows) {
-            long g = Math.max(0,ChronoUnit.DAYS.between(today,r.tarih));
-            if(g<=15)buckets[0]++;else if(g<=30)buckets[1]++;else if(g<=60)buckets[2]++;else if(g<=90)buckets[3]++;else if(g<=120)buckets[4]++;else if(g<=180)buckets[5]++;else if(g<=365)buckets[6]++;else buckets[7]++;
-        }
-        csvChartBox.removeAll(); csvChartBox.setVisible(true);
-        csvChartBox.getStyle().clear();
-        csvChartBox.getStyle().set("background","var(--lumo-base-color)").set("border-radius","10px")
-                .set("padding","12px 16px").set("margin-top","8px").set("border","1px solid var(--lumo-contrast-10pct)");
-        H4 chT = new H4("📊 Vade Dağılımı"); chT.getStyle().set("margin","0 0 6px 0").set("font-size","0.9em");
-        csvChartBox.add(chT);
-
-        List<String> lbls = new ArrayList<>(); List<Double> dat = new ArrayList<>();
-        for(int i=0;i<buckets.length;i++){if(buckets[i]>0){lbls.add(bl[i]);dat.add((double)buckets[i]);}}
-        if(!lbls.isEmpty()){
-            ApexCharts ch = ApexChartsBuilder.get()
-                    .withChart(ChartBuilder.get().withType(Type.BAR).withBackground("transparent").withHeight("200px").build())
-                    .withPlotOptions(PlotOptionsBuilder.get()
-                            .withBar(com.github.appreciated.apexcharts.config.plotoptions.builder.BarBuilder.get()
-                                    .withHorizontal(false).withColumnWidth("60%").build()).build())
-                    .withDataLabels(DataLabelsBuilder.get().withEnabled(true).build())
-                    .withSeries(new Series<>("İşlem",dat.toArray(new Double[0])))
-                    .withXaxis(XAxisBuilder.get().withCategories(lbls).build()).withColors("#2196F3").build();
-            ch.setWidth("100%"); csvChartBox.add(ch);
-        }
-    }
-
-    private Div csvStatCard(String icon, String val, String color) {
-        Div c = new Div();
-        c.getStyle().set("flex","1").set("min-width","120px").set("padding","10px 12px")
-                .set("border-radius","8px").set("background","var(--lumo-base-color)")
-                .set("border-left","3px solid "+color).set("text-align","center");
-        Span v = new Span(icon+" "+val);
-        v.getStyle().set("font-size","0.82em").set("font-weight","700").set("color",color).set("display","block");
-        c.add(v); return c;
-    }
-
-    private void refreshNakit() {
-        nakitContainer.removeAll();
-        for(int i=0;i<nakitList.size();i++){
-            int idx=i; BigDecimal amt=nakitList.get(i);
-            HorizontalLayout r=new HorizontalLayout(); r.setAlignItems(Alignment.CENTER);
-            r.getStyle().set("gap","4px").set("font-size","0.75em");
-            Span l=new Span("Nakit #"+(i+1)+": "+FormatUtils.formatNumber(amt)+" ₺");
-            Button x=new Button(new Icon(VaadinIcon.CLOSE_SMALL),ev->{nakitList.remove(idx);refreshNakit();if(!filteredRows.isEmpty()||!nakitList.isEmpty())showCsvResult();});
-            x.addThemeVariants(ButtonVariant.LUMO_SMALL,ButtonVariant.LUMO_TERTIARY,ButtonVariant.LUMO_ERROR);
-            r.add(l,x); r.expand(l); nakitContainer.add(r);
-        }
-    }
+    private BigDecimal parseAmt(String v){if(v==null||v.trim().isEmpty())return BigDecimal.ZERO;v=v.trim().replace("\"","").replace("₺","").replace("TL","").replace(" ","");try{return new BigDecimal(v.replace(",","."));}catch(Exception e){return BigDecimal.ZERO;}}
+    private int pInt(String v){v=(v!=null?v:"").replaceAll("[^0-9]","");try{return v.isEmpty()?0:Integer.parseInt(v);}catch(Exception e){return 0;}}
 
     private void resetCsv() {
-        allRows.clear();filteredRows.clear();nakitList.clear();nakitContainer.removeAll();
+        allRows.clear();filteredRows.clear();
         grid.setItems(filteredRows);grid.setVisible(false);
         csvResultBox.setVisible(false);csvResultBox.removeAll();
         csvChartBox.setVisible(false);csvChartBox.removeAll();
+        while(csvRowsContainer.getComponentCount() > 1) csvRowsContainer.remove(csvRowsContainer.getComponentAt(csvRowsContainer.getComponentCount()-1));
     }
 
-    // ==================== MANUAL CARD ====================
-    private Div buildManualCard() {
-        Div card = sectionCard(null);
-        card.getStyle().set("flex","0 0 400px").set("min-width","360px");
+    // ==================== MANUAL PANEL ====================
+    private VerticalLayout buildManualPanel() {
+        VerticalLayout p = new VerticalLayout();
+        p.addClassName("maturity-card");
+        p.setPadding(false); p.setSpacing(false);
+        p.getStyle().set("width","340px").set("flex-shrink","0");
 
-        H4 t = new H4("✏️ Manuel Hesaplama");
-        t.getStyle().set("margin","0 0 8px 0");
+        // Header
+        Div header = new Div(); header.addClassName("maturity-card-header");
+        Div hIcon = new Div(); hIcon.addClassName("header-icon"); hIcon.add(VaadinIcon.EDIT.create());
+        VerticalLayout hTexts = new VerticalLayout(
+                new H4("Manuel hesaplama"),
+                new Span("Tarih veya gün girerek hesaplayın") {{
+                    getStyle().set("font-size","0.72em").set("color","var(--lumo-tertiary-text-color)");
+                }}
+        );
+        hTexts.setPadding(false); hTexts.setSpacing(false);
+        header.add(hIcon, hTexts);
+        p.add(header);
 
-        modeGroup = new RadioButtonGroup<>();
-        modeGroup.setItems("📅 Tarih girerek", "🔢 Gün girerek");
-        modeGroup.setValue("📅 Tarih girerek");
-        modeGroup.getStyle().set("font-size","0.85em");
-        modeGroup.addValueChangeListener(e -> rebuildRows());
+        // Radio tabs
+        Div radioTabs = new Div(); radioTabs.addClassName("radio-tabs");
+        Span tabDate = new Span("📅 Tarih"); tabDate.addClassName("radio-tab"); tabDate.addClassName("active");
+        Span tabDay = new Span("🔢 Gün"); tabDay.addClassName("radio-tab");
+        tabDate.addClickListener(e -> { tabDate.addClassName("active"); tabDay.removeClassName("active"); rebuildManRows(true); });
+        tabDay.addClickListener(e -> { tabDay.addClassName("active"); tabDate.removeClassName("active"); rebuildManRows(false); });
+        radioTabs.add(tabDate, tabDay);
+        radioTabs.getStyle().set("margin","12px 0");
 
+        p.add(radioTabs);
+
+        // Count select
         countSelect = new ComboBox<>("Ödeme sayısı");
         countSelect.setItems(1,2,3,4,5,6,7,8,9,10,11,12);
-        countSelect.setValue(2); countSelect.setWidth("130px");
-        countSelect.addValueChangeListener(e -> rebuildRows());
+        countSelect.setValue(2); countSelect.setWidthFull();
+        countSelect.addValueChangeListener(e -> rebuildManRows(tabDate.hasClassName("active")));
+        p.add(countSelect);
 
-        rowsContainer = new VerticalLayout();
-        rowsContainer.setPadding(false); rowsContainer.setSpacing(false);
-        rowsContainer.getStyle().set("gap","8px").set("margin-top","8px");
+        // Rows
+        manRowsContainer = new VerticalLayout();
+        manRowsContainer.setPadding(false); manRowsContainer.setSpacing(false);
+        manRowsContainer.getStyle().set("gap","8px").set("margin-top","8px");
+        p.add(manRowsContainer);
 
-        manualResult = new Div();
-        manualResult.getStyle().set("padding","12px 16px").set("border-radius","10px")
-                .set("text-align","center").set("font-size","0.9em").set("margin-top","10px");
-
-        Button calcBtn = new Button("Hesapla", e -> calcManual());
-        calcBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY); calcBtn.setWidthFull();
+        // Buttons
+        Button calcBtn = new Button("Hesapla", e -> calcManual(tabDate.hasClassName("active")));
+        calcBtn.addClassName("btn-primary-full");
         Button resetBtn = new Button("Sıfırla", e -> resetManual());
-        resetBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY); resetBtn.setWidthFull();
+        resetBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_SMALL);
+        resetBtn.setWidthFull();
 
-        card.add(t, modeGroup, countSelect, rowsContainer, calcBtn, resetBtn, manualResult);
-        rebuildRows();
-        return card;
+        p.add(calcBtn, resetBtn);
+
+        // Result
+        manualResultBox = new Div();
+        manualResultBox.addClassName("maturity-result");
+        manualResultBox.setVisible(false);
+        p.add(manualResultBox);
+
+        rebuildManRows(true);
+        return p;
     }
 
-    private void rebuildRows() {
-        rowsContainer.removeAll();
+    private void rebuildManRows(boolean dateMode) {
+        manRowsContainer.removeAll();
         manDays.clear(); manMonths.clear(); manYears.clear(); manGuns.clear(); manAmt.clear();
         int n = countSelect.getValue() != null ? countSelect.getValue() : 2;
-        boolean dateMode = "📅 Tarih girerek".equals(modeGroup.getValue());
 
         for (int i = 0; i < n; i++) {
             HorizontalLayout row = new HorizontalLayout();
+            row.addClassName("manual-row");
             row.setWidthFull(); row.setAlignItems(Alignment.END);
-            row.getStyle().set("gap","6px").set("padding","6px 8px")
-                    .set("border-radius","8px").set("background","var(--lumo-contrast-5pct)");
 
-            Span num = new Span(String.valueOf(i+1));
-            num.getStyle().set("font-weight","700").set("font-size","0.9em")
-                    .set("min-width","20px").set("color","var(--lumo-primary-text-color)");
+            Span num = new Span(String.valueOf(i+1)); num.addClassName("row-num");
+            row.add(num);
 
             if (dateMode) {
                 ComboBox<Integer> day = new ComboBox<>();
                 day.setItems(java.util.stream.IntStream.rangeClosed(1,31).boxed().toList());
-                day.setValue(15); day.setWidth("58px");
+                day.setValue(15); day.setWidth("55px");
                 ComboBox<Integer> mon = new ComboBox<>();
                 mon.setItems(1,2,3,4,5,6,7,8,9,10,11,12);
-                mon.setItemLabelGenerator(m -> AYLAR[m-1]); mon.setValue(6); mon.setWidth("105px");
+                mon.setItemLabelGenerator(m -> AYLAR[m-1]); mon.setValue(6); mon.setWidth("100px");
                 IntegerField yr = new IntegerField();
-                yr.setValue(LocalDate.now().getYear()); yr.setWidth("80px");
-                row.add(num, day, mon, yr);
+                yr.setValue(LocalDate.now().getYear()); yr.setWidth("75px");
+                row.add(day, mon, yr);
                 manDays.add(day); manMonths.add(mon); manYears.add(yr);
             } else {
                 IntegerField gun = new IntegerField();
                 gun.setMin(1); gun.setValue(30); gun.setWidth("80px");
-                Span gl = new Span("gün"); gl.getStyle().set("font-size","0.8em").set("color","var(--lumo-secondary-text-color)");
-                row.add(num, gun, gl);
+                Span gl = new Span("gün"); gl.getStyle().set("font-size","0.78em").set("color","var(--lumo-tertiary-text-color)");
+                row.add(gun, gl);
                 manGuns.add(gun);
             }
 
             TextField amtF = new TextField();
-            amtF.setValue("0,00"); amtF.setWidth("115px");
+            amtF.setValue("0,00"); amtF.setWidth("110px");
             FormatUtils.attachCurrencyFormatting(amtF);
-            Span tl = new Span("₺"); tl.getStyle().set("font-size","0.85em").set("color","var(--lumo-secondary-text-color)");
+            Span tl = new Span("₺"); tl.getStyle().set("font-size","0.8em").set("color","var(--lumo-tertiary-text-color)");
             row.add(amtF, tl);
             manAmt.add(amtF);
-            rowsContainer.add(row);
+
+            manRowsContainer.add(row);
         }
     }
 
-    private void calcManual() {
-        boolean dateMode = "📅 Tarih girerek".equals(modeGroup.getValue());
+    private void calcManual(boolean dateMode) {
         int n = countSelect.getValue();
         List<BigDecimal> amts = new ArrayList<>();
         List<Long> days = new ArrayList<>();
@@ -390,8 +477,7 @@ public class AverageMaturityView extends VerticalLayout {
             if (dateMode) {
                 try {
                     LocalDate dt = LocalDate.of(manYears.get(i).getValue(), manMonths.get(i).getValue(), manDays.get(i).getValue());
-                    long dd = ChronoUnit.DAYS.between(today, dt);
-                    days.add(Math.max(0, dd));
+                    days.add(Math.max(0, ChronoUnit.DAYS.between(today, dt)));
                 } catch (Exception e) { err.append(i+1).append(". geçersiz tarih. "); }
             } else {
                 long g = manGuns.get(i).getValue();
@@ -400,13 +486,14 @@ public class AverageMaturityView extends VerticalLayout {
             }
         }
 
+        manualResultBox.setVisible(true);
         if (err.length() > 0) {
-            manualResult.getStyle().set("background","var(--lumo-error-color-10pct)").set("color","var(--lumo-error-color)");
-            manualResult.setText("❌ " + err.toString()); return;
+            manualResultBox.removeClassName("success"); manualResultBox.addClassName("error");
+            manualResultBox.setText("❌ " + err.toString()); return;
         }
         if (amts.isEmpty()) {
-            manualResult.getStyle().set("background","var(--lumo-error-color-10pct)").set("color","var(--lumo-error-color)");
-            manualResult.setText("❌ Geçerli ödeme yok."); return;
+            manualResultBox.removeClassName("success"); manualResultBox.addClassName("error");
+            manualResultBox.setText("❌ Geçerli ödeme yok."); return;
         }
 
         BigDecimal total = BigDecimal.ZERO, w = BigDecimal.ZERO;
@@ -414,30 +501,20 @@ public class AverageMaturityView extends VerticalLayout {
         long avgD = w.divide(total, 0, RoundingMode.HALF_UP).longValue();
         BigDecimal avgM = BigDecimal.valueOf(avgD).divide(BigDecimal.valueOf(30), 1, RoundingMode.HALF_UP);
 
-        manualResult.getStyle().set("background","linear-gradient(135deg, #E8F5E9, #C8E6C9)")
-                .set("color","#2E7D32").set("border","1px solid #A5D6A7");
-
+        manualResultBox.removeClassName("error"); manualResultBox.addClassName("success");
         if (dateMode) {
-            manualResult.setText("🗓️ Ortalama Vade Tarihi\n" + today.plusDays(avgD).format(DISPLAY_FMT) + "\n(" + avgD + " gün · ~" + avgM.stripTrailingZeros().toPlainString() + " ay)");
+            manualResultBox.setText("🗓️ Ortalama Vade Tarihi\n" + today.plusDays(avgD).format(DISPLAY_FMT) + "\n(" + avgD + " gün · ~" + avgM.stripTrailingZeros().toPlainString() + " ay)");
         } else {
-            manualResult.setText("🔢 Ortalama Vade\n" + avgD + " gün (~" + avgM.stripTrailingZeros().toPlainString() + " ay)");
+            manualResultBox.setText("🔢 Ortalama Vade\n" + avgD + " gün (~" + avgM.stripTrailingZeros().toPlainString() + " ay)");
         }
     }
 
     private void resetManual() {
-        manualResult.getStyle().clear(); manualResult.setText("");
-        countSelect.setValue(2); modeGroup.setValue("📅 Tarih girerek"); rebuildRows();
+        manualResultBox.setVisible(false); manualResultBox.removeClassName("success"); manualResultBox.removeClassName("error");
+        countSelect.setValue(2); rebuildManRows(true);
     }
 
     // ==================== HELPERS ====================
-    private Div sectionCard(String title) {
-        Div c = new Div();
-        c.getStyle().set("background","var(--lumo-base-color)").set("border-radius","14px")
-                .set("padding","16px 20px").set("box-shadow","0 2px 10px rgba(0,0,0,0.07)")
-                .set("border","1px solid var(--lumo-contrast-10pct)");
-        return c;
-    }
-
     private void notifyOk(String msg) { Notification.show(msg, 3000, Notification.Position.BOTTOM_CENTER).addThemeVariants(NotificationVariant.LUMO_SUCCESS); }
     private void notifyErr(String msg) { Notification.show(msg, 4000, Notification.Position.MIDDLE).addThemeVariants(NotificationVariant.LUMO_ERROR); }
 
