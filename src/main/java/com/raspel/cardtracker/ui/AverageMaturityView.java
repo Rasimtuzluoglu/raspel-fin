@@ -64,8 +64,8 @@ public class AverageMaturityView extends VerticalLayout {
     private final List<IntegerField> manYears = new ArrayList<>(), manGuns = new ArrayList<>();
 
     public AverageMaturityView() {
-        setSizeFull(); setPadding(true); setSpacing(true);
-        getStyle().set("overflow", "auto");
+        setSizeFull(); setPadding(true); setSpacing(false);
+        getStyle().set("overflow", "auto").set("max-width","100vw");
 
         add(buildHeader());
         add(buildColumns());
@@ -106,7 +106,7 @@ public class AverageMaturityView extends VerticalLayout {
         VerticalLayout p = new VerticalLayout();
         p.addClassName("maturity-card");
         p.setPadding(false); p.setSpacing(false);
-        p.getStyle().set("flex","1").set("min-width","420px");
+        p.getStyle().set("flex","1").set("min-width","380px").set("max-width","100%");
 
         // Header
         Div header = new Div(); header.addClassName("maturity-card-header");
@@ -156,7 +156,7 @@ public class AverageMaturityView extends VerticalLayout {
         // Manual rows container (date + nakit)
         csvRowsContainer = new VerticalLayout();
         csvRowsContainer.setPadding(false); csvRowsContainer.setSpacing(false);
-        csvRowsContainer.getStyle().set("gap","6px");
+        csvRowsContainer.getStyle().set("gap","6px").set("max-height","200px").set("overflow-y","auto");
         p.add(csvRowsContainer);
 
         // Column headers
@@ -361,7 +361,7 @@ public class AverageMaturityView extends VerticalLayout {
         VerticalLayout p = new VerticalLayout();
         p.addClassName("maturity-card");
         p.setPadding(false); p.setSpacing(false);
-        p.getStyle().set("width","340px").set("flex-shrink","0");
+        p.getStyle().set("width","310px").set("flex-shrink","0");
 
         // Header
         Div header = new Div(); header.addClassName("maturity-card-header");
