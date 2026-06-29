@@ -1,0 +1,1 @@
+ALTER TABLE expense_archive ALTER COLUMN tag TYPE VARCHAR(20);

@@ -270,14 +270,14 @@ public class ContactView extends VerticalLayout {
                 return;
             }
             String ph = phoneField.getValue().replaceAll("[\\s-]", "");
-            if (!ph.isEmpty() && !ph.matches("^(05\\d{9}|5\\d{9})$")) {
-                Notification.show("Geçersiz telefon. Örn: 05321234567", 3000, Notification.Position.MIDDLE)
+            if (!ph.isEmpty() && !ph.matches("^05\\d{9}$")) {
+                Notification.show("Telefon 11 haneli olmalı (05XX XXX XX XX). Örn: 05321234567", 4000, Notification.Position.MIDDLE)
                         .addThemeVariants(NotificationVariant.LUMO_ERROR);
                 return;
             }
             String em = emailField.getValue().trim();
-            if (!em.isEmpty() && !em.matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+\\.[A-Za-z]{2,}$")) {
-                Notification.show("Geçersiz e-posta. Örn: ornek@firma.com", 3000, Notification.Position.MIDDLE)
+            if (!em.isEmpty() && !em.contains("@")) {
+                Notification.show("Geçersiz e-posta. @ işareti içermelidir. Örn: ornek@firma.com", 4000, Notification.Position.MIDDLE)
                         .addThemeVariants(NotificationVariant.LUMO_ERROR);
                 return;
             }

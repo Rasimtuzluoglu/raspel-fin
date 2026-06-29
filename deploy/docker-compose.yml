@@ -39,6 +39,7 @@ services:
       - ./backups:/app/backups
       - logs:/app/logs
       - reports:/app/reports
+      - /var/run/docker.sock:/var/run/docker.sock
     env_file:
       - .env
     environment:

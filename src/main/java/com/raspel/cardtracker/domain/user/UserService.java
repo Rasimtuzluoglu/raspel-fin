@@ -92,13 +92,7 @@ public class UserService implements UserDetailsService {
         if (user.getLockedUntil() == null) {
             return false;
         }
-        if (LocalDateTime.now().isAfter(user.getLockedUntil())) {
-            user.setLockedUntil(null);
-            user.setFailedLoginAttempts(0);
-            userRepository.save(user);
-            return false;
-        }
-        return true;
+        return !LocalDateTime.now().isAfter(user.getLockedUntil());
     }
 
     public AppUser createUser(String username, String rawPassword, String fullName, Role role) {
@@ -185,7 +179,7 @@ public class UserService implements UserDetailsService {
     public String generateTelegramVerificationCode(String username) {
         AppUser user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new IllegalArgumentException("Kullanıcı bulunamadı"));
-        String code = String.format("%06d", new java.security.SecureRandom().nextInt(999999));
+        String code = String.format("%06d", new java.security.SecureRandom().nextInt(1000000));
         user.setTelegramVerificationCode(code);
         userRepository.save(user);
         return code;

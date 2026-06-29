@@ -76,8 +76,11 @@ public class ExpenseService {
      */
     public Expense updateExpense(Expense expense) {
         if (expense.getExpenseDate() == null) throw new IllegalArgumentException("Harcama tarihi zorunludur");
+        if (expense.getCard() == null) throw new IllegalArgumentException("Kart zorunludur");
         if (expense.getOriginalAmount() != null && expense.getOriginalAmount().compareTo(BigDecimal.ZERO) <= 0)
             throw new IllegalArgumentException("Tutar 0'dan büyük olmalıdır");
+        if (expense.getOriginalAmount() == null && expense.getTotalAmount() == null)
+            throw new IllegalArgumentException("Tutar belirtilmelidir");
 
         // Para birimi ve orijinal tutar doğrulamaları
         if (expense.getCurrency() == null || expense.getCurrency().trim().isEmpty()) {
@@ -234,6 +237,7 @@ public class ExpenseService {
      */
     public Map<String, BigDecimal> getCardTotalsForMonth(int year, int month, List<Card> cards) {
         Map<String, BigDecimal> result = new HashMap<>();
+        if (cards == null) return result;
         for (Card card : cards) {
             BigDecimal total = installmentEntryRepository.sumAmountByYearAndMonthAndCardId(year, month, card.getId());
             if (total != null && total.compareTo(BigDecimal.ZERO) > 0) {
@@ -340,13 +344,13 @@ public class ExpenseService {
         if (description == null || description.trim().isEmpty()) return null;
         String keyword = description.trim();
         List<Object[]> results = expenseRepository.findCategoryByDescriptionKeyword(keyword);
-        if (results != null && !results.isEmpty()) {
+        if (results != null && !results.isEmpty() && results.get(0) != null && results.get(0).length > 0) {
             return (String) results.get(0)[0];
         }
         String[] words = keyword.split("\\s+");
         if (words.length > 0 && words[0].length() > 3) {
             results = expenseRepository.findCategoryByDescriptionKeyword(words[0]);
-            if (results != null && !results.isEmpty()) {
+            if (results != null && !results.isEmpty() && results.get(0) != null && results.get(0).length > 0) {
                 return (String) results.get(0)[0];
             }
         }
@@ -357,6 +361,10 @@ public class ExpenseService {
         return expenseRepository.countByCreatedBy(createdBy);
     }
 
+    public long countByCardId(Long cardId) {
+        return expenseRepository.countByCardId(cardId);
+    }
+
     public BigDecimal getTotalExpenseForMonth(int year, int month) {
         LocalDate start = LocalDate.of(year, month, 1);
         LocalDate end = start.plusMonths(1);
@@ -365,6 +373,10 @@ public class ExpenseService {
 
     public List<Expense> findRecentByCreatedBy(String createdBy, int limit) {
         return expenseRepository.findRecentByCreatedBy(createdBy, org.springframework.data.domain.PageRequest.of(0, limit));
+    }
+
+    public List<InstallmentEntry> getAllUnpaidInstallments() {
+        return installmentEntryRepository.findAllUnpaidWithDetails();
     }
 
     public BigDecimal getDepartmentSpentForMonth(Long deptId, int year, int month) {

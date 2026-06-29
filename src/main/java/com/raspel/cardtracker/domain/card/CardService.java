@@ -101,4 +101,9 @@ public class CardService {
     public long count() {
         return cardRepository.count();
     }
+
+    @Transactional(readOnly = true)
+    public boolean existsByNameIgnoreCaseAndIdNot(String name, Long id) {
+        return cardRepository.existsByNameIgnoreCaseAndIdNot(name, id != null ? id : -1L);
+    }
 }

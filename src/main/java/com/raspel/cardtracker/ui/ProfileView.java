@@ -33,6 +33,7 @@ import com.raspel.cardtracker.domain.user.UserService;
 import com.raspel.cardtracker.domain.settings.AppSettingsService;
 import com.raspel.cardtracker.domain.backup.BackupRestoreService;
 import com.raspel.cardtracker.ui.utils.FormatUtils;
+import com.vaadin.flow.component.ClientCallable;
 import jakarta.annotation.security.PermitAll;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -273,7 +274,7 @@ public class ProfileView extends VerticalLayout {
         List<Expense> recentExpenses = expenseService.findRecentByCreatedBy(username, 3);
         List<Cheque> recentCheques = chequeService.findAll().stream()
                 .sorted(Comparator.comparing(c -> c.getMaturityDate(), Comparator.reverseOrder()))
-                .limit(2).collect(Collectors.toList());
+                .limit(3).collect(Collectors.toList());
 
         for (Expense e : recentExpenses) {
             String date = e.getExpenseDate() != null ? e.getExpenseDate().format(DateTimeFormatter.ofPattern("dd.MM")) : "-";
@@ -288,6 +289,10 @@ public class ProfileView extends VerticalLayout {
         }
         if (recentExpenses.isEmpty() && recentCheques.isEmpty()) {
             recentList.add(new Span("Henüz işlem bulunmuyor."));
+        } else {
+            Span info = new Span("Son harcamalar ve sistemdeki son çekler");
+            info.getStyle().set("font-size", "0.7em").set("color", "var(--lumo-tertiary-text-color)").set("display", "block").set("margin-top", "4px");
+            recentList.add(info);
         }
         recentCard.add(recentList);
         grid.add(recentCard);
@@ -350,7 +355,7 @@ public class ProfileView extends VerticalLayout {
                     java.io.File f = backupService.createBackup();
                     com.vaadin.flow.server.StreamResource res = new com.vaadin.flow.server.StreamResource(
                         f.getName(), () -> {
-                            try { return new java.io.FileInputStream(f); } catch (Exception ex) { return null; }
+                            try { return new java.io.FileInputStream(f); } catch (Exception ex) { throw new RuntimeException("Dosya okunamadı", ex); }
                         });
                     res.setContentType("application/sql");
                     com.vaadin.flow.component.html.Anchor anchor = new com.vaadin.flow.component.html.Anchor(res, "");
@@ -424,6 +429,74 @@ public class ProfileView extends VerticalLayout {
             grid.add(backupCard);
         }
 
+        // Guncelleme Al - herkes gorur, sadece admin calistirabilir
+        Div updateCard = buildCard("Yaz\u0131l\u0131m G\u00FCncelleme");
+        VerticalLayout updateContent = new VerticalLayout();
+        updateContent.setPadding(false);
+        updateContent.setSpacing(true);
+
+        Span updateIcon = new Span("\uD83D\uDE80");
+        updateIcon.getStyle().set("font-size", "28px").set("display", "block");
+
+        Span updateLabel = new Span("Yeni S\u00FCr\u00FCm Kontrol\u00FC");
+        updateLabel.getStyle().set("font-weight", "600").set("font-size", "0.95em").set("display", "block");
+
+        Span updateDesc = new Span("En son yaz\u0131l\u0131m s\u00FCr\u00FCm\u00FCn\u00FC kontrol edin ve g\u00FCncelleme yap\u0131n.");
+        updateDesc.getStyle().set("font-size", "0.8em").set("color", "var(--lumo-secondary-text-color)")
+                .set("display", "block").set("margin-top", "2px");
+
+        Span updateInfo = new Span("Yaz\u0131l\u0131m\u0131m\u0131z s\u00FCrekli geli\u015Fmekte, yeni \u00F6zellikler eklenmektedir.");
+        updateInfo.getStyle().set("font-size", "0.72em").set("color", "var(--lumo-tertiary-text-color)")
+                .set("display", "block").set("font-style", "italic");
+
+        Button updateBtn = new Button("G\u00FCncelleme Al", new Icon(VaadinIcon.REFRESH), e -> {
+            if (!isAdmin) {
+                Notification.show(
+                        "Bu \u00F6zellik sadece y\u00F6netici taraf\u0131ndan kullan\u0131labilir. Yaz\u0131l\u0131m\u0131m\u0131z s\u00FCrekli geli\u015Fmekte, yeni \u00F6zellikler eklenmektedir.",
+                        5000, Notification.Position.MIDDLE)
+                        .addThemeVariants(NotificationVariant.LUMO_CONTRAST);
+                return;
+            }
+
+            // Once guncelleme kontrolu yap
+            Notification.show("G\u00FCncelleme kontrol ediliyor...", 2000, Notification.Position.MIDDLE)
+                    .addThemeVariants(NotificationVariant.LUMO_PRIMARY);
+
+            getElement().executeJs(
+                "fetch('/api/system/check-update', {method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin'})" +
+                ".then(r=>r.json())" +
+                ".then(data=>{" +
+                "  if(data.updateAvailable){" +
+                "    arguments[0].$server.openUpdateConfirm();" +
+                "  }else{" +
+                "    var msg = document.createElement('vaadin-notification-card');" +
+                "    msg.setAttribute('theme', 'contrast');" +
+                "    msg.textContent = '\u015Eu an yeni g\u00FCncelleme yok. Yaz\u0131l\u0131m\u0131n\u0131z g\u00FCncel.';" +
+                "    document.body.appendChild(msg);" +
+                "    msg._show && msg._show(4000);" +
+                "    setTimeout(function(){msg.remove()},5000);" +
+                "  }" +
+                "}).catch(err=>{" +
+                "  var msg = document.createElement('vaadin-notification-card');" +
+                "  msg.textContent = 'G\u00FCncelleme kontrol edilemedi: ' + err.message;" +
+                "  document.body.appendChild(msg);" +
+                "  setTimeout(function(){msg.remove()},5000);" +
+                "})",
+                getElement()
+            );
+        });
+        updateBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        if (!isAdmin) {
+            updateBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
+            updateBtn.getElement().setAttribute("title", "Y\u00F6netici yetkisi gerektirir");
+        }
+
+        updateContent.add(updateIcon, updateLabel, updateDesc, updateInfo, updateBtn);
+        updateContent.setAlignItems(FlexComponent.Alignment.CENTER);
+        updateContent.getStyle().set("text-align", "center").set("padding", "8px 0");
+        updateCard.add(updateContent);
+        grid.add(updateCard);
+
         // SAĞ ALT: Aylık Harcama (grafik)
         Div chartCard = buildCard("Aylık Harcama Projeksiyonu");
         Map<String, BigDecimal> projection = expenseService.getMonthlyProjection(6);
@@ -437,7 +510,8 @@ public class ProfileView extends VerticalLayout {
         ApexCharts miniChart = ApexChartsBuilder.get()
                 .withChart(ChartBuilder.get().withType(Type.BAR).withHeight("200px").build())
                 .withXaxis(XAxisBuilder.get().withCategories(java.util.Arrays.asList(monthNames)).build())
-                .withSeries(new Series<>("TL", projection.values().stream().map(BigDecimal::doubleValue).toArray(Double[]::new)))
+                .withSeries(new Series<>("TL", projection.values().stream()
+                        .map(v -> v != null ? v.doubleValue() : 0.0).toArray(Double[]::new)))
                 .withColors("#2196F3")
                 .build();
         miniChart.setWidth("100%");
@@ -445,6 +519,92 @@ public class ProfileView extends VerticalLayout {
         grid.add(chartCard);
 
         add(grid);
+    }
+
+    @ClientCallable
+    private void openUpdateConfirm() {
+        getUI().ifPresent(ui -> ui.access(() -> {
+            Dialog confirmDialog = new Dialog();
+            confirmDialog.setHeaderTitle("G\u00FCncelleme Onay\u0131 - Dikkat!");
+            confirmDialog.setWidth("480px");
+
+            VerticalLayout confirmContent = new VerticalLayout();
+            confirmContent.setPadding(false);
+            confirmContent.setSpacing(true);
+
+            Span warnTitle = new Span("Sistem g\u00FCncellemesi ba\u015Flat\u0131lacak!");
+            warnTitle.getStyle().set("font-weight", "700").set("font-size", "1.05em")
+                    .set("color", "var(--lumo-error-color)").set("display", "block");
+
+            Span warnMsg = new Span(
+                    "G\u00FCncelleme s\u0131ras\u0131nda uygulama k\u0131sa s\u00FCreli\u011Fine eri\u015Filemez olacakt\u0131r. " +
+                    "T\u00FCm kullan\u0131c\u0131lar\u0131n i\u015Flemlerini kaydetmi\u015F oldu\u011Fundan emin olun. " +
+                    "Bu i\u015Flemi mesai saati d\u0131\u015F\u0131nda yapman\u0131z \u00F6nerilir.");
+            warnMsg.getStyle().set("font-size", "0.88em").set("color", "var(--lumo-body-text-color)")
+                    .set("display", "block").set("line-height", "1.5");
+
+            Span activeWarning = new Span("Aktif kullan\u0131c\u0131 say\u0131s\u0131 sorgulan\u0131yor...");
+            activeWarning.getStyle().set("display", "block").set("font-size", "0.85em")
+                    .set("color", "var(--lumo-warning-color)").set("font-weight", "600");
+
+            confirmContent.add(warnTitle, warnMsg, activeWarning);
+            confirmDialog.add(confirmContent);
+
+            Button proceedBtn = new Button("G\u00FCncellemeyi Ba\u015Flat", ev -> {
+                confirmDialog.close();
+                executeUpdate();
+            });
+            proceedBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY, ButtonVariant.LUMO_ERROR);
+            proceedBtn.setEnabled(false);
+
+            Button cancelBtn = new Button("\u0130ptal", ev -> confirmDialog.close());
+            cancelBtn.addClickShortcut(com.vaadin.flow.component.Key.ESCAPE);
+            confirmDialog.getFooter().add(cancelBtn, proceedBtn);
+            confirmDialog.open();
+
+            getElement().executeJs(
+                "fetch('/api/system/active-users', {method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin'})" +
+                ".then(r=>r.json())" +
+                ".then(data=>{" +
+                "  var el=arguments[0];" +
+                "  if(data.count>0){" +
+                "    el.textContent='Uyar\u0131: Sistemde ' + data.count + ' aktif kullan\u0131c\u0131 bulunuyor! L\u00FCtfen g\u00FCncellemeyi mesai saati d\u0131\u015F\u0131nda yap\u0131n.';" +
+                "    el.style.color='var(--lumo-error-color)';" +
+                "  }else{" +
+                "    el.textContent='Aktif kullan\u0131c\u0131 bulunmuyor. G\u00FCncelleme i\u00E7in uygun zaman.';" +
+                "    el.style.color='var(--lumo-success-color)';" +
+                "    arguments[1].disabled=false;" +
+                "  }" +
+                "}).catch(()=>{" +
+                "  arguments[1].disabled=false;" +
+                "})",
+                activeWarning.getElement(), proceedBtn.getElement()
+            );
+        }));
+    }
+
+    private void executeUpdate() {
+        Notification.show("Guncelleme baslatiliyor, lutfen bekleyin...", 3000, Notification.Position.MIDDLE)
+                .addThemeVariants(NotificationVariant.LUMO_PRIMARY);
+
+        getElement().executeJs(
+            "fetch('/api/system/update', {method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin'})" +
+            ".then(r=>r.json())" +
+            ".then(data=>{" +
+            "  if(data.status==='ok'){" +
+            "    document.body.innerHTML='<div style=\"display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;font-family:sans-serif;\">" +
+            "      <div style=\"font-size:48px;margin-bottom:16px\">&#128640;</div>" +
+            "      <h2 style=\"color:#4CAF50\">Guncelleme Basarili!</h2>" +
+            "      <p style=\"color:#666;margin-bottom:24px\">Uygulama yeniden baslatiliyor, lutfen bekleyin...</p>" +
+            "      <div class=\\\"loading-spinner\\\" style=\\\"width:40px;height:40px;border:4px solid #e0e0e0;border-top:4px solid #2196F3;border-radius:50%;animation:spin 1s linear infinite;\\\"></div>" +
+            "      <style>@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}</style>" +
+            "    </div>';" +
+            "    setTimeout(function(){location.reload()},8000);" +
+            "  }else{" +
+            "    alert('Guncelleme basarisiz: ' + data.message);" +
+            "  }" +
+            "}).catch(err=>{alert('Guncelleme yapilamadi. Docker kurulu olmayabilir.');});"
+        );
     }
 
     private Div buildCard(String title) {

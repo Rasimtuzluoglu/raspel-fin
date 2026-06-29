@@ -19,14 +19,14 @@ public interface InstallmentEntryRepository extends JpaRepository<InstallmentEnt
     @Query("SELECT ie FROM InstallmentEntry ie JOIN FETCH ie.expense WHERE ie.expense.id = :expenseId")
     List<InstallmentEntry> findByExpenseId(@Param("expenseId") Long expenseId);
 
-    @Modifying
+    @Modifying(flushAutomatically = true)
     @Query("DELETE FROM InstallmentEntry ie WHERE ie.expense.id = :expenseId")
     void deleteByExpenseId(@Param("expenseId") Long expenseId);
 
-    @Query("SELECT ie FROM InstallmentEntry ie JOIN FETCH ie.expense e JOIN FETCH e.card LEFT JOIN FETCH e.contact WHERE ie.dueYear = :year AND ie.dueMonth = :month")
+    @Query("SELECT ie FROM InstallmentEntry ie JOIN FETCH ie.expense e JOIN FETCH e.card LEFT JOIN FETCH e.contact LEFT JOIN FETCH e.card.department WHERE ie.dueYear = :year AND ie.dueMonth = :month")
     List<InstallmentEntry> findByYearAndMonthWithDetails(@Param("year") Integer year, @Param("month") Integer month);
 
-    @Query("SELECT ie FROM InstallmentEntry ie JOIN FETCH ie.expense e JOIN FETCH e.card LEFT JOIN FETCH e.contact WHERE ie.dueYear = :year AND ie.dueMonth = :month AND e.card.id = :cardId")
+    @Query("SELECT ie FROM InstallmentEntry ie JOIN FETCH ie.expense e JOIN FETCH e.card LEFT JOIN FETCH e.contact LEFT JOIN FETCH e.card.department WHERE ie.dueYear = :year AND ie.dueMonth = :month AND e.card.id = :cardId")
     List<InstallmentEntry> findByYearAndMonthAndCardId(@Param("year") Integer year, @Param("month") Integer month, @Param("cardId") Long cardId);
 
     @Query("SELECT COALESCE(SUM(ie.amount), 0) FROM InstallmentEntry ie JOIN ie.expense e WHERE ie.dueYear = :year AND ie.dueMonth = :month")
@@ -52,10 +52,10 @@ public interface InstallmentEntryRepository extends JpaRepository<InstallmentEnt
     @Query("SELECT COALESCE(SUM(ie.amount), 0) FROM InstallmentEntry ie WHERE ie.dueYear = :year AND ie.dueMonth = :month AND ie.isPaid = false")
     BigDecimal sumUnpaidAmountByYearAndMonth(@Param("year") Integer year, @Param("month") Integer month);
 
-    @Query("SELECT ie FROM InstallmentEntry ie JOIN FETCH ie.expense e JOIN FETCH e.card LEFT JOIN FETCH e.contact WHERE ie.isPaid = false AND e.card.active = true")
+    @Query("SELECT ie FROM InstallmentEntry ie JOIN FETCH ie.expense e JOIN FETCH e.card LEFT JOIN FETCH e.contact LEFT JOIN FETCH e.card.department WHERE ie.isPaid = false AND e.card.active = true")
     List<InstallmentEntry> findAllUnpaidWithDetails();
 
-    @Query(value = "SELECT ie FROM InstallmentEntry ie JOIN FETCH ie.expense e JOIN FETCH e.card LEFT JOIN FETCH e.contact WHERE ie.dueYear = :year AND ie.dueMonth = :month " +
+    @Query(value = "SELECT ie FROM InstallmentEntry ie JOIN FETCH ie.expense e JOIN FETCH e.card LEFT JOIN FETCH e.contact LEFT JOIN FETCH e.card.department WHERE ie.dueYear = :year AND ie.dueMonth = :month " +
            "AND (:cardId IS NULL OR e.card.id = :cardId) " +
            "AND (:term IS NULL OR :term = '' OR LOWER(e.description) LIKE LOWER(CONCAT('%', :term, '%')) " +
            "OR LOWER(e.category) LIKE LOWER(CONCAT('%', :term, '%')) " +
@@ -78,7 +78,7 @@ public interface InstallmentEntryRepository extends JpaRepository<InstallmentEnt
            "OR LOWER(e.card.department.name) LIKE LOWER(CONCAT('%', :term, '%')))")
     BigDecimal sumAmountBySearchTermAndYearAndMonth(@Param("term") String term, @Param("year") Integer year, @Param("month") Integer month, @Param("cardId") Long cardId);
 
-    @Query("SELECT ie FROM InstallmentEntry ie JOIN FETCH ie.expense e JOIN FETCH e.card LEFT JOIN FETCH e.contact WHERE " +
+    @Query("SELECT ie FROM InstallmentEntry ie JOIN FETCH ie.expense e JOIN FETCH e.card LEFT JOIN FETCH e.contact LEFT JOIN FETCH e.card.department WHERE " +
            "((ie.dueYear > :startYear) OR (ie.dueYear = :startYear AND ie.dueMonth >= :startMonth)) AND " +
            "((ie.dueYear < :endYear) OR (ie.dueYear = :endYear AND ie.dueMonth <= :endMonth)) AND " +
            "(:cardId IS NULL OR e.card.id = :cardId) AND " +

@@ -27,7 +27,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 public class TcmbCurrencyService {
 
     private final Map<String, Map<String, BigDecimal>> rateCache = new ConcurrentHashMap<>();
-    private LocalDateTime lastLiveFetchTime = null;
+    private volatile LocalDateTime lastLiveFetchTime = null;
     
     // Dinamik fallback haritası - başarılı çekilen kurlar burayı günceller
     private static final Map<String, BigDecimal> DYNAMIC_FALLBACKS = new ConcurrentHashMap<>();
@@ -65,8 +65,9 @@ public class TcmbCurrencyService {
         }
 
         // 1) Cache kontrolü
-        if (rateCache.containsKey(cacheKey) && rateCache.get(cacheKey).containsKey(targetCurrency)) {
-            return rateCache.get(cacheKey).get(targetCurrency);
+        Map<String, BigDecimal> dateRates = rateCache.get(cacheKey);
+        if (dateRates != null && dateRates.containsKey(targetCurrency)) {
+            return dateRates.get(targetCurrency);
         }
 
         // 2) Eğer tarih bugün ise, öncelikle canlı kur servislerini dene (Truncgil veya Frankfurter)
@@ -173,7 +174,8 @@ public class TcmbCurrencyService {
                     factory.setXIncludeAware(false);
                     factory.setExpandEntityReferences(false);
                 } catch (Exception e) {
-                    log.warn("DocumentBuilderFactory security features not fully supported", e);
+                    log.error("XML güvenlik ayarları desteklenmiyor, TCMB kuru çekilemedi", e);
+                    return null;
                 }
                 DocumentBuilder builder = factory.newDocumentBuilder();
                 Document doc = builder.parse(is);
@@ -259,7 +261,15 @@ public class TcmbCurrencyService {
                         }
                         if (buyingIndex != -1) {
                             int start = json.indexOf("\"", buyingIndex + 6);
+                            if (start == -1) {
+                                log.warn("getGoldPrice: JSON değer başlangıcı bulunamadı");
+                                return new BigDecimal("2450.00");
+                            }
                             int end = json.indexOf("\"", start + 1);
+                            if (end == -1) {
+                                log.warn("getGoldPrice: JSON değer sonu bulunamadı");
+                                return new BigDecimal("2450.00");
+                            }
                             String val = json.substring(start + 1, end);
                             val = val.replace(".", "").replace(",", "."); 
                             return new BigDecimal(val.trim());

@@ -27,7 +27,7 @@ jobs:
         run: mvn test -B
 
       - name: Upload coverage report
-        if: always()
+        if: success() || failure()
         uses: actions/upload-artifact@v4
         with:
           name: jacoco-report
@@ -47,6 +47,7 @@ jobs:
 
       - name: Build and push to ghcr.io
         run: |
+          set -e
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u rasimtuzluoglu --password-stdin
           docker build -t ghcr.io/rasimtuzluoglu/raspel-fin:latest .
           docker push ghcr.io/rasimtuzluoglu/raspel-fin:latest

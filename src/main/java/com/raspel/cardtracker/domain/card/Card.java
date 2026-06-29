@@ -77,4 +77,10 @@ public class Card {
     @Column(name = "created_at", nullable = false, updatable = false)
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Min(10)
+    @Max(100)
+    @Column(name = "limit_warning_threshold", nullable = false)
+    @Builder.Default
+    private Integer limitWarningThreshold = 80;
 }

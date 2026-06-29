@@ -1,5 +1,7 @@
 package com.raspel.cardtracker.config;
 
+import com.raspel.cardtracker.domain.note.Note;
+import com.raspel.cardtracker.domain.note.NoteService;
 import com.raspel.cardtracker.domain.card.Card;
 import com.raspel.cardtracker.domain.card.CardService;
 import com.raspel.cardtracker.domain.cheque.Cheque;
@@ -18,6 +20,7 @@ import com.raspel.cardtracker.domain.settings.AppSettingsService;
 import com.raspel.cardtracker.ui.utils.FormatUtils;
 import com.raspel.cardtracker.ui.utils.HolidayUtils;
 import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.env.Environment;
 import org.springframework.stereotype.Component;
@@ -49,13 +52,16 @@ public class TelegramBotService extends TelegramLongPollingBot {
     private final ExpenseService expenseService;
     private final ChequeService chequeService;
     private final EmployeeService employeeService;
+    private final NoteService noteService;
     private final Environment environment;
     private final AppSettingsService appSettingsService;
     private final java.util.Set<String> sentAlerts;
+    private TelegramBotsApi botsApi;
+    private DefaultBotSession botSession;
 
     public TelegramBotService(UserService userService, CardService cardService,
                               ExpenseService expenseService, ChequeService chequeService,
-                              EmployeeService employeeService,
+                              EmployeeService employeeService, NoteService noteService,
                               Environment environment, AppSettingsService appSettingsService) {
         super(environment.getProperty("TELEGRAM_BOT_TOKEN", ""));
         this.userService = userService;
@@ -63,9 +69,11 @@ public class TelegramBotService extends TelegramLongPollingBot {
         this.expenseService = expenseService;
         this.chequeService = chequeService;
         this.employeeService = employeeService;
+        this.noteService = noteService;
         this.environment = environment;
         this.appSettingsService = appSettingsService;
-        this.sentAlerts = appSettingsService.getSentAlerts();
+        this.sentAlerts = java.util.concurrent.ConcurrentHashMap.newKeySet();
+        this.sentAlerts.addAll(appSettingsService.getSentAlerts());
     }
 
     @PostConstruct
@@ -74,12 +82,27 @@ public class TelegramBotService extends TelegramLongPollingBot {
             log.info("TELEGRAM_BOT_TOKEN tanımlı değil, Telegram bot devre dışı.");
         } else {
             try {
-                new TelegramBotsApi(DefaultBotSession.class).registerBot(this);
+                botsApi = new TelegramBotsApi(DefaultBotSession.class);
+                botSession = (DefaultBotSession) botsApi.registerBot(this);
                 registerCommands();
-                log.info("Telegram bot başlatıldı: @raspel_fin_bot (15 komut)");
+                log.info("Telegram bot başlatıldı: @raspel_fin_bot (16 komut)");
             } catch (TelegramApiException e) {
-                log.error("Bot kaydedilemedi: {}", e.getMessage());
+                log.error("Bot kaydedilemedi: {}", e.getMessage(), e);
+            } catch (Exception e) {
+                log.error("Bot başlatılamadı: {}", e.getMessage(), e);
             }
+        }
+    }
+
+    @PreDestroy
+    void shutdown() {
+        try {
+            if (botSession != null && botSession.isRunning()) {
+                botSession.stop();
+                log.info("Telegram bot session kapatıldı: @raspel_fin_bot");
+            }
+        } catch (Exception e) {
+            log.warn("Bot kapatılırken hata: {}", e.getMessage());
         }
     }
 
@@ -99,6 +122,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
                 new BotCommand("ismegore", "İsme göre kart ara"),
                 new BotCommand("gorevler", "Bekleyen görevler"),
                 new BotCommand("hesapkesim", "Yaklaşan hesap kesim tarihleri"),
+                new BotCommand("notlar", "Notlarınızı listeleyin"),
                 new BotCommand("baglantikes", "Bağlantıyı kes")
         );
         try { execute(new SetMyCommands(cmds, new BotCommandScopeDefault(), null)); }
@@ -109,41 +133,53 @@ public class TelegramBotService extends TelegramLongPollingBot {
 
     @Override
     public void onUpdateReceived(Update update) {
-        if (!update.hasMessage() || !update.getMessage().hasText()) return;
-        String text = update.getMessage().getText().trim();
-        Long chatId = update.getMessage().getChatId();
-        String fn = update.getMessage().getFrom().getFirstName();
+        try {
+            if (!update.hasMessage() || !update.getMessage().hasText()) return;
+            String text = update.getMessage().getText().trim();
+            Long chatId = update.getMessage().getChatId();
+            String fn = update.getMessage().getFrom() != null ? update.getMessage().getFrom().getFirstName() : "Kullanıcı";
 
-        switch (text.toLowerCase(java.util.Locale.ENGLISH)) {
-            case "/start" -> sendWelcome(chatId, fn);
-            case "/help" -> sendHelp(chatId);
-            case "/durum" -> sendStatus(chatId);
-            case "/ozet" -> sendSummary(chatId);
-            case "/kartlar" -> sendCards(chatId);
-            case "/bakiye" -> sendBalance(chatId);
-            case "/limit" -> sendLimits(chatId);
-            case "/odemeler" -> sendInstallments(chatId);
-            case "/gecikmeler" -> sendOverdue(chatId);
-            case "/cekler" -> sendCheques(chatId);
-            case "/sonharcamalar" -> sendRecent(chatId);
-            case "/gorevler" -> sendTasks(chatId);
-            case "/hesapkesim" -> sendStatementDates(chatId);
-            case "/baglantikes" -> sendDisconnect(chatId);
-            default -> {
-                if (text.toLowerCase(java.util.Locale.ENGLISH).startsWith("/ismegore ")) {
-                    sendCardsByName(chatId, text.substring(10).trim());
-                } else if (text.startsWith("/")) {
-                    sendMsg(chatId, "❌ Bilinmeyen komut. /help yazın.");
-                } else {
-                    handleCode(chatId, text);
+            switch (text.toLowerCase(java.util.Locale.ENGLISH)) {
+                case "/start" -> sendWelcome(chatId, fn);
+                case "/help" -> sendHelp(chatId);
+                case "/durum" -> sendStatus(chatId);
+                case "/ozet" -> sendSummary(chatId);
+                case "/kartlar" -> sendCards(chatId);
+                case "/bakiye" -> sendBalance(chatId);
+                case "/limit" -> sendLimits(chatId);
+                case "/odemeler" -> sendInstallments(chatId);
+                case "/gecikmeler" -> sendOverdue(chatId);
+                case "/cekler" -> sendCheques(chatId);
+                case "/sonharcamalar" -> sendRecent(chatId);
+                case "/gorevler" -> sendTasks(chatId);
+                case "/hesapkesim" -> sendStatementDates(chatId);
+                case "/notlar" -> sendNotes(chatId);
+                case "/baglantikes" -> sendDisconnect(chatId);
+                default -> {
+                    if (text.toLowerCase(java.util.Locale.ENGLISH).startsWith("/ismegore ")) {
+                        sendCardsByName(chatId, text.substring(10).trim());
+                    } else if (text.startsWith("/")) {
+                        sendMsg(chatId, "❌ Bilinmeyen komut. /help yazın.");
+                    } else {
+                        handleCode(chatId, text);
+                    }
                 }
             }
+        } catch (Exception e) {
+            log.error("Telegram komut hatası: {}", e.getMessage(), e);
+            try {
+                if (update.hasMessage() && update.getMessage().getChatId() != null) {
+                    sendMsg(update.getMessage().getChatId(), "⚠️ Bir hata oluştu. Lütfen daha sonra tekrar deneyin.");
+                }
+            } catch (Exception ignored) {}
         }
     }
 
     public void notifyUser(Long chatId, String message) { sendMsg(chatId, message); }
 
     public void checkAndNotifyLimits() {
+        cleanupOldAlerts();
+
         List<Card> cards = cardService.findAllActive();
         List<AppUser> connected = userService.findAllActive().stream()
                 .filter(u -> u.getTelegramChatId() != null).toList();
@@ -159,7 +195,8 @@ public class TelegramBotService extends TelegramLongPollingBot {
             BigDecimal unpaid = unpaidMap.getOrDefault(c.getId(), BigDecimal.ZERO);
             if (c.getCardLimit() == null || c.getCardLimit().compareTo(BigDecimal.ZERO) <= 0) continue;
             double pct = unpaid.divide(c.getCardLimit(), 4, RoundingMode.HALF_UP).doubleValue() * 100;
-            if (pct >= 80.0) {
+            int threshold = c.getLimitWarningThreshold() != null ? c.getLimitWarningThreshold() : 80;
+            if (pct >= threshold) {
                 String key = "limit_" + c.getId();
                 if (!sentAlerts.add(key)) continue;
                 String emoji = pct >= 95 ? "🔴" : pct >= 85 ? "🟠" : "🟡";
@@ -170,9 +207,9 @@ public class TelegramBotService extends TelegramLongPollingBot {
         }
 
         // 2. Overdue payments
-        List<InstallmentEntry> entries = expenseService.getInstallmentsForMonth(ym.getYear(), ym.getMonthValue());
-        if (!entries.isEmpty()) {
-            List<InstallmentEntry> overdue = entries.stream().filter(e -> !e.getIsPaid()).filter(e -> {
+        List<InstallmentEntry> allUnpaid = expenseService.getAllUnpaidInstallments();
+        if (!allUnpaid.isEmpty()) {
+            List<InstallmentEntry> overdue = allUnpaid.stream().filter(e -> !e.getIsPaid()).filter(e -> {
                 LocalDate due = calcDueDate(e);
                 return due.isBefore(today.plusDays(1));
             }).toList();
@@ -190,7 +227,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
             }
 
             // 3. Upcoming payments (within 3 days)
-            List<InstallmentEntry> upcoming = entries.stream().filter(e -> !e.getIsPaid()).filter(e -> {
+            List<InstallmentEntry> upcoming = allUnpaid.stream().filter(e -> !e.getIsPaid()).filter(e -> {
                 LocalDate due = calcDueDate(e);
                 long days = ChronoUnit.DAYS.between(today, due);
                 return days >= 0 && days <= 3;
@@ -265,15 +302,18 @@ public class TelegramBotService extends TelegramLongPollingBot {
                 sendMsg(u.getTelegramChatId(), msg);
             }
             log.info("Telegram bildirimi gönderildi: {} kullanıcı", connected.size());
-            try { appSettingsService.saveSentAlerts(sentAlerts); } catch (Exception ignored) {}
+            try { appSettingsService.saveSentAlerts(new java.util.HashSet<>(sentAlerts)); } catch (Exception e) { log.warn("Sent alerts kaydedilemedi", e); }
         }
     }
 
     private LocalDate calcDueDate(InstallmentEntry e) {
         YearMonth ym = YearMonth.of(e.getDueYear(), e.getDueMonth());
-        int cd = Math.min(e.getExpense().getCard().getClosingDay(), ym.lengthOfMonth());
+        Card card = e.getExpense().getCard();
+        int closingDay = card != null && card.getClosingDay() != null ? card.getClosingDay() : 1;
+        int dueDay = card != null && card.getDueDay() != null ? card.getDueDay() : 10;
+        int cd = Math.min(closingDay, ym.lengthOfMonth());
         return HolidayUtils.getNextBusinessDay(
-                LocalDate.of(e.getDueYear(), e.getDueMonth(), cd).plusDays(e.getExpense().getCard().getDueDay()));
+                LocalDate.of(e.getDueYear(), e.getDueMonth(), cd).plusDays(dueDay));
     }
 
     // ── /ismegore ──
@@ -283,7 +323,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
         if (nameFilter.isEmpty()) { sendMsg(chatId, "Kullanım: /ismegore KartAdı\nÖrnek: /ismegore Visa"); return; }
 
         List<Card> cards = cardService.findAllActive().stream()
-                .filter(c -> c.getName().toLowerCase(java.util.Locale.forLanguageTag("tr-TR")).contains(nameFilter.toLowerCase(java.util.Locale.forLanguageTag("tr-TR"))))
+                .filter(c -> c.getName() != null && c.getName().toLowerCase(java.util.Locale.forLanguageTag("tr-TR")).contains(nameFilter.toLowerCase(java.util.Locale.forLanguageTag("tr-TR"))))
                 .toList();
         if (cards.isEmpty()) { sendMsg(chatId, "\"" + esc(nameFilter) + "\" ile eşleşen kart bulunamadı."); return; }
 
@@ -325,6 +365,8 @@ public class TelegramBotService extends TelegramLongPollingBot {
                 sb.append("  👤 ").append(esc(t.getAssignedTo().getFullName())).append("\n");
             if (t.getDueDate() != null)
                 sb.append("  📅 ").append(t.getDueDate().format(DateTimeFormatter.ofPattern("dd.MM.yyyy"))).append("\n");
+            if (t.getDescription() != null && !t.getDescription().trim().isEmpty())
+                sb.append("  📝 ").append(esc(t.getDescription())).append("\n");
             sb.append("\n");
         }
         sendMsg(chatId, sb.toString());
@@ -338,9 +380,11 @@ public class TelegramBotService extends TelegramLongPollingBot {
 
         LocalDate today = LocalDate.now();
         StringBuilder sb = new StringBuilder("<b>📅 Yaklaşan Hesap Kesim Tarihleri</b>\n\n");
+        boolean hasStatements = false;
 
         for (Card card : cards) {
             if (card.getClosingDay() == null) continue;
+            hasStatements = true;
             int closingDay = card.getClosingDay();
             LocalDate statementDate = LocalDate.of(today.getYear(), today.getMonthValue(), Math.min(closingDay, today.lengthOfMonth()));
             if (today.isAfter(statementDate)) {
@@ -363,7 +407,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
             sb.append("\n");
         }
 
-        if (sb.toString().equals("<b>📅 Yaklaşan Hesap Kesim Tarihleri</b>\n\n")) {
+        if (!hasStatements) {
             sendMsg(chatId, "Hesap kesim bilgisi bulunamadı.");
             return;
         }
@@ -382,6 +426,41 @@ public class TelegramBotService extends TelegramLongPollingBot {
                 "/help ile tüm komutları görebilirsiniz.");
     }
 
+    // ── /notlar ──
+    private void sendNotes(Long chatId) {
+        var u = getUser(chatId);
+        if (u.isEmpty()) { sendNotConnected(chatId); return; }
+        List<Note> notes = noteService.findAllByUser(u.get().getUsername());
+        if (notes.isEmpty()) { sendMsg(chatId, "📝 Henüz not eklenmemiş. Web panelden not ekleyebilirsiniz."); return; }
+
+        StringBuilder sb = new StringBuilder("<b>📝 Notlarınız</b>\n\n");
+        int count = 0;
+        for (Note note : notes) {
+            if (count++ >= 10) { sb.append("\n<i>...ve " + (notes.size() - 10) + " not daha</i>"); break; }
+            String pinIcon = note.getPinned() ? "📌 " : "";
+            sb.append(pinIcon).append("<b>").append(esc(note.getTitle())).append("</b>\n");
+            if (note.getContent() != null && !note.getContent().trim().isEmpty()) {
+                String content = note.getContent();
+                if (content.length() > 100) content = content.substring(0, 100) + "...";
+                sb.append("  ").append(esc(content)).append("\n");
+            }
+            if (note.getCategory() != null)
+                sb.append("  🏷 ").append(esc(note.getCategory()));
+            if (note.getReminderAt() != null)
+                sb.append("  ⏰ ").append(note.getReminderAt().format(DateTimeFormatter.ofPattern("dd.MM HH:mm")));
+            sb.append("\n\n");
+        }
+        sendMsg(chatId, sb.toString());
+    }
+
+    private void cleanupOldAlerts() {
+        if (sentAlerts.size() > 1000) {
+            sentAlerts.clear();
+            try { appSettingsService.saveSentAlerts(new java.util.HashSet<>()); } catch (Exception ignored) {}
+            log.info("sentAlerts temizlendi (bellek yönetimi)");
+        }
+    }
+
     private void sendHelp(Long chatId) {
         sendMsg(chatId, "<b>📋 Komutlar</b>\n\n" +
                 "/start - Başlangıç\n/help - Bu menü\n/durum - Bağlantı bilgisi\n" +
@@ -390,7 +469,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
                 "/odemeler - Bu ay taksitler\n/gecikmeler - <b>Geciken ödemeler</b>\n" +
                 "/cekler - Portföy çekleri\n/sonharcamalar - Son harcamalar\n" +
                 "/ismegore Visa - <b>İsme göre kart ara</b>\n/gorevler - <b>Bekleyen görevler</b>\n" +
-                "/hesapkesim - <b>Yaklaşan hesap kesim tarihleri</b>\n" +
+                "/hesapkesim - <b>Yaklaşan hesap kesim tarihleri</b>\n/notlar - <b>Notlarınızı listeleyin</b>\n" +
                 "/baglantikes - Bağlantıyı kes\n\n<b>Bağlantı:</b> Web panel → Profilim → Telegram'a Bağlan → Kodu gönder");
     }
 
@@ -413,10 +492,9 @@ public class TelegramBotService extends TelegramLongPollingBot {
         LocalDate today = LocalDate.now();
         YearMonth ym = YearMonth.now();
         List<InstallmentEntry> monthEntries = expenseService.getInstallmentsForMonth(ym.getYear(), ym.getMonthValue());
-        long overdueCount = monthEntries.stream().filter(e -> !e.getIsPaid() &&
-                HolidayUtils.getNextBusinessDay(LocalDate.of(e.getDueYear(), e.getDueMonth(),
-                        Math.min(e.getExpense().getCard().getClosingDay(), YearMonth.of(e.getDueYear(), e.getDueMonth()).lengthOfMonth()))
-                        .plusDays(e.getExpense().getCard().getDueDay())).isBefore(today)).count();
+        List<InstallmentEntry> allUnpaid = expenseService.getAllUnpaidInstallments();
+        long overdueCount = allUnpaid.stream()
+                .filter(e -> calcDueDate(e).isBefore(today)).count();
 
         List<Cheque> cheques = chequeService.findAll();
         long incomingCheques = cheques.stream().filter(c -> c.getType() == ChequeType.ENTERING && c.getStatus() == ChequeStatus.PORTFOLIO).count();
@@ -512,11 +590,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
         List<InstallmentEntry> entries = expenseService.getInstallmentsForMonth(ym.getYear(), ym.getMonthValue());
         if (entries.isEmpty()) { sendMsg(chatId, "Bu ay taksit yok."); return; }
 
-        entries.sort(Comparator.comparing(e -> {
-            YearMonth ym2 = YearMonth.of(e.getDueYear(), e.getDueMonth());
-            int cd = Math.min(e.getExpense().getCard().getClosingDay(), ym2.lengthOfMonth());
-            return HolidayUtils.getNextBusinessDay(LocalDate.of(e.getDueYear(), e.getDueMonth(), cd).plusDays(e.getExpense().getCard().getDueDay()));
-        }));
+        entries.sort(Comparator.comparing(this::calcDueDate));
 
         StringBuilder sb = new StringBuilder("<b>📅 Bu Ayki Ödemeler</b>\n\n");
         int cnt = 0;
@@ -525,9 +599,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
             String cn = e.getExpense().getCard() != null ? e.getExpense().getCard().getName() : "-";
             String desc = e.getExpense().getDescription() != null ? e.getExpense().getDescription() : "";
             if (desc.length() > 22) desc = desc.substring(0, 22) + "...";
-            YearMonth ym2 = YearMonth.of(e.getDueYear(), e.getDueMonth());
-            int cd = Math.min(e.getExpense().getCard().getClosingDay(), ym2.lengthOfMonth());
-            LocalDate due = HolidayUtils.getNextBusinessDay(LocalDate.of(e.getDueYear(), e.getDueMonth(), cd).plusDays(e.getExpense().getCard().getDueDay()));
+            LocalDate due = calcDueDate(e);
             String st = e.getIsPaid() ? "✅" : "⏳";
             sb.append(st).append(" <b>").append(esc(cn)).append("</b> ").append(FormatUtils.formatNumber(e.getAmount())).append(" ₺\n");
             sb.append("  ").append(esc(desc)).append(" | ").append(due.format(DateTimeFormatter.ofPattern("dd.MM"))).append("\n\n");
@@ -539,19 +611,16 @@ public class TelegramBotService extends TelegramLongPollingBot {
     private void sendOverdue(Long chatId) {
         var u = getUser(chatId); if (u.isEmpty()) { sendNotConnected(chatId); return; }
         LocalDate today = LocalDate.now();
+        List<InstallmentEntry> allUnpaid = expenseService.getAllUnpaidInstallments();
         List<InstallmentEntry> all = expenseService.getInstallmentsForMonth(today.getYear(), today.getMonthValue());
 
-        List<InstallmentEntry> overdue = all.stream().filter(e -> !e.getIsPaid()).filter(e -> {
-            YearMonth ym = YearMonth.of(e.getDueYear(), e.getDueMonth());
-            int cd = Math.min(e.getExpense().getCard().getClosingDay(), ym.lengthOfMonth());
-            LocalDate due = HolidayUtils.getNextBusinessDay(LocalDate.of(e.getDueYear(), e.getDueMonth(), cd).plusDays(e.getExpense().getCard().getDueDay()));
+        List<InstallmentEntry> overdue = allUnpaid.stream().filter(e -> {
+            LocalDate due = calcDueDate(e);
             return due.isBefore(today);
-        }).toList();
+        }).sorted(java.util.Comparator.comparing(this::calcDueDate)).toList();
 
         List<InstallmentEntry> upcoming = all.stream().filter(e -> !e.getIsPaid()).filter(e -> {
-            YearMonth ym = YearMonth.of(e.getDueYear(), e.getDueMonth());
-            int cd = Math.min(e.getExpense().getCard().getClosingDay(), ym.lengthOfMonth());
-            LocalDate due = HolidayUtils.getNextBusinessDay(LocalDate.of(e.getDueYear(), e.getDueMonth(), cd).plusDays(e.getExpense().getCard().getDueDay()));
+            LocalDate due = calcDueDate(e);
             long days = ChronoUnit.DAYS.between(today, due);
             return days >= 0 && days <= 7;
         }).toList();
@@ -566,9 +635,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
             sb.append("<b>🔴 GECİKMİŞ:</b>\n");
             for (InstallmentEntry e : overdue) {
                 String cn = e.getExpense().getCard() != null ? e.getExpense().getCard().getName() : "-";
-                YearMonth ym = YearMonth.of(e.getDueYear(), e.getDueMonth());
-                int cd = Math.min(e.getExpense().getCard().getClosingDay(), ym.lengthOfMonth());
-                LocalDate due = HolidayUtils.getNextBusinessDay(LocalDate.of(e.getDueYear(), e.getDueMonth(), cd).plusDays(e.getExpense().getCard().getDueDay()));
+                LocalDate due = calcDueDate(e);
                 long days = ChronoUnit.DAYS.between(due, today);
                 sb.append("• <b>").append(esc(cn)).append("</b> ").append(FormatUtils.formatNumber(e.getAmount())).append(" ₺ (").append(days).append(" gün)\n");
             }
@@ -578,9 +645,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
             sb.append("<b>🟡 7 GÜN İÇİNDE:</b>\n");
             for (InstallmentEntry e : upcoming) {
                 String cn = e.getExpense().getCard() != null ? e.getExpense().getCard().getName() : "-";
-                YearMonth ym = YearMonth.of(e.getDueYear(), e.getDueMonth());
-                int cd = Math.min(e.getExpense().getCard().getClosingDay(), ym.lengthOfMonth());
-                LocalDate due = HolidayUtils.getNextBusinessDay(LocalDate.of(e.getDueYear(), e.getDueMonth(), cd).plusDays(e.getExpense().getCard().getDueDay()));
+                LocalDate due = calcDueDate(e);
                 long days = ChronoUnit.DAYS.between(today, due);
                 sb.append("• <b>").append(esc(cn)).append("</b> ").append(FormatUtils.formatNumber(e.getAmount())).append(" ₺ (").append(days).append(" gün kaldı)\n");
             }
@@ -662,10 +727,11 @@ public class TelegramBotService extends TelegramLongPollingBot {
     private Optional<AppUser> getUser(Long chatId) { return userService.findByTelegramChatId(chatId); }
     private void sendNotConnected(Long chatId) { sendMsg(chatId, "⚠️ Hesabınız bağlı değil.\nWeb panel → Profilim → Telegram'a Bağlan → kodu gönderin."); }
     private void sendMsg(Long chatId, String text) {
+        if (chatId == null) return;
         try { execute(SendMessage.builder().chatId(chatId.toString()).text(text).parseMode("HTML").disableWebPagePreview(true).build()); }
         catch (TelegramApiException e) { log.error("Mesaj hatası: {}", e.getMessage()); }
     }
-    private String esc(String t) { return t == null ? "" : t.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"); }
+    private String esc(String t) { return t == null ? "" : t.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\"", "&quot;"); }
     private String progressBar(double pct) {
         int n = (int)(pct / 10);
         StringBuilder b = new StringBuilder();

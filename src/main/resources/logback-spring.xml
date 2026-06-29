@@ -16,8 +16,21 @@
     <springProfile name="!production">
         <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
         <include resource="org/springframework/boot/logging/logback/console-appender.xml"/>
+        <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
+            <file>logs/cardtracker.log</file>
+            <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+                <fileNamePattern>logs/cardtracker.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+                <maxHistory>30</maxHistory>
+                <maxFileSize>50MB</maxFileSize>
+                <totalSizeCap>1GB</totalSizeCap>
+            </rollingPolicy>
+            <encoder>
+                <pattern>%d{yyyy-MM-dd HH:mm:ss} %-5level [%thread] %logger{36} - %msg%n</pattern>
+            </encoder>
+        </appender>
         <root level="INFO">
             <appender-ref ref="CONSOLE"/>
+            <appender-ref ref="FILE"/>
         </root>
     </springProfile>
 </configuration>

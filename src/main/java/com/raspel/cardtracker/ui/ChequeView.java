@@ -20,7 +20,7 @@ import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.textfield.TextField;
-import com.vaadin.flow.data.provider.ListDataProvider;
+import com.vaadin.flow.data.provider.CallbackDataProvider;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.vaadin.flow.server.StreamResource;
@@ -39,6 +39,7 @@ import com.raspel.cardtracker.ui.utils.FormatUtils;
 import com.raspel.cardtracker.ui.utils.HolidayUtils;
 import com.raspel.cardtracker.ui.utils.TurkishDatePickerI18n;
 import jakarta.annotation.security.PermitAll;
+import org.springframework.data.domain.PageRequest;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -68,8 +69,6 @@ public class ChequeView extends VerticalLayout {
     private final Span totalIncomingSpan = new Span("0,00 ₺");
     private final Span totalOutgoingSpan = new Span("0,00 ₺");
     private final Div emptyState = new Div();
-
-    private ListDataProvider<Cheque> dataProvider;
 
     public ChequeView(ChequeService chequeService, ContactService contactService,
                       AuditLogService auditLogService,
@@ -210,7 +209,7 @@ public class ChequeView extends VerticalLayout {
     }
 
     private void exportExcel() {
-        List<Cheque> all = dataProvider != null ? new ArrayList<>(dataProvider.getItems()) : new ArrayList<>();
+        List<Cheque> all = chequeService.findAll();
         StreamResource resource = new StreamResource(
                 "cekler_raporu.xlsx",
                 () -> excelExportService.exportCheques(all)
@@ -219,7 +218,7 @@ public class ChequeView extends VerticalLayout {
     }
 
     private void exportPdf() {
-        List<Cheque> all = dataProvider != null ? new ArrayList<>(dataProvider.getItems()) : new ArrayList<>();
+        List<Cheque> all = chequeService.findAll();
         StreamResource resource = new StreamResource(
                 "cekler_raporu.pdf",
                 () -> pdfExportService.exportCheques(all)
@@ -428,6 +427,13 @@ public class ChequeView extends VerticalLayout {
                 return;
             }
 
+            String chequeNo = chequeNoField.getValue().trim();
+            if (!chequeNo.matches("\\d{11}")) {
+                Notification.show("Çek numarası tam olarak 11 rakam olmalıdır", 4000, Notification.Position.BOTTOM_CENTER)
+                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                return;
+            }
+
             BigDecimal amountVal = FormatUtils.parseTurkishCurrency(amountField.getValue());
             if (amountVal.compareTo(BigDecimal.ZERO) <= 0) {
                 Notification.show("Lütfen geçerli bir tutar girin", 3000, Notification.Position.BOTTOM_CENTER)
@@ -441,7 +447,7 @@ public class ChequeView extends VerticalLayout {
                 return;
             }
 
-            targetCheque.setChequeNumber(chequeNoField.getValue().trim());
+            targetCheque.setChequeNumber(chequeNo);
             targetCheque.setBank(bankField.getValue().trim());
             targetCheque.setMaturityDate(maturityField.getValue());
             targetCheque.setAmount(amountVal);
@@ -450,8 +456,8 @@ public class ChequeView extends VerticalLayout {
             targetCheque.setStatus(statusField.getValue());
             targetCheque.setDescription(descField.getValue().trim());
 
-            if (isNew || !chequeNoField.getValue().trim().equals(cheque.getChequeNumber())) {
-                Optional<Cheque> existing = chequeService.findByChequeNumber(chequeNoField.getValue().trim());
+            if (isNew || !chequeNo.equals(cheque.getChequeNumber())) {
+                Optional<Cheque> existing = chequeService.findByChequeNumber(chequeNo);
                 if (existing.isPresent() && (isNew || !existing.get().getId().equals(cheque.getId()))) {
                     Notification.show("Bu çek numarası zaten kayıtlı", 3000, Notification.Position.BOTTOM_CENTER)
                             .addThemeVariants(NotificationVariant.LUMO_ERROR);
@@ -596,66 +602,36 @@ public class ChequeView extends VerticalLayout {
     }
 
     private void loadData() {
-        try {
-        String term = searchFilter.getValue().trim();
-        List<Cheque> all;
-        if (!term.isEmpty()) {
-            all = chequeService.searchByTerm(term);
-        } else {
-            all = chequeService.findAll();
-        }
+        final String term = searchFilter.getValue().trim();
+        final String typeVal = typeFilter.getValue();
+        final ChequeStatus statusVal = statusFilter.getValue();
 
-        BigDecimal incomingPortfolioSum = all.stream()
-                .filter(c -> c.getType() == ChequeType.ENTERING && c.getStatus() == ChequeStatus.PORTFOLIO)
-                .map(Cheque::getAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        ChequeType type = null;
+        if ("Giriş Çekleri".equals(typeVal)) type = ChequeType.ENTERING;
+        else if ("Çıkış Çekleri".equals(typeVal)) type = ChequeType.EXITING;
+        final ChequeType finalType = type;
 
-        BigDecimal outgoingPortfolioSum = all.stream()
-                .filter(c -> c.getType() == ChequeType.EXITING && c.getStatus() == ChequeStatus.PORTFOLIO)
-                .map(Cheque::getAmount)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        final LocalDate startDate = startDateFilter.getValue();
+        final LocalDate endDate = endDateFilter.getValue();
 
+        // Update portfolio sums from DB
+        BigDecimal incomingPortfolioSum = chequeService.sumAmountByTypeAndStatus(ChequeType.ENTERING, ChequeStatus.PORTFOLIO);
+        BigDecimal outgoingPortfolioSum = chequeService.sumAmountByTypeAndStatus(ChequeType.EXITING, ChequeStatus.PORTFOLIO);
         totalIncomingSpan.setText(FormatUtils.formatNumber(incomingPortfolioSum) + " ₺");
         totalOutgoingSpan.setText(FormatUtils.formatNumber(outgoingPortfolioSum) + " ₺");
 
-        String typeVal = typeFilter.getValue();
-        ChequeStatus statusVal = statusFilter.getValue();
-
-        List<Cheque> filtered = all.stream().filter(c -> {
-            if ("Giriş Çekleri".equals(typeVal)) {
-                if (c.getType() != ChequeType.ENTERING) return false;
-            } else if ("Çıkış Çekleri".equals(typeVal)) {
-                if (c.getType() != ChequeType.EXITING) return false;
-            }
-
-            if (statusVal != null) {
-                if (c.getStatus() != statusVal) return false;
-            }
-
-            LocalDate startDate = startDateFilter.getValue();
-            LocalDate endDate = endDateFilter.getValue();
-            if (startDate != null && c.getMaturityDate().isBefore(startDate)) return false;
-            if (endDate != null && c.getMaturityDate().isAfter(endDate)) return false;
-
-            return true;
-        }).toList();
-
-        dataProvider = new ListDataProvider<>(filtered);
-        grid.setItems(dataProvider);
-
-        if (filtered.isEmpty()) {
-            grid.setVisible(false);
-            emptyState.getStyle().set("display", "flex");
-        } else {
-            grid.setVisible(true);
-            emptyState.getStyle().set("display", "none");
-        }
-        } catch (Exception ex) {
-            grid.setVisible(false);
-            emptyState.getStyle().set("display", "flex");
-            Notification.show("Veri yüklenirken hata oluştu.", 3000, Notification.Position.BOTTOM_CENTER)
-                    .addThemeVariants(NotificationVariant.LUMO_ERROR);
-        }
+        grid.setItems(new CallbackDataProvider<>(
+                query -> {
+                    var page = chequeService.findFilteredPaged(term, finalType, statusVal, startDate, endDate,
+                            PageRequest.of(query.getPage(), query.getPageSize()));
+                    return page.getContent().stream();
+                },
+                query -> {
+                    var page = chequeService.findFilteredPaged(term, finalType, statusVal, startDate, endDate,
+                            PageRequest.of(query.getPage(), query.getPageSize()));
+                    return (int) page.getTotalElements();
+                }
+        ));
     }
 
     private void applyFilters() {

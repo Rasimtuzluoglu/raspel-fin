@@ -2,6 +2,8 @@ package com.raspel.cardtracker.domain.audit;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -63,6 +65,14 @@ public class AuditLogService {
     }
 
     @Transactional(readOnly = true)
+    public Page<AuditLog> findFilteredPaged(String username, AuditAction action, String entityType,
+                                            LocalDateTime startDate, LocalDateTime endDate, String term, Pageable pageable) {
+        String actionStr = action != null ? action.name() : null;
+        String searchTerm = term != null && !term.trim().isEmpty() ? term.trim() : null;
+        return auditLogRepository.findFilteredPaged(username, actionStr, entityType, startDate, endDate, searchTerm, pageable);
+    }
+
+    @Transactional(readOnly = true)
     public List<AuditLog> findByUsername(String username) {
         return auditLogRepository.findByUsernameOrderByCreatedAtDesc(username);
     }
@@ -81,6 +91,10 @@ public class AuditLogService {
         LocalDateTime cutoffDate = LocalDateTime.now().minusYears(1);
         int deletedCount = auditLogRepository.deleteOlderThan(cutoffDate);
         log.info("{} adet eski audit log kaydı silindi (1 yıldan eski)", deletedCount);
+    }
+
+    public void deleteByEntityTypeAndId(String entityType, Long entityId) {
+        auditLogRepository.deleteByEntityTypeAndId(entityType, entityId);
     }
 
     private String getCurrentUsername() {

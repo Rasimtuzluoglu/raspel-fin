@@ -18,4 +18,6 @@ public interface CardRepository extends JpaRepository<Card, Long> {
     List<Card> findByBank(@Param("bank") String bank);
     @Query("SELECT c FROM Card c LEFT JOIN FETCH c.department WHERE c.department = :department")
     List<Card> findByDepartment(@Param("department") Department department);
+
+    boolean existsByNameIgnoreCaseAndIdNot(String name, Long id);
 }

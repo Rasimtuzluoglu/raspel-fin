@@ -15,9 +15,6 @@ import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 @EnableWebSecurity
 public class SecurityConfig extends VaadinWebSecurity {
 
-    // CSRF protection is handled automatically by VaadinWebSecurity.
-    // Vaadin uses a double-submit cookie pattern; no explicit CSRF configuration needed.
-
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
@@ -28,13 +25,25 @@ public class SecurityConfig extends VaadinWebSecurity {
         http.authorizeHttpRequests(auth -> auth
                 .requestMatchers(new AntPathRequestMatcher("/images/**")).permitAll()
                 .requestMatchers(new AntPathRequestMatcher("/line-awesome/**")).permitAll()
-                .requestMatchers(new AntPathRequestMatcher("/swagger-ui/**")).permitAll()
-                .requestMatchers(new AntPathRequestMatcher("/swagger-ui.html")).permitAll()
-                .requestMatchers(new AntPathRequestMatcher("/v3/api-docs/**")).permitAll()
-                .requestMatchers(new AntPathRequestMatcher("/api-docs/**")).permitAll()
+        );
+
+        http.authorizeHttpRequests(auth -> auth
+                .requestMatchers(new AntPathRequestMatcher("/actuator/health")).permitAll()
+                .requestMatchers(new AntPathRequestMatcher("/actuator/**")).hasRole("ADMIN")
+                .requestMatchers(new AntPathRequestMatcher("/swagger-ui/**")).hasRole("ADMIN")
+                .requestMatchers(new AntPathRequestMatcher("/swagger-ui.html")).hasRole("ADMIN")
+                .requestMatchers(new AntPathRequestMatcher("/v3/api-docs/**")).hasRole("ADMIN")
+                .requestMatchers(new AntPathRequestMatcher("/api-docs/**")).hasRole("ADMIN")
+                .requestMatchers(new AntPathRequestMatcher("/api/**")).authenticated()
         );
 
         http.sessionManagement(session -> session.maximumSessions(1).expiredUrl("/login?expired"));
+
+        http.headers(headers -> headers
+                .frameOptions(frame -> frame.sameOrigin())
+        );
+
+        http.csrf(csrf -> csrf.ignoringRequestMatchers(new AntPathRequestMatcher("/api/**")));
 
         super.configure(http);
         setLoginView(http, LoginView.class);

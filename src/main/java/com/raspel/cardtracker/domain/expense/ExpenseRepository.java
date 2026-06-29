@@ -45,6 +45,8 @@ public interface ExpenseRepository extends JpaRepository<Expense, Long> {
 
     long countByCreatedBy(String createdBy);
 
+    long countByCardId(Long cardId);
+
     @Query("SELECT e FROM Expense e JOIN FETCH e.card LEFT JOIN FETCH e.contact WHERE e.createdBy = :createdBy ORDER BY e.createdAt DESC")
     List<Expense> findRecentByCreatedBy(@Param("createdBy") String createdBy, org.springframework.data.domain.Pageable pageable);
 

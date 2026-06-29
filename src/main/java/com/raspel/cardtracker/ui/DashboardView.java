@@ -75,6 +75,10 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
     
     private DashboardConfig currentConfig;
     private VerticalLayout dashboardContent;
+    private List<Card> cachedCards;
+    private Map<Long, BigDecimal> cachedUnpaidMap;
+    private List<InstallmentEntry> cachedMonthInstallments;
+    private YearMonth cachedYearMonth;
 
     public DashboardView(ExpenseService expenseService, CardService cardService,
                          TcmbCurrencyService currencyService,
@@ -116,6 +120,11 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         String username = auth != null ? auth.getName() : "system";
         currentConfig = userService.getDashboardConfig(username);
+
+        cachedYearMonth = YearMonth.now();
+        cachedCards = cardService.findAllActive();
+        cachedUnpaidMap = cachedCards.isEmpty() ? java.util.Collections.emptyMap() : expenseService.getUnpaidBalancesGroupedByCard();
+        cachedMonthInstallments = expenseService.getInstallmentsForMonth(cachedYearMonth.getYear(), cachedYearMonth.getMonthValue());
         
         getUI().ifPresent(ui -> ui.getPage().executeJs(
             "window._dashScrollY = window.scrollY || window.pageYOffset; return window._dashScrollY;"
@@ -144,16 +153,15 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
             "  window.scrollTo(0, window._dashScrollY);" +
             "  delete window._dashScrollY;" +
             "}" +
-            // Tum ApexCharts tooltip'lerine TL formati ekle (surekli calisir)
             "if(!window.__tooltipPatched){" +
             "window.__tooltipPatched=true;" +
-            "var fmt=new Intl.NumberFormat('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2});" +
-            "setInterval(function(){" +
-            "  document.querySelectorAll('.apexcharts-tooltip-text-y-value:not([data-fmt])').forEach(function(v){" +
-            "    var num=parseFloat(v.textContent.replace(/[^0-9.-]/g,''));" +
-            "    if(!isNaN(num)){v.textContent=fmt.format(num)+' ₺';v.setAttribute('data-fmt','1');}" +
-            "  });" +
-            "},300);" +
+            "var fmt=new Intl.NumberFormat('tr-TR',{minimumFractionDigits:0,maximumFractionDigits:1});" +
+            "function patchCurrency(){document.querySelectorAll('.apexcharts-tooltip-text-y-value:not([data-fmt]), .apexcharts-text.apexcharts-yaxis-label:not([data-fmt])').forEach(function(v){" +
+            "  var num=parseFloat(v.textContent.replace(/[^0-9.-]/g,''));" +
+            "  if(!isNaN(num)){v.textContent=fmt.format(num)+'₺';v.setAttribute('data-fmt','1');}" +
+            "});}" +
+            "patchCurrency();" +
+            "setInterval(patchCurrency,500);" +
             "}"
         );
     }
@@ -197,21 +205,18 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
                 .set("display", "block")
                 .set("margin-bottom", "0.5em");
 
-        YearMonth now = YearMonth.now();
-        List<InstallmentEntry> monthInstallments = expenseService.getInstallmentsForMonth(now.getYear(), now.getMonthValue());
-        long unpaidPayments = monthInstallments.stream().filter(e -> !e.getIsPaid()).count();
+        long unpaidPayments = cachedMonthInstallments.stream().filter(e -> !e.getIsPaid()).count();
 
         long pendingTasks = employeeService.findAllTasks().stream()
                 .filter(t -> t.getStatus() != TaskStatus.COMPLETED)
                 .count();
 
-        List<Card> activeCards = cardService.findAllActive();
-        Map<Long, BigDecimal> unpaidMap = expenseService.getUnpaidBalancesGroupedByCard();
-        long limitWarnings = activeCards.stream()
+        long limitWarnings = cachedCards.stream()
                 .filter(c -> c.getCardLimit() != null && c.getCardLimit().compareTo(BigDecimal.ZERO) > 0)
                 .filter(c -> {
-                    BigDecimal unpaid = unpaidMap.getOrDefault(c.getId(), BigDecimal.ZERO);
-                    return unpaid.divide(c.getCardLimit(), 4, RoundingMode.HALF_UP).doubleValue() >= 0.80;
+                    BigDecimal unpaid = cachedUnpaidMap.getOrDefault(c.getId(), BigDecimal.ZERO);
+                    int threshold = c.getLimitWarningThreshold() != null ? c.getLimitWarningThreshold() : 80;
+                    return unpaid.divide(c.getCardLimit(), 4, RoundingMode.HALF_UP).doubleValue() * 100 >= threshold;
                 })
                 .count();
 
@@ -268,17 +273,16 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
         warningsLayout.setPadding(false);
         warningsLayout.setSpacing(true);
 
-        List<Card> activeCards = cardService.findAllActive();
-        Map<Long, BigDecimal> unpaidMap = expenseService.getUnpaidBalancesGroupedByCard();
-        for (Card card : activeCards) {
-            BigDecimal unpaid = unpaidMap.getOrDefault(card.getId(), BigDecimal.ZERO);
+        for (Card card : cachedCards) {
+            BigDecimal unpaid = cachedUnpaidMap.getOrDefault(card.getId(), BigDecimal.ZERO);
             BigDecimal limit = card.getCardLimit();
             
             if (limit != null && limit.compareTo(BigDecimal.ZERO) > 0) {
                 double pct = unpaid.divide(limit, 4, RoundingMode.HALF_UP).doubleValue() * 100;
-                
-                // %80 limit doluluk uyarısı
-                if (pct >= 80.0) {
+                int threshold = card.getLimitWarningThreshold() != null ? card.getLimitWarningThreshold() : 80;
+
+                // % limit doluluk uyarisi
+                if (pct >= threshold) {
                     Div banner = new Div();
                     banner.getStyle()
                             .set("background-color", "#FFEBEE")
@@ -367,9 +371,8 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
         int month = now.getMonthValue();
 
         BigDecimal totalThisMonth = expenseService.getTotalForMonth(year, month);
-        long activeCards = cardService.findAllActive().size();
-        List<com.raspel.cardtracker.domain.expense.InstallmentEntry> monthInstallments = expenseService.getInstallmentsForMonth(year, month);
-        int installmentCount = monthInstallments.size();
+        long activeCards = cachedCards.size();
+        int installmentCount = cachedMonthInstallments.size();
 
         Map<String, BigDecimal> projection = expenseService.getMonthlyProjection(6);
         BigDecimal totalDebt = projection.values().stream().reduce(BigDecimal.ZERO, BigDecimal::add);
@@ -649,7 +652,7 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
         scheduleList.setPadding(false);
         scheduleList.setSpacing(true);
 
-        List<Card> activeCards = cardService.findAllActive();
+        List<Card> activeCards = cachedCards;
         
         List<CardSchedule> cardSchedules = new ArrayList<>();
         LocalDate today = LocalDate.now();
@@ -752,10 +755,8 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
     }
 
     private ApexCharts createBarChart() {
-        YearMonth now = YearMonth.now();
-        List<Card> cards = cardService.findAllActive();
         Map<String, BigDecimal> cardTotals = expenseService.getCardTotalsForMonth(
-                now.getYear(), now.getMonthValue(), cards);
+                cachedYearMonth.getYear(), cachedYearMonth.getMonthValue(), cachedCards);
 
         List<String> categories = new ArrayList<>();
         List<Double> data = new ArrayList<>();
@@ -911,7 +912,7 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
 
     private ApexCharts createCategoryPieChart() {
         YearMonth now = YearMonth.now();
-        List<InstallmentEntry> monthInstallments = expenseService.getInstallmentsForMonth(now.getYear(), now.getMonthValue());
+        List<InstallmentEntry> monthInstallments = cachedMonthInstallments;
 
         Map<String, BigDecimal> categoryTotals = new java.util.HashMap<>();
         for (InstallmentEntry entry : monthInstallments) {

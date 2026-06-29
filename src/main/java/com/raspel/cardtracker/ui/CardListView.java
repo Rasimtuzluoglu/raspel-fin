@@ -301,12 +301,12 @@ public class CardListView extends VerticalLayout {
         ComboBox<ColorOption> colorField = new ComboBox<>("Renk");
         List<ColorOption> colorOptions = Arrays.asList(
             new ColorOption("Mavi", "#1976D2"),
-            new ColorOption("Yesil", "#2E7D32"),
-            new ColorOption("Kirmizi", "#D32F2F"),
+            new ColorOption("Yeşil", "#2E7D32"),
+            new ColorOption("Kırmızı", "#D32F2F"),
             new ColorOption("Turuncu", "#E65100"),
             new ColorOption("Gri", "#607D8B"),
             new ColorOption("Mor", "#7B1FA2"),
-            new ColorOption("Sari", "#FBC02D"),
+            new ColorOption("Sarı", "#FBC02D"),
             new ColorOption("Turkuaz", "#00796B")
         );
         colorField.setItems(colorOptions);
@@ -341,7 +341,14 @@ public class CardListView extends VerticalLayout {
         dueDayField.setValue(10);
         dueDayField.setStepButtonsVisible(true);
 
-        form.add(nameField, bankField, cardTypeField, holderNameField, deptField, limitField, monthlyAssignmentField, categoryField, colorField, closingDayField, dueDayField);
+        IntegerField warningThresholdField = new IntegerField("Limit Uyarı Eşiği (%)");
+        warningThresholdField.setMin(10);
+        warningThresholdField.setMax(100);
+        warningThresholdField.setValue(80);
+        warningThresholdField.setStepButtonsVisible(true);
+        warningThresholdField.setHelperText("Kart limitinin yüzde kaçı dolunca uyarı gelsin?");
+
+        form.add(nameField, bankField, cardTypeField, holderNameField, deptField, limitField, monthlyAssignmentField, categoryField, colorField, closingDayField, dueDayField, warningThresholdField);
 
         if (card != null) {
             nameField.setValue(card.getName() != null ? card.getName() : "");
@@ -361,6 +368,7 @@ public class CardListView extends VerticalLayout {
             
             closingDayField.setValue(card.getClosingDay() != null ? card.getClosingDay() : 1);
             dueDayField.setValue(card.getDueDay() != null ? card.getDueDay() : 10);
+            warningThresholdField.setValue(card.getLimitWarningThreshold() != null ? card.getLimitWarningThreshold() : 80);
             deptField.setValue(card.getDepartment());
         } else {
             colorField.setValue(colorOptions.get(0)); // Default to first
@@ -402,11 +410,10 @@ public class CardListView extends VerticalLayout {
             editCard.setColor(selectedColor != null ? selectedColor.getHex() : "#1976D2");
             editCard.setClosingDay(closingDayField.getValue() != null ? closingDayField.getValue() : 1);
             editCard.setDueDay(dueDayField.getValue() != null ? dueDayField.getValue() : 10);
+            editCard.setLimitWarningThreshold(warningThresholdField.getValue() != null ? warningThresholdField.getValue() : 80);
 
             String newName = nameField.getValue().trim();
-            boolean duplicate = cardService.findAllActive().stream()
-                    .anyMatch(c -> c.getName().equalsIgnoreCase(newName)
-                            && (editCard.getId() == null || !c.getId().equals(editCard.getId())));
+            boolean duplicate = cardService.existsByNameIgnoreCaseAndIdNot(newName, editCard.getId());
             if (duplicate) {
                 Notification.show("Bu isimde bir kart zaten mevcut", 3000, Notification.Position.BOTTOM_CENTER)
                         .addThemeVariants(NotificationVariant.LUMO_ERROR);
@@ -439,8 +446,7 @@ public class CardListView extends VerticalLayout {
     }
 
     private void deleteCard(Card card) {
-        List<Expense> expenses = expenseService.findByCardId(card.getId());
-        int expenseCount = expenses != null ? expenses.size() : 0;
+        long expenseCount = expenseService.countByCardId(card.getId());
 
         Dialog confirmDialog = new Dialog();
         confirmDialog.setHeaderTitle("Kart Silme Onayı");

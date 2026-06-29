@@ -7,6 +7,7 @@ import com.vaadin.flow.component.button.ButtonVariant;
 import com.vaadin.flow.component.checkbox.Checkbox;
 import com.vaadin.flow.component.dialog.Dialog;
 import com.vaadin.flow.component.textfield.PasswordField;
+import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.component.html.Div;
 import com.vaadin.flow.component.html.Footer;
 import com.vaadin.flow.component.html.H1;
@@ -77,6 +78,54 @@ public class MainLayout extends AppLayout {
         setPrimarySection(Section.DRAWER);
         addDrawerContent();
         addHeaderContent();
+        checkFirstRunSetup();
+    }
+
+    private void checkFirstRunSetup() {
+        if (!appSettingsService.isSetupComplete()) {
+            getUI().ifPresent(ui -> ui.access(() -> openSetupDialog()));
+        }
+    }
+
+    private void openSetupDialog() {
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle("Kurulum - Hoş Geldiniz");
+        dialog.setWidth("420px");
+        dialog.setCloseOnEsc(false);
+        dialog.setCloseOnOutsideClick(false);
+
+        VerticalLayout content = new VerticalLayout();
+        content.setPadding(false);
+        content.setSpacing(true);
+
+        content.add(new Span("RasPel Finans'a hoş geldiniz! Başlamak için lütfen şirket adınızı girin."));
+
+        TextField companyField = new TextField("Şirket Adı");
+        companyField.setWidthFull();
+        companyField.setValue(appSettingsService.getCompanyName());
+        if (companyField.getValue().equals("Bozkır Ağaç Ürünleri")) {
+            companyField.setValue("");
+        }
+        companyField.setPlaceholder("Şirket adınızı girin...");
+
+        Button saveBtn = new Button("Kaydet ve Devam Et", e -> {
+            String name = companyField.getValue().trim();
+            if (name.isEmpty()) {
+                Notification.show("Lütfen bir şirket adı girin.", 3000, Notification.Position.MIDDLE)
+                        .addThemeVariants(NotificationVariant.LUMO_ERROR);
+                return;
+            }
+            appSettingsService.setCompanyName(name);
+            dialog.close();
+            Notification.show("Kurulum tamamlandı!", 3000, Notification.Position.BOTTOM_CENTER)
+                    .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
+            getUI().ifPresent(ui -> ui.getPage().reload());
+        });
+        saveBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+
+        dialog.add(content, companyField);
+        dialog.getFooter().add(saveBtn);
+        dialog.open();
     }
 
     private void injectKeyboardShortcuts() {
@@ -107,7 +156,11 @@ public class MainLayout extends AppLayout {
             quickJs +
             "if(k==='?'){e.preventDefault();document.getElementById('shortcuts-help-trigger').click();return;}" +
             "if(routes.hasOwnProperty(k)){" +
-            "window.location.href=(routes[k]?routes[k]:'');}" +
+            "var now=Date.now();" +
+            "if(last[k]&&(now-last[k])<500){" +
+            "window.location.href=(routes[k]?routes[k]:'');last[k]=0;" +
+            "}else{last[k]=now;}" +
+            "return;}" +
             "});"
         );
     }
@@ -148,7 +201,8 @@ public class MainLayout extends AppLayout {
                 BigDecimal limit = card.getCardLimit();
                 if (limit != null && limit.compareTo(BigDecimal.ZERO) > 0) {
                     double pct = unpaid.divide(limit, 4, RoundingMode.HALF_UP).doubleValue() * 100;
-                    if (pct >= 80.0) {
+                    int threshold = card.getLimitWarningThreshold() != null ? card.getLimitWarningThreshold() : 80;
+                    if (pct >= threshold) {
                         warningCount++;
                     }
                 }
@@ -171,9 +225,12 @@ public class MainLayout extends AppLayout {
         final int totalNotifications = warningCount + reminderCount;
 
         // session attribute kontrolü - senkronize okuma
-        Integer readCount;
-        synchronized (com.vaadin.flow.server.VaadinSession.getCurrent().getLockInstance()) {
-            readCount = (Integer) com.vaadin.flow.server.VaadinSession.getCurrent().getAttribute("notificationsReadCount");
+        Integer readCount = 0;
+        var session = com.vaadin.flow.server.VaadinSession.getCurrent();
+        if (session != null) {
+            synchronized (session.getLockInstance()) {
+                readCount = (Integer) session.getAttribute("notificationsReadCount");
+            }
         }
         if (readCount == null) readCount = 0;
         
@@ -300,9 +357,18 @@ public class MainLayout extends AppLayout {
         list.setPadding(false);
         
         List<DashboardConfig.WidgetConfig> widgets = config.getOrderedWidgets();
+        List<DashboardConfig.WidgetConfig> editableWidgets = new java.util.ArrayList<>();
+        for (DashboardConfig.WidgetConfig wc : widgets) {
+            DashboardConfig.WidgetConfig copy = new DashboardConfig.WidgetConfig();
+            copy.setId(wc.getId());
+            copy.setLabel(wc.getLabel());
+            copy.setVisible(wc.isVisible());
+            copy.setOrder(wc.getOrder());
+            editableWidgets.add(copy);
+        }
         
-        for (int i = 0; i < widgets.size(); i++) {
-            DashboardConfig.WidgetConfig wc = widgets.get(i);
+        for (int i = 0; i < editableWidgets.size(); i++) {
+            DashboardConfig.WidgetConfig wc = editableWidgets.get(i);
             HorizontalLayout item = new HorizontalLayout();
             item.setAlignItems(FlexComponent.Alignment.CENTER);
             item.setWidthFull();
@@ -316,6 +382,13 @@ public class MainLayout extends AppLayout {
         }
         
         Button saveBtn = new Button("Kaydet", e -> {
+            for (int i = 0; i < editableWidgets.size(); i++) {
+                DashboardConfig.WidgetConfig copy = editableWidgets.get(i);
+                DashboardConfig.WidgetConfig original = widgets.get(i);
+                if (original.getId().equals(copy.getId())) {
+                    original.setVisible(copy.isVisible());
+                }
+            }
             userService.saveDashboardConfig(username, config);
             Notification.show("Görünüm ayarları kaydedildi.", 3000, Notification.Position.BOTTOM_CENTER)
                     .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
@@ -603,11 +676,23 @@ public class MainLayout extends AppLayout {
                 .set("padding", "var(--lumo-space-m)")
                 .set("border-top", "1px solid var(--lumo-contrast-10pct)");
 
+        HorizontalLayout copyRow = new HorizontalLayout();
+        copyRow.setWidthFull();
+        copyRow.setAlignItems(FlexComponent.Alignment.CENTER);
+        copyRow.setJustifyContentMode(FlexComponent.JustifyContentMode.BETWEEN);
+
         Span copyright = new Span("© " + java.time.LocalDate.now().getYear() + " RasPel Co.");
         copyright.getStyle()
                 .set("font-size", "0.8em")
                 .set("font-weight", "600")
                 .set("color", "var(--lumo-secondary-text-color)");
+
+        Button statusBtn = new Button("Sistem Durumu", new Icon(VaadinIcon.DOCTOR), e -> openSystemStatusDialog());
+        statusBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY, ButtonVariant.LUMO_SMALL);
+        statusBtn.getStyle().set("font-size", "0.7em");
+        statusBtn.getElement().setAttribute("title", "Sistem durumunu kontrol et");
+
+        copyRow.add(copyright, statusBtn);
 
         Span author = new Span("Yazılım: Rasim Tuzluoğlu");
         author.getStyle()
@@ -615,8 +700,85 @@ public class MainLayout extends AppLayout {
                 .set("color", "var(--lumo-tertiary-text-color)")
                 .set("margin-top", "0.2em");
 
-        footer.add(copyright, author);
+        footer.add(copyRow, author);
         return footer;
+    }
+
+    private void openSystemStatusDialog() {
+        Dialog dialog = new Dialog();
+        dialog.setHeaderTitle("Sistem Durumu");
+        dialog.setWidth("520px");
+
+        VerticalLayout content = new VerticalLayout();
+        content.setPadding(false);
+        content.setSpacing(true);
+
+        ProgressBar loadingBar = new ProgressBar();
+        loadingBar.setIndeterminate(true);
+        content.add(loadingBar);
+
+        VerticalLayout results = new VerticalLayout();
+        results.setPadding(false);
+        results.setSpacing(false);
+        results.setVisible(false);
+        content.add(results);
+
+        dialog.add(content);
+
+        Button closeBtn = new Button("Kapat", e -> dialog.close());
+        closeBtn.addClickShortcut(com.vaadin.flow.component.Key.ESCAPE);
+        dialog.getFooter().add(closeBtn);
+        dialog.open();
+
+        getElement().executeJs(
+            "fetch('/api/system/status',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin'})" +
+            ".then(r=>r.json())" +
+            ".then(data=>{" +
+            "  arguments[0].style.display='none';" +
+            "  arguments[1].style.display='';" +
+            "  var color = {'yes':'#4CAF50','no':'#F44336','unknown':'#FF9800'};" +
+            "  var text = {'yes':'Evet ✓','no':'Hayır ✗','unknown':'Bilinmiyor'};" +
+            "  var html='';" +
+
+            "  html+='<div style=\"display:flex;justify-content:space-between;padding:8px 12px;border-radius:8px;margin-bottom:6px;\">" +
+            "    <strong>Docker</strong>" +
+            "    <span style=\"color:'+color[data.docker.status]+';font-weight:600\">'+text[data.docker.status]+'</span>" +
+            "  </div>';" +
+
+            "  html+='<div style=\"font-size:0.7em;color:var(--lumo-tertiary-text-color);margin:-4px 0 10px 12px\">'+data.docker.detail+'</div>';" +
+
+            "  html+='<div style=\"display:flex;justify-content:space-between;padding:8px 12px;border-radius:8px;margin-bottom:6px;\">" +
+            "    <strong>Container</strong>" +
+            "    <span style=\"color:'+color[data.container.status]+';font-weight:600\">'+text[data.container.status]+'</span>" +
+            "  </div>';" +
+
+            "  html+='<div style=\"font-size:0.7em;color:var(--lumo-tertiary-text-color);margin:-4px 0 10px 12px\">'+data.container.detail+'</div>';" +
+
+            "  html+='<div style=\"display:flex;justify-content:space-between;padding:8px 12px;border-radius:8px;margin-bottom:6px;\">" +
+            "    <strong>Veritabani</strong>" +
+            "    <span style=\"color:'+color[data.database.status]+';font-weight:600\">'+text[data.database.status]+'</span>" +
+            "  </div>';" +
+
+            "  html+='<div style=\"font-size:0.7em;color:var(--lumo-tertiary-text-color);margin:-4px 0 10px 12px\">'+data.database.detail+'</div>';" +
+
+            "  html+='<div style=\"margin-top:12px;font-weight:700;font-size:0.85em\">Son Hatalar:</div>';" +
+            "  data.lastErrors.forEach(function(e){" +
+            "    html+='<div style=\"background:#FFF3E0;border-left:3px solid #FF9800;padding:6px 10px;margin:4px 0;border-radius:4px;font-size:0.75em;color:#555\">" +
+            "      <div style=\"color:#888;font-size:0.9em\">'+e.time+'</div>" +
+            "      <div>'+e.message+'</div>" +
+            "    </div>';" +
+            "  });" +
+
+            "  html+='<div style=\"margin-top:16px;text-align:center;font-size:0.65em;color:var(--lumo-tertiary-text-color)\">'+data.timestamp+'</div>';" +
+
+            "  arguments[1].innerHTML=html;" +
+            "}).catch(err=>{" +
+            "  arguments[0].style.display='none';" +
+            "  arguments[1].style.display='';" +
+            "  arguments[1].innerHTML='<div style=\"color:#F44336;padding:16px;text-align:center\">Sistem durumu alinamadi: '+err.message+'</div>';" +
+            "})",
+            loadingBar.getElement(), results.getElement()
+        );
     }
 
     @Override

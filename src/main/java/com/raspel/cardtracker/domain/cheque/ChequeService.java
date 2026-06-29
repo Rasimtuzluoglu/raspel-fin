@@ -3,8 +3,12 @@ package com.raspel.cardtracker.domain.cheque;
 import com.raspel.cardtracker.domain.audit.AuditAction;
 import com.raspel.cardtracker.domain.audit.AuditLogService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -36,6 +40,18 @@ public class ChequeService {
         return chequeRepository.findByChequeNumber(chequeNumber);
     }
 
+    @Transactional(readOnly = true)
+    public Page<Cheque> findFilteredPaged(String term, ChequeType type, ChequeStatus status,
+                                          LocalDate startDate, LocalDate endDate, Pageable pageable) {
+        String t = term != null && !term.trim().isEmpty() ? term.trim() : null;
+        return chequeRepository.findFilteredPaged(t, type, status, startDate, endDate, pageable);
+    }
+
+    @Transactional(readOnly = true)
+    public BigDecimal sumAmountByTypeAndStatus(ChequeType type, ChequeStatus status) {
+        return chequeRepository.sumAmountByTypeAndStatus(type, status);
+    }
+
     public Cheque save(Cheque cheque) {
         if (cheque == null) throw new IllegalArgumentException("Çek bilgisi zorunludur");
         boolean isNew = cheque.getId() == null;
@@ -58,6 +74,7 @@ public class ChequeService {
     public void delete(Long id) {
         chequeRepository.findById(id).ifPresent(cheque -> {
             auditLogService.log(AuditAction.DELETE, "Çek", id, "Çek silindi: " + cheque.getChequeNumber());
+            auditLogService.deleteByEntityTypeAndId("Çek", id);
         });
         chequeRepository.deleteById(id);
     }

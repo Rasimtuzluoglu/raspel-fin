@@ -65,7 +65,7 @@ public class BankStatementImportService {
 
                     boolean isExpense = amountStr.startsWith("-");
                     String cleanAmount = amountStr.replace("-", "").replace("+", "").replace("TL", "").replace("₺", "").trim();
-                    cleanAmount = cleanAmount.replace(".", "").replace(",", ".");
+                    cleanAmount = normalizeAmount(cleanAmount);
                     cleanAmount = cleanAmount.replaceAll("[^0-9.]", "");
 
                     if (cleanAmount.isEmpty() || cleanAmount.equals(".")) continue;
@@ -161,7 +161,7 @@ public class BankStatementImportService {
         int dateCol = -1, descCol = -1, amountCol = -1;
         for (int i = 0; i < lowerParts.length; i++) {
             String col = lowerParts[i].replace("\"", "").trim();
-            if (dateCol == -1 && (col.contains("tarih") || col.contains("date") || col.contains("işlem"))) {
+            if (dateCol == -1 && (col.contains("tarih") || col.contains("date") || (col.contains("işlem") && col.contains("tarih")))) {
                 dateCol = i;
             } else if (descCol == -1 && (col.contains("açıklama") || col.contains("aciklama") || col.contains("description"))) {
                 descCol = i;
@@ -182,5 +182,15 @@ public class BankStatementImportService {
             } catch (DateTimeParseException ignored) {}
         }
         return null;
+    }
+
+    private String normalizeAmount(String amount) {
+        if (amount == null || amount.isEmpty()) return amount;
+        int lastComma = amount.lastIndexOf(',');
+        int lastDot = amount.lastIndexOf('.');
+        if (lastComma > lastDot) {
+            return amount.replace(".", "").replace(",", ".");
+        }
+        return amount.replace(",", "");
     }
 }

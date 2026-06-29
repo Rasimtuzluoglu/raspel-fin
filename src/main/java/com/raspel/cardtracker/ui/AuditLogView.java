@@ -15,6 +15,7 @@ import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
 import com.vaadin.flow.component.progressbar.ProgressBar;
 import com.vaadin.flow.component.textfield.TextField;
+import com.vaadin.flow.data.provider.CallbackDataProvider;
 import com.vaadin.flow.data.renderer.ComponentRenderer;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
@@ -23,10 +24,10 @@ import com.raspel.cardtracker.domain.audit.AuditLog;
 import com.raspel.cardtracker.domain.audit.AuditLogService;
 import com.raspel.cardtracker.ui.utils.TurkishDatePickerI18n;
 import jakarta.annotation.security.RolesAllowed;
+import org.springframework.data.domain.PageRequest;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
 
 @Route(value = "audit-log", layout = MainLayout.class)
 @PageTitle("İşlem Geçmişi")
@@ -177,31 +178,23 @@ public class AuditLogView extends VerticalLayout {
     }
 
     private void refreshGrid() {
-        loadingBar.setVisible(true);
         AuditAction action = actionFilter.getValue();
         String entityType = entityTypeFilter.getValue();
         LocalDateTime startDate = startDateFilter.getValue() != null ? startDateFilter.getValue().atStartOfDay() : null;
         LocalDateTime endDate = endDateFilter.getValue() != null ? endDateFilter.getValue().plusDays(1).atStartOfDay() : null;
+        String term = searchField.getValue() != null ? searchField.getValue().trim() : "";
 
-        List<AuditLog> logs = auditLogService.findFiltered(null, action, entityType, startDate, endDate);
-        
-        String term = searchField.getValue() != null ? searchField.getValue().trim().toLowerCase(java.util.Locale.forLanguageTag("tr-TR")) : "";
-        if (!term.isEmpty()) {
-            logs = logs.stream().filter(log -> {
-                boolean matchUser = log.getUsername() != null && log.getUsername().toLowerCase(java.util.Locale.forLanguageTag("tr-TR")).contains(term);
-                boolean matchDesc = log.getDescription() != null && log.getDescription().toLowerCase(java.util.Locale.forLanguageTag("tr-TR")).contains(term);
-                return matchUser || matchDesc;
-            }).toList();
-        }
-
-        grid.setItems(logs);
-        if (logs.isEmpty()) {
-            grid.setVisible(false);
-            emptyState.getStyle().set("display", "flex");
-        } else {
-            grid.setVisible(true);
-            emptyState.getStyle().set("display", "none");
-        }
-        loadingBar.setVisible(false);
+        grid.setItems(new CallbackDataProvider<>(
+                query -> {
+                    var page = auditLogService.findFilteredPaged(null, action, entityType, startDate, endDate, term,
+                            PageRequest.of(query.getPage(), query.getPageSize()));
+                    return page.getContent().stream();
+                },
+                query -> {
+                    var page = auditLogService.findFilteredPaged(null, action, entityType, startDate, endDate, term,
+                            PageRequest.of(query.getPage(), query.getPageSize()));
+                    return (int) page.getTotalElements();
+                }
+        ));
     }
 }

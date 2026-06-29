@@ -28,6 +28,7 @@ import com.raspel.cardtracker.ui.utils.TurkishDatePickerI18n;
 import com.raspel.cardtracker.ui.utils.CategoryConstants;
 import com.vaadin.flow.component.upload.Upload;
 import com.vaadin.flow.component.upload.receivers.MemoryBuffer;
+import com.vaadin.flow.data.provider.CallbackDataProvider;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
 import com.raspel.cardtracker.domain.card.Card;
@@ -47,6 +48,7 @@ import com.raspel.cardtracker.config.ScheduledTasks;
 import com.vaadin.flow.component.html.Anchor;
 import com.vaadin.flow.server.StreamResource;
 import jakarta.annotation.security.PermitAll;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -471,8 +473,9 @@ public class ExpenseView extends VerticalLayout {
                     fileExtension = originalFileName.substring(originalFileName.lastIndexOf("."));
                 }
                 
-                // uploads dizinini oluştur
-                java.nio.file.Path uploadDir = java.nio.file.Paths.get("uploads");
+                // uploads dizinini oluştur (yapılandırılabilir)
+                String uploadDirPath = System.getProperty("app.upload.dir", System.getProperty("user.dir") + java.io.File.separator + "uploads");
+                java.nio.file.Path uploadDir = java.nio.file.Paths.get(uploadDirPath);
                 if (!java.nio.file.Files.exists(uploadDir)) {
                     java.nio.file.Files.createDirectories(uploadDir);
                 }
@@ -528,7 +531,7 @@ public class ExpenseView extends VerticalLayout {
                         .addThemeVariants(NotificationVariant.LUMO_ERROR);
                 return;
             }
-            if (descField.getValue().isEmpty() || amountField.getValue().trim().isEmpty() || FormatUtils.parseTurkishCurrency(amountField.getValue()).compareTo(BigDecimal.ZERO) <= 0) {
+            if (descField.isEmpty() || amountField.isEmpty() || FormatUtils.parseTurkishCurrency(amountField.getValue()).compareTo(BigDecimal.ZERO) <= 0) {
                 Notification.show("Lütfen geçerli bir tutar girin", 3000, Notification.Position.BOTTOM_CENTER)
                         .addThemeVariants(NotificationVariant.LUMO_ERROR);
                 return;
@@ -778,6 +781,8 @@ public class ExpenseView extends VerticalLayout {
                 refreshGrid();
             });
             confirmBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+            confirmBtn.getElement().setAttribute("id", "bank-import-confirm");
+            content.getChildren().filter(c -> c.getElement().getAttribute("id") != null && "bank-import-confirm".equals(c.getElement().getAttribute("id"))).forEach(c -> content.remove(c));
             content.add(confirmBtn);
         });
 
@@ -792,51 +797,44 @@ public class ExpenseView extends VerticalLayout {
     }
 
     private void refreshGrid() {
-        loadingBar.setVisible(true);
         Integer startYear = yearFilter.getValue();
         Integer startMonth = monthFilter.getValue();
 
         if (startYear == null || startMonth == null) {
             grid.setItems(java.util.Collections.emptyList());
-            loadingBar.setVisible(false);
             showEmptyState();
             return;
         }
 
         Card selectedCard = cardFilter.getValue();
-        String term = searchField.getValue() != null ? searchField.getValue().trim() : null;
-        Long cardId = selectedCard != null ? selectedCard.getId() : null;
+        final String term = searchField.getValue() != null ? searchField.getValue().trim() : null;
+        final Long cardId = selectedCard != null ? selectedCard.getId() : null;
+        final int year = startYear;
+        final int month = startMonth;
 
-        List<InstallmentEntry> entries;
-        if (cardId != null) {
-            entries = expenseService.getInstallmentsForMonthAndCard(startYear, startMonth, cardId);
-        } else {
-            entries = expenseService.getInstallmentsForMonth(startYear, startMonth);
-        }
-        if (term != null && !term.isEmpty()) {
-            String lowerTerm = term.toLowerCase(java.util.Locale.forLanguageTag("tr-TR"));
-            entries = entries.stream().filter(e ->
-                (e.getExpense().getDescription() != null && e.getExpense().getDescription().toLowerCase(java.util.Locale.forLanguageTag("tr-TR")).contains(lowerTerm)) ||
-                (e.getExpense().getCategory() != null && e.getExpense().getCategory().toLowerCase(java.util.Locale.forLanguageTag("tr-TR")).contains(lowerTerm)) ||
-                (e.getExpense().getCard().getName() != null && e.getExpense().getCard().getName().toLowerCase(java.util.Locale.forLanguageTag("tr-TR")).contains(lowerTerm)) ||
-                (e.getExpense().getCard().getDepartment() != null && e.getExpense().getCard().getDepartment().getName().toLowerCase(java.util.Locale.forLanguageTag("tr-TR")).contains(lowerTerm))
-            ).collect(java.util.stream.Collectors.toList());
-        }
+        grid.setItems(new CallbackDataProvider<>(
+                query -> {
+                    var page = expenseService.findBySearchTermAndYearAndMonth(
+                            term, year, month, cardId,
+                            PageRequest.of(query.getPage(), query.getPageSize()));
+                    return page.getContent().stream();
+                },
+                query -> {
+                    var page = expenseService.findBySearchTermAndYearAndMonth(
+                            term, year, month, cardId,
+                            PageRequest.of(query.getPage(), query.getPageSize()));
+                    return (int) page.getTotalElements();
+                }
+        ));
 
-        grid.setItems(entries);
-
-        if (entries.isEmpty()) {
-            showEmptyState();
-        } else {
-            showGrid();
-        }
-
-        BigDecimal total = entries.stream().map(InstallmentEntry::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+        // Calculate total for display
+        BigDecimal total = expenseService.sumAmountBySearchTermAndYearAndMonth(term, year, month, cardId);
         getElement().executeJs(
                 "var el = document.getElementById('total-display'); if(el) el.textContent = 'Toplam: ' + $0 + ' ₺'",
-                FormatUtils.formatNumber(total)
+                FormatUtils.formatNumber(total != null ? total : BigDecimal.ZERO)
         );
-        loadingBar.setVisible(false);
+
+        showGrid();
     }
 
     private void showEmptyState() {
@@ -875,7 +873,8 @@ public class ExpenseView extends VerticalLayout {
         if (receiptPath == null || receiptPath.trim().isEmpty()) return null;
         try {
             java.nio.file.Path path = java.nio.file.Paths.get(receiptPath).toRealPath();
-            java.nio.file.Path uploadsDir = java.nio.file.Paths.get("uploads").toRealPath();
+            String uploadDirPath = System.getProperty("app.upload.dir", System.getProperty("user.dir") + java.io.File.separator + "uploads");
+            java.nio.file.Path uploadsDir = java.nio.file.Paths.get(uploadDirPath).toRealPath();
             if (!path.startsWith(uploadsDir)) {
                 return null;
             }
