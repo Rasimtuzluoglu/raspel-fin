@@ -466,7 +466,7 @@ apex-charts {
     max-width: 100% !important;
 }
 
-.summary-cards {
+.summary-cards, .view-toolbar, .filters-layout, .charts-row, .second-row, .third-row, .fourth-row {
     flex-wrap: wrap !important;
 }
 

@@ -466,8 +466,8 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
         Div barChartContainer = createChartContainer("Kart Bazlı Ödeme Dağılımı", createBarChart());
         Div lineChartContainer = createChartContainer("6 Aylık Projeksiyon", createLineChart());
 
-        barChartContainer.getStyle().set("flex", "1").set("min-width", "0");
-        lineChartContainer.getStyle().set("flex", "1").set("min-width", "0");
+        barChartContainer.getStyle().set("flex", "1").set("min-width", "350px");
+        lineChartContainer.getStyle().set("flex", "1").set("min-width", "350px");
 
         row.add(barChartContainer, lineChartContainer);
         return row;
@@ -498,9 +498,9 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
         }
         Div scheduleContainer = createPaymentScheduleContainer();
 
-        deptChartContainer.getStyle().set("flex", "1").set("min-width", "0");
-        categoryPieContainer.getStyle().set("flex", "1").set("min-width", "0");
-        scheduleContainer.getStyle().set("flex", "1").set("min-width", "0");
+        deptChartContainer.getStyle().set("flex", "1").set("min-width", "350px");
+        categoryPieContainer.getStyle().set("flex", "1").set("min-width", "350px");
+        scheduleContainer.getStyle().set("flex", "1").set("min-width", "350px");
 
         row.add(deptChartContainer, categoryPieContainer, scheduleContainer);
         return row;
@@ -515,8 +515,8 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
         Div yearlyComparisonContainer = createYearlyComparisonPanel();
         Div cashFlowContainer = createChartContainer("6 Aylık Nakit Akış Analizi (Çek ve Harcamalar)", createCashFlowChart());
 
-        yearlyComparisonContainer.getStyle().set("flex", "1").set("min-width", "0");
-        cashFlowContainer.getStyle().set("flex", "1").set("min-width", "0");
+        yearlyComparisonContainer.getStyle().set("flex", "1").set("min-width", "350px");
+        cashFlowContainer.getStyle().set("flex", "1").set("min-width", "350px");
 
         row.add(yearlyComparisonContainer, cashFlowContainer);
         return row;
@@ -530,7 +530,7 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
 
         Div trendChartContainer = createChartContainer("12 Aylık Harcama Trendi", createTrendChart());
 
-        trendChartContainer.getStyle().set("flex", "1").set("min-width", "0");
+        trendChartContainer.getStyle().set("flex", "1").set("min-width", "350px");
 
         row.add(trendChartContainer);
         return row;
@@ -618,7 +618,7 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
                 .set("border-radius", "12px")
                 .set("padding", "1.5em")
                 .set("box-shadow", "0 2px 8px rgba(0,0,0,0.1)")
-                .set("min-width", "0")
+                .set("min-width", "350px")
                 .set("max-width", "100%")
                 .set("overflow", "hidden");
 
@@ -1201,7 +1201,7 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
                 .set("text-overflow", "ellipsis")
                 .set("overflow", "hidden")
                 .set("white-space", "nowrap")
-                .set("min-width", "0");
+                .set("min-width", "350px");
 
         Span amountSpan = new Span(currencyFormat.format(amount));
         amountSpan.getStyle()

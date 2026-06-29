@@ -15,6 +15,7 @@ import com.vaadin.flow.component.notification.NotificationVariant;
 import com.vaadin.flow.component.orderedlayout.FlexComponent;
 import com.vaadin.flow.component.orderedlayout.HorizontalLayout;
 import com.vaadin.flow.component.orderedlayout.VerticalLayout;
+import com.vaadin.flow.component.progressbar.ProgressBar;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
@@ -78,7 +79,7 @@ public class ProfileView extends VerticalLayout {
         Optional<AppUser> userOpt = userService.findByUsername(username);
 
         if (userOpt.isEmpty()) {
-            add(new Span("Kullanici bulunamadi."));
+            add(new Span("Kullanıcı bulunamadı."));
             return;
         }
 
@@ -458,31 +459,75 @@ public class ProfileView extends VerticalLayout {
                 return;
             }
 
-            // Once guncelleme kontrolu yap
-            Notification.show("G\u00FCncelleme kontrol ediliyor...", 2000, Notification.Position.MIDDLE)
-                    .addThemeVariants(NotificationVariant.LUMO_PRIMARY);
+            // Kontrol dialog'u ac
+            Dialog checkDialog = new Dialog();
+            checkDialog.setHeaderTitle("G\u00FCncelleme Kontrol\u00FC");
+            checkDialog.setWidth("450px");
+            checkDialog.setCloseOnOutsideClick(false);
+
+            VerticalLayout checkContent = new VerticalLayout();
+            checkContent.setPadding(true);
+            checkContent.setSpacing(true);
+            checkContent.setAlignItems(FlexComponent.Alignment.CENTER);
+
+            ProgressBar loadingBar = new ProgressBar();
+            loadingBar.setIndeterminate(true);
+            loadingBar.setWidth("60px");
+
+            Span statusText = new Span("G\u00FCncelleme kontrol ediliyor, l\u00FCtfen bekleyin...");
+            statusText.getStyle().set("font-size", "0.9em").set("color", "var(--lumo-secondary-text-color)");
+
+            checkContent.add(loadingBar, statusText);
+            checkDialog.add(checkContent);
+
+            Button cancelBtn = new Button("Kapat", ev -> checkDialog.close());
+            cancelBtn.addClickShortcut(com.vaadin.flow.component.Key.ESCAPE);
+            checkDialog.getFooter().add(cancelBtn);
+            checkDialog.open();
 
             getElement().executeJs(
-                "fetch('/api/system/check-update', {method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin'})" +
+                "var d=arguments[0]; var l=arguments[1]; var s=arguments[2]; var view=arguments[3];" +
+                "var controller=new AbortController(); var timeout=setTimeout(function(){controller.abort()},30000);" +
+                "fetch('/api/system/check-update', {method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',signal:controller.signal})" +
                 ".then(r=>r.json())" +
                 ".then(data=>{" +
+                "  clearTimeout(timeout);" +
+                "  l.style.display='none';" +
                 "  if(data.updateAvailable){" +
-                "    arguments[0].$server.openUpdateConfirm();" +
+                "    s.textContent='Yeni g\u00FCncelleme mevcut!';" +
+                "    s.style.color='var(--lumo-success-color)'; s.style.fontWeight='700';" +
+                "    d.close();" +
+                "    view.$server.openUpdateConfirm();" +
+                "  }else if(data.upToDate){" +
+                "    var icon=document.createElement('span'); icon.textContent='\u2705'; icon.style.fontSize='36px';" +
+                "    s.parentElement.insertBefore(icon,s);" +
+                "    s.textContent='Yaz\u0131l\u0131m\u0131n\u0131z g\u00FCncel.';" +
+                "    s.style.color='var(--lumo-success-color)'; s.style.fontWeight='600';" +
+                "    var sub=document.createElement('span'); sub.textContent='Yeni bir s\u00FCr\u00FCm bulunamad\u0131.';" +
+                "    sub.style.cssText='font-size:0.78em;color:var(--lumo-tertiary-text-color);display:block;margin-top:4px';" +
+                "    s.parentElement.appendChild(sub);" +
                 "  }else{" +
-                "    var msg = document.createElement('vaadin-notification-card');" +
-                "    msg.setAttribute('theme', 'contrast');" +
-                "    msg.textContent = '\u015Eu an yeni g\u00FCncelleme yok. Yaz\u0131l\u0131m\u0131n\u0131z g\u00FCncel.';" +
-                "    document.body.appendChild(msg);" +
-                "    msg._show && msg._show(4000);" +
-                "    setTimeout(function(){msg.remove()},5000);" +
+                "    var icon=document.createElement('span'); icon.textContent='\u26A0\uFE0F'; icon.style.fontSize='36px';" +
+                "    s.parentElement.insertBefore(icon,s);" +
+                "    s.textContent='G\u00FCncelleme kontrol edilemedi.';" +
+                "    s.style.color='var(--lumo-error-color)'; s.style.fontWeight='600';" +
+                "    var sub=document.createElement('span'); sub.textContent=data.message||'Docker eri\u015Filebilir olmayabilir.';" +
+                "    sub.style.cssText='font-size:0.78em;color:var(--lumo-tertiary-text-color);display:block;margin-top:4px';" +
+                "    s.parentElement.appendChild(sub);" +
                 "  }" +
-                "}).catch(err=>{" +
-                "  var msg = document.createElement('vaadin-notification-card');" +
-                "  msg.textContent = 'G\u00FCncelleme kontrol edilemedi: ' + err.message;" +
-                "  document.body.appendChild(msg);" +
-                "  setTimeout(function(){msg.remove()},5000);" +
+                "}).catch(function(err){" +
+                "  clearTimeout(timeout);" +
+                "  l.style.display='none';" +
+                "  var icon=document.createElement('span'); icon.textContent='\u26A0\uFE0F'; icon.style.fontSize='36px';" +
+                "  s.parentElement.insertBefore(icon,s);" +
+                "  s.textContent='G\u00FCncelleme kontrol edilemedi.';" +
+                "  s.style.color='var(--lumo-error-color)'; s.style.fontWeight='600';" +
+                "  var sub=document.createElement('span');" +
+                "  sub.textContent=err.name==='AbortError'?'\u0130\u015Flem zaman a\u015F\u0131m\u0131na u\u011Frad\u0131 (30sn). Docker eri\u015Filebilir olmayabilir.':'Docker eri\u015Filebilir olmayabilir.';" +
+                "  sub.style.cssText='font-size:0.78em;color:var(--lumo-tertiary-text-color);display:block;margin-top:4px';" +
+                "  s.parentElement.appendChild(sub);" +
                 "})",
-                getElement()
+                checkDialog.getElement(), loadingBar.getElement(), statusText.getElement(), getElement()
             );
         });
         updateBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
@@ -584,7 +629,7 @@ public class ProfileView extends VerticalLayout {
     }
 
     private void executeUpdate() {
-        Notification.show("Guncelleme baslatiliyor, lutfen bekleyin...", 3000, Notification.Position.MIDDLE)
+        Notification.show("G\u00FCncelleme ba\u015Flat\u0131l\u0131yor, l\u00FCtfen bekleyin...", 3000, Notification.Position.MIDDLE)
                 .addThemeVariants(NotificationVariant.LUMO_PRIMARY);
 
         getElement().executeJs(
@@ -594,16 +639,16 @@ public class ProfileView extends VerticalLayout {
             "  if(data.status==='ok'){" +
             "    document.body.innerHTML='<div style=\"display:flex;align-items:center;justify-content:center;height:100vh;flex-direction:column;font-family:sans-serif;\">" +
             "      <div style=\"font-size:48px;margin-bottom:16px\">&#128640;</div>" +
-            "      <h2 style=\"color:#4CAF50\">Guncelleme Basarili!</h2>" +
-            "      <p style=\"color:#666;margin-bottom:24px\">Uygulama yeniden baslatiliyor, lutfen bekleyin...</p>" +
+            "      <h2 style=\"color:#4CAF50\">G\u00FCncelleme Ba\u015Far\u0131l\u0131!</h2>" +
+            "      <p style=\"color:#666;margin-bottom:24px\">Uygulama yeniden ba\u015Flat\u0131l\u0131yor, l\u00FCtfen bekleyin...</p>" +
             "      <div class=\\\"loading-spinner\\\" style=\\\"width:40px;height:40px;border:4px solid #e0e0e0;border-top:4px solid #2196F3;border-radius:50%;animation:spin 1s linear infinite;\\\"></div>" +
             "      <style>@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}</style>" +
             "    </div>';" +
             "    setTimeout(function(){location.reload()},8000);" +
             "  }else{" +
-            "    alert('Guncelleme basarisiz: ' + data.message);" +
+            "    alert('G\u00FCncelleme ba\u015Far\u0131s\u0131z: ' + data.message);" +
             "  }" +
-            "}).catch(err=>{alert('Guncelleme yapilamadi. Docker kurulu olmayabilir.');});"
+            "}).catch(err=>{alert('G\u00FCncelleme yap\u0131lamad\u0131. Docker kurulu olmayabilir.');});"
         );
     }
 

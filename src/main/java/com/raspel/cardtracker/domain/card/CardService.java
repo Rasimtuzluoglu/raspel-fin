@@ -4,7 +4,6 @@ import com.raspel.cardtracker.domain.audit.AuditAction;
 import com.raspel.cardtracker.domain.audit.AuditLogService;
 import com.raspel.cardtracker.domain.expense.Expense;
 import com.raspel.cardtracker.domain.expense.ExpenseRepository;
-import com.raspel.cardtracker.domain.expense.InstallmentEntryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -20,7 +19,6 @@ public class CardService {
 
     private final CardRepository cardRepository;
     private final ExpenseRepository expenseRepository;
-    private final InstallmentEntryRepository installmentEntryRepository;
     private final AuditLogService auditLogService;
 
     @Transactional(readOnly = true)
@@ -58,18 +56,10 @@ public class CardService {
         cardRepository.findById(id).ifPresent(card -> {
             card.setActive(false);
             cardRepository.save(card);
-
-            List<Expense> expenses = expenseRepository.findByCardId(id);
-            if (!expenses.isEmpty()) {
-                for (Expense e : expenses) {
-                    installmentEntryRepository.deleteByExpenseId(e.getId());
-                }
-                expenseRepository.deleteAllByCardId(id);
-                auditLogService.log(AuditAction.DELETE, "Kart", id,
-                        "Kart silindi: " + card.getName() + " - " + expenses.size() + " harcama ve tüm taksitleri silindi");
-            } else {
-                auditLogService.log(AuditAction.DELETE, "Kart", id, "Kart silindi: " + card.getName());
-            }
+            long expenseCount = expenseRepository.countByCardId(id);
+            auditLogService.log(AuditAction.DELETE, "Kart", id,
+                    "Kart pasif hale getirildi (soft delete): " + card.getName()
+                    + (expenseCount > 0 ? " - " + expenseCount + " harcama korundu" : ""));
         });
     }
 

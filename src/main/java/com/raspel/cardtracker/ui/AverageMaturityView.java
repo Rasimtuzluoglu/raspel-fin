@@ -78,26 +78,10 @@ public class AverageMaturityView extends VerticalLayout {
     private VerticalLayout buildContent() {
         VerticalLayout p = new VerticalLayout();
         p.addClassName("maturity-card");
-        p.setPadding(false);
+        p.setPadding(true);
         p.setSpacing(false);
         p.setWidthFull();
         p.getStyle().set("min-width", "0").set("overflow", "auto");
-
-        Div header = new Div();
-        header.addClassName("maturity-card-header");
-        Div hIcon = new Div();
-        hIcon.addClassName("header-icon");
-        hIcon.add(VaadinIcon.EDIT.create());
-        VerticalLayout hTexts = new VerticalLayout(
-                new H4("Ortalama Vade Hesaplama"),
-                new Span("Tarih veya gün girerek vade hesaplayın") {{
-                    getStyle().set("font-size", "0.72em").set("color", "var(--lumo-tertiary-text-color)");
-                }}
-        );
-        hTexts.setPadding(false);
-        hTexts.setSpacing(false);
-        header.add(hIcon, hTexts);
-        p.add(header);
 
         Span warning = new Span("* Doldurulması zorunlu alanlar.");
         warning.getStyle()

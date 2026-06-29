@@ -89,6 +89,7 @@ public class ChequeView extends VerticalLayout {
         HorizontalLayout toolbar = createToolbar();
         toolbar.addClassName("view-toolbar");
         HorizontalLayout filters = createFiltersLayout();
+        filters.addClassName("filters-layout");
 
         configureGrid();
         configureEmptyState();
@@ -332,7 +333,7 @@ public class ChequeView extends VerticalLayout {
             return badge;
         }).setHeader("Durum").setAutoWidth(true);
 
-        grid.addColumn(Cheque::getDescription).setHeader("Açıklama").setAutoWidth(true);
+        grid.addColumn(Cheque::getDescription).setHeader("Açıklama").setAutoWidth(false).setWidth("350px");
 
         grid.addComponentColumn(cheque -> {
             Button editBtn = new Button(new Icon(VaadinIcon.EDIT), e -> openEditDialog(cheque, cheque.getType()));
@@ -353,7 +354,9 @@ public class ChequeView extends VerticalLayout {
         Dialog dialog = new Dialog();
         boolean isNew = (cheque == null);
         dialog.setHeaderTitle(isNew ? (defaultType == ChequeType.ENTERING ? "Yeni Çek Girişi Ekle" : "Yeni Çek Çıkışı Ekle") : "Çek Düzenle");
-        dialog.setWidth("500px");
+        dialog.setMinWidth("350px");
+        dialog.setMaxWidth("550px");
+        dialog.setWidth("95vw");
 
         Cheque targetCheque = isNew ? Cheque.builder().type(defaultType).status(ChequeStatus.PORTFOLIO).build() : cheque;
 
@@ -534,7 +537,9 @@ public class ChequeView extends VerticalLayout {
     private void openHistoryDialog(Cheque cheque) {
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle("Çek Geçmişi - " + cheque.getChequeNumber());
-        dialog.setWidth("500px");
+        dialog.setMinWidth("350px");
+        dialog.setMaxWidth("550px");
+        dialog.setWidth("95vw");
 
         VerticalLayout timeline = new VerticalLayout();
         timeline.setPadding(true);

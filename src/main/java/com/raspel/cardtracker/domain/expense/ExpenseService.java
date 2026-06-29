@@ -14,9 +14,11 @@ import java.time.LocalDate;
 import java.time.YearMonth;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
@@ -73,6 +75,8 @@ public class ExpenseService {
 
     /**
      * Güncellenen harcama bilgilerine göre taksit satırlarını yeniden oluşturur.
+     * Ödenmiş taksitlerin durumu korunur: yeni oluşan taksitlerden aynı yıl/ay
+     * kombinasyonuna sahip olanlar, önceki ödenmiş durumunu devam ettirir.
      */
     public Expense updateExpense(Expense expense) {
         if (expense.getExpenseDate() == null) throw new IllegalArgumentException("Harcama tarihi zorunludur");
@@ -101,7 +105,16 @@ public class ExpenseService {
             expense.setTotalAmount(expense.getOriginalAmount());
         }
 
-        // Mevcut taksit satırlarını temizle/sil
+        // Mevcut ödenmiş taksitlerin (yıl, ay) bilgisini sakla
+        List<InstallmentEntry> existingEntries = installmentEntryRepository.findByExpenseId(expense.getId());
+        Set<String> paidKeys = new HashSet<>();
+        for (InstallmentEntry ie : existingEntries) {
+            if (Boolean.TRUE.equals(ie.getIsPaid())) {
+                paidKeys.add(ie.getDueYear() + "-" + ie.getDueMonth());
+            }
+        }
+
+        // Mevcut taksit satırlarını sil
         installmentEntryRepository.deleteByExpenseId(expense.getId());
 
         // Harcamayı kaydet
@@ -113,6 +126,15 @@ public class ExpenseService {
 
         // Yeni taksit satırlarını oluştur
         List<InstallmentEntry> entries = generateInstallments(managedExpense);
+
+        // Önceden ödenmiş olan taksitlerin durumunu geri yükle
+        for (InstallmentEntry ie : entries) {
+            String key = ie.getDueYear() + "-" + ie.getDueMonth();
+            if (paidKeys.contains(key)) {
+                ie.setIsPaid(true);
+            }
+        }
+
         managedExpense.getInstallmentEntries().addAll(entries);
         installmentEntryRepository.saveAll(entries);
         auditLogService.log(AuditAction.UPDATE, "Harcama", managedExpense.getId(),

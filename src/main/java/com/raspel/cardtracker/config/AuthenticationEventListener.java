@@ -35,6 +35,9 @@ public class AuthenticationEventListener {
             log.info("Başarılı giriş: {}", username);
             try {
                 userService.recordSuccessfulLogin(username);
+                if (userService.mustChangePassword(username)) {
+                    log.warn("GÜVENLİK UYARISI: {} kullanıcısı varsayılan şifre ile giriş yaptı! Şifre değiştirilmeli.", username);
+                }
             } catch (Exception e) {
                 log.error("Başarılı giriş kaydı yapılamadı: {}", username, e);
             }

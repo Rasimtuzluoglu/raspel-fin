@@ -142,7 +142,22 @@ public class UserService implements UserDetailsService {
         AppUser user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("Kullanıcı bulunamadı: " + userId));
         user.setPassword(passwordEncoder.encode(newPassword));
+        user.setMustChangePassword(false);
         userRepository.save(user);
+    }
+
+    public void markPasswordChanged(String username) {
+        userRepository.findByUsername(username).ifPresent(user -> {
+            user.setMustChangePassword(false);
+            userRepository.save(user);
+        });
+    }
+
+    @Transactional(readOnly = true)
+    public boolean mustChangePassword(String username) {
+        return userRepository.findByUsername(username)
+                .map(AppUser::getMustChangePassword)
+                .orElse(false);
     }
 
     public void deactivateUser(Long userId) {

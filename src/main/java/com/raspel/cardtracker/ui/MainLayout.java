@@ -220,9 +220,17 @@ public class MainLayout extends AppLayout {
             // Expected: initial load without data
         }
 
+        // Guncelleme kontrolu
+        int updateCount = 0;
+        try {
+            String updateFlag = appSettingsService.getSetting("updateAvailable");
+            if ("true".equals(updateFlag)) updateCount = 1;
+        } catch (Exception ignored) {}
+
         final int finalWarningCount = warningCount;
         final int finalReminderCount = reminderCount;
-        final int totalNotifications = warningCount + reminderCount;
+        final int finalUpdateCount = updateCount;
+        final int totalNotifications = warningCount + reminderCount + updateCount;
 
         // session attribute kontrolü - senkronize okuma
         Integer readCount = 0;
@@ -260,7 +268,8 @@ public class MainLayout extends AppLayout {
         alertTray.getElement().setAttribute("title", "Hatırlatıcılar");
 
         alertTray.addClickListener(e -> {
-            com.vaadin.flow.server.VaadinSession.getCurrent().setAttribute("notificationsReadCount", finalWarningCount + finalReminderCount);
+            appSettingsService.setSetting("updateAvailable", "false");
+            com.vaadin.flow.server.VaadinSession.getCurrent().setAttribute("notificationsReadCount", finalWarningCount + finalReminderCount + finalUpdateCount);
             e.getSource().getUI().ifPresent(ui -> {
                 ui.access(() -> {
                     alertBadge.setText("0");
@@ -271,11 +280,14 @@ public class MainLayout extends AppLayout {
         });
 
         if (totalNotifications > 0) {
-            bellIcon.getStyle().set("color", reminderCount > 0 ? "var(--lumo-warning-color)" : "var(--lumo-error-color)");
+            bellIcon.getStyle().set("color", updateCount > 0 ? "var(--lumo-primary-color)" : reminderCount > 0 ? "var(--lumo-warning-color)" : "var(--lumo-error-color)");
             alertBadge.setText(String.valueOf(unreadCount));
             alertBadge.setVisible(true);
-            String tooltip = String.format("%d limit uyarısı, %d bekleyen ödeme var!", warningCount, reminderCount);
-            alertTray.getElement().setAttribute("title", tooltip);
+            String tooltip = "";
+            if (updateCount > 0) tooltip = "Yeni guncelleme mevcut! ";
+            if (warningCount > 0) tooltip += warningCount + " limit uyarisi, ";
+            if (reminderCount > 0) tooltip += reminderCount + " bekleyen odeme";
+            alertTray.getElement().setAttribute("title", tooltip.trim().replaceAll(",$", ""));
         }
 
         rightSection.add(alertTray);
@@ -707,77 +719,69 @@ public class MainLayout extends AppLayout {
     private void openSystemStatusDialog() {
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle("Sistem Durumu");
-        dialog.setWidth("520px");
+        dialog.setWidth("360px");
 
         VerticalLayout content = new VerticalLayout();
         content.setPadding(false);
-        content.setSpacing(true);
+        content.setSpacing(false);
 
-        ProgressBar loadingBar = new ProgressBar();
-        loadingBar.setIndeterminate(true);
-        content.add(loadingBar);
+        Div loadingDiv = new Div();
+        loadingDiv.setId("status-loading");
+        loadingDiv.getStyle().set("text-align", "center").set("padding", "16px 0");
+        Span loadingText = new Span("Kontrol ediliyor...");
+        loadingText.getStyle().set("font-size", "0.8em").set("color", "var(--lumo-secondary-text-color)");
+        loadingDiv.add(loadingText);
+        content.add(loadingDiv);
 
-        VerticalLayout results = new VerticalLayout();
-        results.setPadding(false);
-        results.setSpacing(false);
-        results.setVisible(false);
+        Div results = new Div();
+        results.setId("status-results");
+        results.getStyle().set("display", "none");
         content.add(results);
 
         dialog.add(content);
-
-        Button closeBtn = new Button("Kapat", e -> dialog.close());
-        closeBtn.addClickShortcut(com.vaadin.flow.component.Key.ESCAPE);
-        dialog.getFooter().add(closeBtn);
+        dialog.getFooter().add(new Button("Kapat", e -> dialog.close()));
         dialog.open();
 
         getElement().executeJs(
+            "setTimeout(function(){" +
             "fetch('/api/system/status',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin'})" +
-            ".then(r=>r.json())" +
-            ".then(data=>{" +
-            "  arguments[0].style.display='none';" +
-            "  arguments[1].style.display='';" +
-            "  var color = {'yes':'#4CAF50','no':'#F44336','unknown':'#FF9800'};" +
-            "  var text = {'yes':'Evet ✓','no':'Hayır ✗','unknown':'Bilinmiyor'};" +
-            "  var html='';" +
-
-            "  html+='<div style=\"display:flex;justify-content:space-between;padding:8px 12px;border-radius:8px;margin-bottom:6px;\">" +
-            "    <strong>Docker</strong>" +
-            "    <span style=\"color:'+color[data.docker.status]+';font-weight:600\">'+text[data.docker.status]+'</span>" +
-            "  </div>';" +
-
-            "  html+='<div style=\"font-size:0.7em;color:var(--lumo-tertiary-text-color);margin:-4px 0 10px 12px\">'+data.docker.detail+'</div>';" +
-
-            "  html+='<div style=\"display:flex;justify-content:space-between;padding:8px 12px;border-radius:8px;margin-bottom:6px;\">" +
-            "    <strong>Container</strong>" +
-            "    <span style=\"color:'+color[data.container.status]+';font-weight:600\">'+text[data.container.status]+'</span>" +
-            "  </div>';" +
-
-            "  html+='<div style=\"font-size:0.7em;color:var(--lumo-tertiary-text-color);margin:-4px 0 10px 12px\">'+data.container.detail+'</div>';" +
-
-            "  html+='<div style=\"display:flex;justify-content:space-between;padding:8px 12px;border-radius:8px;margin-bottom:6px;\">" +
-            "    <strong>Veritabani</strong>" +
-            "    <span style=\"color:'+color[data.database.status]+';font-weight:600\">'+text[data.database.status]+'</span>" +
-            "  </div>';" +
-
-            "  html+='<div style=\"font-size:0.7em;color:var(--lumo-tertiary-text-color);margin:-4px 0 10px 12px\">'+data.database.detail+'</div>';" +
-
-            "  html+='<div style=\"margin-top:12px;font-weight:700;font-size:0.85em\">Son Hatalar:</div>';" +
-            "  data.lastErrors.forEach(function(e){" +
-            "    html+='<div style=\"background:#FFF3E0;border-left:3px solid #FF9800;padding:6px 10px;margin:4px 0;border-radius:4px;font-size:0.75em;color:#555\">" +
-            "      <div style=\"color:#888;font-size:0.9em\">'+e.time+'</div>" +
-            "      <div>'+e.message+'</div>" +
+            ".then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json()})" +
+            ".then(function(d){" +
+            "  var lb=document.getElementById('status-loading'); if(lb)lb.remove();" +
+            "  var rs=document.getElementById('status-results'); if(!rs)return; rs.style.display='';" +
+            "  var c={yes:'#43A047',no:'#E53935',unknown:'#9E9E9E'};" +
+            "  var t={yes:'\u2713',no:'\u2717',unknown:'~'};" +
+            "  var items=[" +
+            "    {name:'Docker',status:d.docker.status,detail:d.docker.detail}," +
+            "    {name:'Uygulama',status:d.container.status,detail:d.container.detail}," +
+            "    {name:'Veritaban\u0131',status:d.database.status,detail:d.database.detail}" +
+            "  ];" +
+            "  var h='<div style=\"padding:2px 0\">';" +
+            "  items.forEach(function(i){" +
+            "    h+='<div style=\"display:flex;align-items:center;padding:5px 0\">" +
+            "      <span style=\"color:'+c[i.status]+';font-size:0.9em;width:14px;flex-shrink:0\">'+t[i.status]+'</span>" +
+            "      <span style=\"font-size:0.85em;font-weight:600;width:75px;flex-shrink:0\">'+i.name+'</span>" +
+            "      <span style=\"font-size:0.72em;color:var(--lumo-secondary-text-color)\">'+i.detail+'</span>" +
             "    </div>';" +
             "  });" +
-
-            "  html+='<div style=\"margin-top:16px;text-align:center;font-size:0.65em;color:var(--lumo-tertiary-text-color)\">'+data.timestamp+'</div>';" +
-
-            "  arguments[1].innerHTML=html;" +
-            "}).catch(err=>{" +
-            "  arguments[0].style.display='none';" +
-            "  arguments[1].style.display='';" +
-            "  arguments[1].innerHTML='<div style=\"color:#F44336;padding:16px;text-align:center\">Sistem durumu alinamadi: '+err.message+'</div>';" +
-            "})",
-            loadingBar.getElement(), results.getElement()
+            "  if(d.restricted){" +
+            "    h+='<div style=\"font-size:0.65em;color:var(--lumo-tertiary-text-color);text-align:center;margin-top:6px\">Hata detaylar\u0131 i\u00E7in y\u00F6netici gerekli</div>';" +
+            "  }else if(d.lastErrors&&d.lastErrors.length>0&&d.lastErrors[0].message&&d.lastErrors[0].message!=='Hata bulunamad\u0131'){" +
+            "    h+='<div style=\"margin-top:8px;border-top:1px solid var(--lumo-contrast-10pct);padding-top:6px\">';" +
+            "    h+='<div style=\"font-size:0.7em;font-weight:600;color:var(--lumo-error-color);margin-bottom:4px\">Son Hatalar</div>';" +
+            "    d.lastErrors.forEach(function(e){" +
+            "      h+='<div style=\"font-size:0.68em;color:#555;padding:2px 0;border-bottom:1px solid var(--lumo-contrast-5pct)\">" +
+            "        <span style=\"color:#888\">'+e.time+'</span> '+e.message+'</div>';" +
+            "    });" +
+            "    h+='</div>';" +
+            "  }" +
+            "  h+='<div style=\"font-size:0.58em;color:var(--lumo-tertiary-text-color);text-align:center;margin-top:8px\">'+d.timestamp+'</div>';" +
+            "  h+='</div>';" +
+            "  rs.innerHTML=h;" +
+            "}).catch(function(){" +
+            "  var lb=document.getElementById('status-loading'); if(lb)lb.remove();" +
+            "  var rs=document.getElementById('status-results'); if(rs){rs.style.display='';rs.innerHTML='<div style=\"color:var(--lumo-error-color);text-align:center;padding:12px;font-size:0.82em\">Sistem durumu al\u0131namad\u0131</div>';}" +
+            "});},100);"
         );
     }
 
@@ -974,6 +978,8 @@ public class MainLayout extends AppLayout {
                 if (rc != null) readCount = rc;
                 PaymentReminderService.ReminderSummary s = reminderService.getReminderSummary();
                 total = s.getTotalCount();
+                String updateFlag = appSettingsService.getSetting("updateAvailable");
+                if ("true".equals(updateFlag)) total += 1;
                 int unread = Math.max(0, total - readCount);
                 if (alertBadge != null) {
                     alertBadge.setText(String.valueOf(unread));

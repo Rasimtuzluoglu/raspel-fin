@@ -73,6 +73,38 @@ public class ScheduledTasks {
         }
     }
 
+    @Scheduled(cron = "0 0 6 * * *")
+    public void checkForUpdates() {
+        log.info("Gunluk guncelleme kontrolu baslatiliyor...");
+        try {
+            String image = System.getenv().getOrDefault("DOCKER_IMAGE", "ghcr.io/rasimtuzluoglu/raspel-fin:latest");
+            ProcessBuilder pb = new ProcessBuilder("docker", "pull", image);
+            pb.redirectErrorStream(true);
+            Process p = pb.start();
+            StringBuilder out = new StringBuilder();
+            try (java.io.BufferedReader r = new java.io.BufferedReader(new java.io.InputStreamReader(p.getInputStream()))) {
+                String line;
+                while ((line = r.readLine()) != null) out.append(line).append("\n");
+            }
+            boolean finished = p.waitFor(120, java.util.concurrent.TimeUnit.SECONDS);
+            if (!finished) p.destroyForcibly();
+            String output = out.toString();
+            boolean hasUpdate = output.contains("Downloaded newer image") || output.contains("Pulling from");
+            boolean isUpToDate = output.contains("Image is up to date");
+
+            if (hasUpdate) {
+                appSettingsService.setSetting("updateAvailable", "true");
+                appSettingsService.setSetting("updateMessage", "Yeni guncelleme mevcut!");
+                log.info("Gunluk kontrol: Yeni guncelleme bulundu!");
+            } else if (isUpToDate) {
+                appSettingsService.setSetting("updateAvailable", "false");
+                log.info("Gunluk kontrol: Yazilim guncel.");
+            }
+        } catch (Exception e) {
+            log.warn("Gunluk guncelleme kontrolu basarisiz: {}", e.getMessage());
+        }
+    }
+
     @Scheduled(fixedDelay = 300_000, initialDelay = 30_000)
     public void checkAndNotifyTelegram() {
         if (telegramBotService != null) {

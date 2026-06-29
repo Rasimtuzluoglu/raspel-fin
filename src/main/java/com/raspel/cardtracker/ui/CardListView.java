@@ -207,7 +207,9 @@ public class CardListView extends VerticalLayout {
     private void openExpenseDetailsDialog(Card card) {
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle(card.getName() + " - Harcamalar");
-        dialog.setWidth("800px");
+        dialog.setMinWidth("350px");
+        dialog.setMaxWidth("800px");
+        dialog.setWidth("95vw");
 
         Grid<Expense> expenseGrid = new Grid<>(Expense.class, false);
         expenseGrid.addThemeVariants(GridVariant.LUMO_ROW_STRIPES, GridVariant.LUMO_WRAP_CELL_CONTENT);
@@ -261,7 +263,9 @@ public class CardListView extends VerticalLayout {
     void openEditDialog(Card card) {
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle(card == null ? "Yeni Kart Ekle" : "Kart Düzenle");
-        dialog.setWidth("500px");
+        dialog.setMinWidth("350px");
+        dialog.setMaxWidth("550px");
+        dialog.setWidth("95vw");
 
         Card editCard = card != null ? card : Card.builder().build();
 

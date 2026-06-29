@@ -3,6 +3,9 @@ package com.raspel.cardtracker.domain.cheque;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -10,6 +13,7 @@ import com.raspel.cardtracker.domain.contact.Contact;
 
 @Entity
 @Table(name = "cheque")
+@EntityListeners(AuditingEntityListener.class)
 @Getter
 @Setter
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
@@ -61,6 +65,11 @@ public class Cheque {
     private String description;
 
     @Column(name = "created_at", nullable = false, updatable = false)
+    @CreatedDate
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Column(name = "updated_at")
+    @LastModifiedDate
+    private LocalDateTime updatedAt;
 }

@@ -6,6 +6,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.env.Environment;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -39,56 +41,72 @@ public class UpdateController {
     public ResponseEntity<Map<String, Object>> systemStatus() {
         Map<String, Object> status = new LinkedHashMap<>();
         status.put("timestamp", LocalDateTime.now().format(DateTimeFormatter.ofPattern("dd.MM.yyyy HH:mm:ss")));
-
-        status.put("docker", checkDocker());
-
-        status.put("container", Map.of("status", "yes", "detail", "Uygulama yanit veriyor"));
-
+        status.put("docker", checkDockerFast());
+        status.put("container", Map.of("status", "yes", "detail", "Uygulama yan\u0131t veriyor"));
         status.put("database", checkDatabase());
 
-        status.put("lastErrors", getLastErrors(5));
+        boolean isAdmin = false;
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null) {
+            isAdmin = auth.getAuthorities().stream()
+                    .anyMatch(a -> a.getAuthority().equals("ROLE_ADMIN"));
+        }
+
+        if (isAdmin) {
+            status.put("lastErrors", getLastErrors(3));
+        } else {
+            List<Map<String, String>> restricted = new ArrayList<>();
+            Map<String, String> msg = new LinkedHashMap<>();
+            msg.put("time", "");
+            msg.put("message", "Hata detaylar\u0131 sadece y\u00F6netici g\u00F6rebilir");
+            restricted.add(msg);
+            status.put("lastErrors", restricted);
+            status.put("restricted", true);
+        }
 
         return ResponseEntity.ok(status);
     }
 
-    private Map<String, Object> checkDocker() {
+    private Map<String, Object> checkDockerFast() {
+        // Check if Docker socket exists and is accessible
+        Path socket = Paths.get("/var/run/docker.sock");
+        if (Files.exists(socket)) {
+            return Map.of("status", "yes", "detail", "Docker socket mevcut");
+        }
+        // Try docker command with short timeout
         try {
-            ProcessBuilder pb = new ProcessBuilder("docker", "info");
+            ProcessBuilder pb = new ProcessBuilder("docker", "version");
             pb.redirectErrorStream(true);
             Process p = pb.start();
-            boolean finished = p.waitFor(5, TimeUnit.SECONDS);
-            int code = finished ? p.exitValue() : -1;
-            if (code == 0) {
-                return Map.of("status", "yes", "detail", "Docker calisiyor");
+            boolean finished = p.waitFor(3, TimeUnit.SECONDS);
+            if (finished && p.exitValue() == 0) {
+                return Map.of("status", "yes", "detail", "Docker \u00E7al\u0131\u015F\u0131yor");
             }
-            return Map.of("status", "no", "detail", "Docker exit code: " + code);
-        } catch (Exception e) {
-            return Map.of("status", "no", "detail", "Docker erisilemedi: " + e.getMessage());
-        }
+            if (!finished) p.destroyForcibly();
+        } catch (Exception ignored) {}
+        return Map.of("status", "unknown", "detail", "Docker kontrol edilemedi (docker.sock mount edilmemi\u015F olabilir)");
     }
 
     private Map<String, Object> checkDatabase() {
         try (Connection conn = dataSource.getConnection()) {
-            boolean valid = conn.isValid(3);
-            String url = conn.getMetaData().getURL();
+            boolean valid = conn.isValid(2);
             return Map.of("status", valid ? "yes" : "no",
-                    "detail", valid ? "Baglanti basarili" : "Baglanti gecersiz",
-                    "url", url != null ? url.replaceAll("//[^@]*@", "//***:***@") : "-");
+                    "detail", valid ? "Ba\u011Flant\u0131 ba\u015Far\u0131l\u0131" : "Ba\u011Flant\u0131 ge\u00E7ersiz");
         } catch (Exception e) {
-            return Map.of("status", "no", "detail", "Veritabani hatasi: " + e.getMessage());
+            return Map.of("status", "no", "detail", "Veritaban\u0131 hatas\u0131: " + e.getMessage());
         }
     }
 
     private List<Map<String, String>> getLastErrors(int count) {
         List<Map<String, String>> errors = new ArrayList<>();
-        Path logFile = Paths.get(System.getProperty("user.dir"), "logs", "cardtracker.log");
+        Path logFile = Paths.get("/app/logs/cardtracker.log");
         if (!Files.exists(logFile)) {
-            logFile = Paths.get(System.getProperty("user.dir"), "logs", "application.json");
+            logFile = Paths.get(System.getProperty("user.dir"), "logs", "cardtracker.log");
         }
         if (!Files.exists(logFile)) {
             Map<String, String> empty = new LinkedHashMap<>();
             empty.put("time", "-");
-            empty.put("message", "Log dosyasi bulunamadi");
+            empty.put("message", "Log dosyas\u0131 bulunamad\u0131");
             errors.add(empty);
             return errors;
         }
@@ -113,13 +131,13 @@ public class UpdateController {
             if (errors.isEmpty()) {
                 Map<String, String> empty = new LinkedHashMap<>();
                 empty.put("time", "-");
-                empty.put("message", "Hata bulunamadi");
+                empty.put("message", "Hata bulunamad\u0131");
                 errors.add(empty);
             }
         } catch (Exception e) {
             Map<String, String> err = new LinkedHashMap<>();
             err.put("time", "-");
-            err.put("message", "Log okunamadi: " + e.getMessage());
+            err.put("message", "Log okunamad\u0131: " + e.getMessage());
             errors.add(err);
         }
         return errors;
@@ -159,8 +177,11 @@ public class UpdateController {
                 }
             }
 
-            boolean finished = process.waitFor(60, TimeUnit.SECONDS);
+            boolean finished = process.waitFor(120, TimeUnit.SECONDS);
             int exitCode = finished ? process.exitValue() : -1;
+            if (!finished) {
+                process.destroyForcibly();
+            }
             String out = output.toString();
 
             boolean isNewer = out.contains("Downloaded newer image") || out.contains("Pulling from");
@@ -170,14 +191,17 @@ public class UpdateController {
                     "status", exitCode == 0 ? "ok" : "error",
                     "updateAvailable", isNewer,
                     "upToDate", isUpToDate,
-                    "message", isNewer ? "Yeni guncelleme mevcut!" : "Suan yeni guncelleme yok",
+                    "message", isNewer ? "Yeni g\u00FCncelleme mevcut!" :
+                               isUpToDate ? "\u015Eu an yeni g\u00FCncelleme yok" :
+                               exitCode == 0 ? "Kontrol tamamland\u0131" : "Docker komutu ba\u015Far\u0131s\u0131z",
                     "detail", out.length() > 300 ? out.substring(out.length() - 300) : out
             ));
         } catch (Exception e) {
             return ResponseEntity.ok(Map.of(
                     "status", "error",
                     "updateAvailable", false,
-                    "message", "Guncelleme kontrol edilemedi: " + e.getMessage()
+                    "upToDate", false,
+                    "message", "G\u00FCncelleme kontrol edilemedi: " + e.getMessage()
             ));
         }
     }
@@ -212,14 +236,14 @@ public class UpdateController {
                 }).start();
                 return ResponseEntity.ok(Map.of(
                         "status", "ok",
-                        "message", "Guncelleme basariyla indirildi. Uygulama yeniden baslatiliyor...",
+                        "message", "G\u00FCncelleme ba\u015Far\u0131yla indirildi. Uygulama yeniden ba\u015Flat\u0131l\u0131yor...",
                         "output", output.toString()
                 ));
             } else {
                 log.error("Imaj cekme basarisiz. Exit code: {}", exitCode);
                 return ResponseEntity.status(500).body(Map.of(
                         "status", "error",
-                        "message", "Imaj cekilemedi (exit code: " + exitCode + "). Docker'in kurulu ve erisilebilir oldugundan emin olun.",
+                        "message", "\u0130maj \u00E7ekilemedi (exit code: " + exitCode + "). Docker'\u0131n kurulu ve eri\u015Filebilir oldu\u011Fundan emin olun.",
                         "output", output.toString()
                 ));
             }
@@ -227,7 +251,7 @@ public class UpdateController {
             log.error("Guncelleme hatasi", e);
             return ResponseEntity.status(500).body(Map.of(
                     "status", "error",
-                    "message", "Guncelleme yapilamadi: " + e.getMessage() + ". Docker'in kurulu ve docker.sock'in mount edilmis oldugundan emin olun."
+                    "message", "G\u00FCncelleme yap\u0131lamad\u0131: " + e.getMessage() + ". Docker'\u0131n kurulu ve docker.sock'\u0131n mount edilmi\u015F oldu\u011Fundan emin olun."
             ));
         }
     }

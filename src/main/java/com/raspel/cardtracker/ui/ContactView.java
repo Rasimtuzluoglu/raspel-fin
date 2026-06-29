@@ -62,6 +62,7 @@ public class ContactView extends VerticalLayout {
         HorizontalLayout toolbar = createToolbar();
         toolbar.addClassName("view-toolbar");
         HorizontalLayout filters = createFilters();
+        filters.addClassName("filters-layout");
 
         // 3. Grid konfigürasyonu
         configureGrid();
@@ -229,7 +230,9 @@ public class ContactView extends VerticalLayout {
     private void openEditDialog(Contact contactToEdit) {
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle(contactToEdit == null ? "Yeni Cari Kart Oluştur" : "Cari Kart Düzenle");
-        dialog.setWidth("500px");
+        dialog.setMinWidth("350px");
+        dialog.setMaxWidth("550px");
+        dialog.setWidth("95vw");
 
         FormLayout form = new FormLayout();
 

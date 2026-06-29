@@ -3,7 +3,6 @@ package com.raspel.cardtracker.domain.card;
 import com.raspel.cardtracker.domain.audit.AuditLogService;
 import com.raspel.cardtracker.domain.expense.Expense;
 import com.raspel.cardtracker.domain.expense.ExpenseRepository;
-import com.raspel.cardtracker.domain.expense.InstallmentEntryRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -23,7 +22,6 @@ class CardServiceTest {
 
     @Mock private CardRepository cardRepository;
     @Mock private ExpenseRepository expenseRepository;
-    @Mock private InstallmentEntryRepository installmentEntryRepository;
     @Mock private AuditLogService auditLogService;
 
     @InjectMocks
@@ -66,41 +64,41 @@ class CardServiceTest {
     }
 
     @Test
-    void delete_shouldSetCardInactiveAndDetachExpenses() {
+    void delete_shouldSetCardInactiveAndPreserveExpenses() {
         Card card = new Card();
         card.setId(1L);
         card.setName("Kart");
         card.setActive(true);
 
-        Expense expense = new Expense();
-        expense.setCard(card);
-
         when(cardRepository.findById(1L)).thenReturn(Optional.of(card));
-        when(expenseRepository.findByCardId(1L)).thenReturn(List.of(expense));
         when(cardRepository.save(any())).thenReturn(card);
+        when(expenseRepository.countByCardId(1L)).thenReturn(3L);
 
         cardService.delete(1L);
 
         assertThat(card.getActive()).isFalse();
         verify(cardRepository).save(card);
-        verify(expenseRepository).deleteAllByCardId(1L);
-        verify(auditLogService).log(any(), eq("Kart"), any(), contains("Kart silindi"));
+        verify(expenseRepository).countByCardId(1L);
+        verify(expenseRepository, never()).deleteAllByCardId(any());
+        verify(auditLogService).log(any(), eq("Kart"), any(), contains("soft delete"));
     }
 
     @Test
-    void delete_shouldNotDetachExpensesWhenNoneExist() {
+    void delete_shouldHandleCardWithNoExpenses() {
         Card card = new Card();
         card.setId(2L);
         card.setName("Boş Kart");
         card.setActive(true);
 
         when(cardRepository.findById(2L)).thenReturn(Optional.of(card));
-        when(expenseRepository.findByCardId(2L)).thenReturn(List.of());
         when(cardRepository.save(any())).thenReturn(card);
+        when(expenseRepository.countByCardId(2L)).thenReturn(0L);
 
         cardService.delete(2L);
 
-        verify(expenseRepository, never()).saveAll(any());
+        assertThat(card.getActive()).isFalse();
+        verify(cardRepository).save(card);
+        verify(expenseRepository).countByCardId(2L);
     }
 
     @Test

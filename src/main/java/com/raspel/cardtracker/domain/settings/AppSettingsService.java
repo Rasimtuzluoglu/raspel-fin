@@ -56,4 +56,16 @@ public class AppSettingsService {
         setting.setSettingValue(raw);
         appSettingsRepository.save(setting);
     }
+
+    public String getSetting(String key) {
+        return appSettingsRepository.findById(key)
+                .map(AppSettings::getSettingValue).orElse(null);
+    }
+
+    public void setSetting(String key, String value) {
+        AppSettings setting = appSettingsRepository.findById(key)
+                .orElse(new AppSettings(key, value));
+        setting.setSettingValue(value);
+        appSettingsRepository.save(setting);
+    }
 }

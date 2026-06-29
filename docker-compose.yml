@@ -49,6 +49,7 @@ services:
       REPORTS_DIR: /app/reports
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
     restart: unless-stopped
+    stop_grace_period: 15s
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health"]
       interval: 30s

@@ -28,6 +28,7 @@ import com.github.appreciated.apexcharts.ApexChartsBuilder;
 import com.github.appreciated.apexcharts.config.builder.*;
 import com.github.appreciated.apexcharts.config.chart.Type;
 import com.github.appreciated.apexcharts.config.plotoptions.builder.BarBuilder;
+import com.github.appreciated.apexcharts.config.yaxis.builder.LabelsBuilder;
 import com.github.appreciated.apexcharts.helper.Series;
 
 import java.math.BigDecimal;
@@ -213,8 +214,14 @@ public class ReportView extends VerticalLayout {
                                 .withColumnWidth("55%")
                                 .build())
                         .build())
+                .withDataLabels(DataLabelsBuilder.get().withEnabled(false).build())
                 .withXaxis(XAxisBuilder.get()
                         .withCategories(categories.toArray(new String[0]))
+                        .build())
+                .withYaxis(YAxisBuilder.get()
+                        .withLabels(LabelsBuilder.get()
+                                .withFormatter("function(val){return new Intl.NumberFormat('tr-TR',{maximumFractionDigits:0}).format(val)+'₺';}")
+                                .build())
                         .build())
                 .withSeries(new Series<>("Harcama Tutarı (₺)", amounts.toArray(new Double[0])))
                 .withColors("#2196F3")

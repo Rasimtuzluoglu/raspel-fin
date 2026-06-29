@@ -109,6 +109,7 @@ public class ExpenseView extends VerticalLayout {
         HorizontalLayout toolbar = createToolbar();
         toolbar.addClassName("view-toolbar");
         HorizontalLayout filters = createFilters();
+        filters.addClassName("filters-layout");
 
         add(loadingBar, toolbar, filters, grid);
 
@@ -153,7 +154,7 @@ public class ExpenseView extends VerticalLayout {
                 desc += " (" + entry.getExpense().getContact().getName() + ")";
             }
             return desc.length() > 40 ? desc.substring(0, 40) + "..." : desc;
-        }).setHeader("Açıklama").setSortable(true).setAutoWidth(true).setFlexGrow(1);
+        }).setHeader("Açıklama").setSortable(true).setAutoWidth(false).setWidth("350px").setFlexGrow(1);
 
         grid.addColumn(entry -> FormatUtils.formatNumber(entry.getAmount()) + " ₺")
                 .setHeader("Tutar").setSortable(true).setAutoWidth(true);
@@ -395,7 +396,9 @@ public class ExpenseView extends VerticalLayout {
         Dialog dialog = new Dialog();
         boolean isEdit = expenseToEdit != null && expenseToEdit.getId() != null;
         dialog.setHeaderTitle(isEdit ? "Harcama Düzenle" : (expenseToEdit != null ? "Harcama Kopyala" : "Yeni Harcama"));
-        dialog.setWidth("550px");
+        dialog.setMinWidth("350px");
+        dialog.setMaxWidth("600px");
+        dialog.setWidth("95vw");
 
         FormLayout form = new FormLayout();
 
@@ -651,7 +654,9 @@ public class ExpenseView extends VerticalLayout {
     private void openImportDialog() {
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle("Excel Import");
-        dialog.setWidth("500px");
+        dialog.setMinWidth("350px");
+        dialog.setMaxWidth("550px");
+        dialog.setWidth("95vw");
 
         VerticalLayout content = new VerticalLayout();
         content.setPadding(false);
@@ -706,7 +711,9 @@ public class ExpenseView extends VerticalLayout {
     private void openBankImportDialog() {
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle("Banka Ekstresi İçe Aktar");
-        dialog.setWidth("550px");
+        dialog.setMinWidth("350px");
+        dialog.setMaxWidth("600px");
+        dialog.setWidth("95vw");
 
         VerticalLayout content = new VerticalLayout();
         content.setPadding(false);

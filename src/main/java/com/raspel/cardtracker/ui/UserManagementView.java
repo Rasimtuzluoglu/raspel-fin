@@ -140,7 +140,9 @@ public class UserManagementView extends VerticalLayout {
     private void openCreateDialog() {
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle("Yeni Kullanıcı");
-        dialog.setWidth("400px");
+        dialog.setMinWidth("350px");
+        dialog.setMaxWidth("450px");
+        dialog.setWidth("95vw");
 
         FormLayout form = new FormLayout();
 
@@ -199,7 +201,9 @@ public class UserManagementView extends VerticalLayout {
     private void openPasswordResetDialog(AppUser user) {
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle("Şifre Sıfırla - " + user.getUsername());
-        dialog.setWidth("400px");
+        dialog.setMinWidth("350px");
+        dialog.setMaxWidth("450px");
+        dialog.setWidth("95vw");
 
         FormLayout form = new FormLayout();
 

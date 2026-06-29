@@ -12,6 +12,7 @@
         <root level="INFO">
             <appender-ref ref="JSON"/>
         </root>
+        <logger name="org.telegram" level="WARN"/>
     </springProfile>
     <springProfile name="!production">
         <include resource="org/springframework/boot/logging/logback/defaults.xml"/>
@@ -32,5 +33,6 @@
             <appender-ref ref="CONSOLE"/>
             <appender-ref ref="FILE"/>
         </root>
+        <logger name="org.telegram" level="WARN"/>
     </springProfile>
 </configuration>

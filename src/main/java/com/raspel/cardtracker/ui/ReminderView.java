@@ -29,6 +29,7 @@ import com.raspel.cardtracker.domain.expense.InstallmentEntry;
 import com.raspel.cardtracker.domain.note.Note;
 import com.raspel.cardtracker.domain.note.NoteService;
 import com.raspel.cardtracker.domain.reminder.PaymentReminderService;
+import com.raspel.cardtracker.domain.settings.AppSettingsService;
 import jakarta.annotation.security.PermitAll;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -47,6 +48,7 @@ public class ReminderView extends VerticalLayout {
     private final ExpenseService expenseService;
     private final ChequeService chequeService;
     private final NoteService noteService;
+    private final AppSettingsService appSettingsService;
 
     private final Grid<InstallmentEntry> installmentGrid = new Grid<>(InstallmentEntry.class, false);
     private final Grid<Cheque> chequeGrid = new Grid<>(Cheque.class, false);
@@ -61,11 +63,12 @@ public class ReminderView extends VerticalLayout {
     private final Tabs tabs = new Tabs(installmentTab, chequeTab);
     private HorizontalLayout summaryLayout;
 
-    public ReminderView(PaymentReminderService reminderService, ExpenseService expenseService, ChequeService chequeService, NoteService noteService) {
+    public ReminderView(PaymentReminderService reminderService, ExpenseService expenseService, ChequeService chequeService, NoteService noteService, AppSettingsService appSettingsService) {
         this.reminderService = reminderService;
         this.expenseService = expenseService;
         this.chequeService = chequeService;
         this.noteService = noteService;
+        this.appSettingsService = appSettingsService;
 
         setSizeFull();
         setPadding(true);
@@ -78,6 +81,7 @@ public class ReminderView extends VerticalLayout {
 
         createHeader();
         createNoteSection();
+        createUpdateBanner();
         createSummaryCards();
         createTabs();
         createGrids();
@@ -102,6 +106,52 @@ public class ReminderView extends VerticalLayout {
         header.add(title, refreshBtn);
         header.expand(title);
         add(header);
+    }
+
+    private void createUpdateBanner() {
+        String updateFlag = appSettingsService.getSetting("updateAvailable");
+        if (!"true".equals(updateFlag)) return;
+
+        Div banner = new Div();
+        banner.getStyle()
+                .set("background", "linear-gradient(135deg, var(--lumo-primary-color-10pct), var(--lumo-base-color))")
+                .set("border", "1px solid var(--lumo-primary-color-30pct)")
+                .set("border-radius", "12px")
+                .set("padding", "1em 1.5em")
+                .set("margin-bottom", "1em")
+                .set("display", "flex")
+                .set("align-items", "center")
+                .set("gap", "1em");
+
+        Span icon = new Span("\uD83C\uDF1F");
+        icon.getStyle().set("font-size", "1.8em");
+
+        VerticalLayout text = new VerticalLayout();
+        text.setPadding(false);
+        text.setSpacing(false);
+
+        Span title = new Span("Yeni G\u00FCncelleme Mevcut!");
+        title.getStyle().set("font-weight", "700").set("font-size", "1em").set("color", "var(--lumo-primary-text-color)");
+
+        Span sub = new Span("Yaz\u0131l\u0131m\u0131n yeni bir s\u00FCr\u00FCm\u00FC bulundu. Profil sayfas\u0131ndan g\u00FCncelleme yapabilirsiniz.");
+        sub.getStyle().set("font-size", "0.8em").set("color", "var(--lumo-secondary-text-color)");
+
+        text.add(title, sub);
+
+        Button goBtn = new Button("G\u00FCncelle", new Icon(VaadinIcon.ARROW_RIGHT), e -> {
+            appSettingsService.setSetting("updateAvailable", "false");
+            getUI().ifPresent(ui -> ui.navigate("profile"));
+        });
+        goBtn.addThemeVariants(ButtonVariant.LUMO_PRIMARY);
+        goBtn.getStyle().set("flex-shrink", "0");
+
+        HorizontalLayout row = new HorizontalLayout(icon, text, goBtn);
+        row.setWidthFull();
+        row.setAlignItems(Alignment.CENTER);
+        row.expand(text);
+
+        banner.add(row);
+        add(banner);
     }
 
     private void createNoteSection() {

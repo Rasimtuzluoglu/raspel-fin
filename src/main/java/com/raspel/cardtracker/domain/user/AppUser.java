@@ -3,10 +3,14 @@ package com.raspel.cardtracker.domain.user;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "app_user")
+@EntityListeners(AuditingEntityListener.class)
 @Getter
 @Setter
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
@@ -43,8 +47,13 @@ public class AppUser {
     private Boolean active = true;
 
     @Column(name = "created_at", nullable = false, updatable = false)
+    @CreatedDate
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Column(name = "updated_at")
+    @LastModifiedDate
+    private LocalDateTime updatedAt;
 
     @Column(name = "dashboard_config", columnDefinition = "TEXT")
     private String dashboardConfig;
@@ -68,4 +77,8 @@ public class AppUser {
 
     @Column(name = "telegram_verification_code", length = 20)
     private String telegramVerificationCode;
+
+    @Column(name = "must_change_password", nullable = false)
+    @Builder.Default
+    private Boolean mustChangePassword = false;
 }

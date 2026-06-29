@@ -287,7 +287,9 @@ public class EmployeeTaskView extends VerticalLayout {
     private void openEmployeeDialog(Employee employee) {
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle(employee.getId() == null ? "Yeni Eleman" : "Elemanı Düzenle");
-        dialog.setWidth("400px");
+        dialog.setMinWidth("350px");
+        dialog.setMaxWidth("450px");
+        dialog.setWidth("95vw");
 
         FormLayout form = new FormLayout();
         TextField firstName = new TextField("Ad");
@@ -363,7 +365,9 @@ public class EmployeeTaskView extends VerticalLayout {
     private void openTaskDialog(EmployeeTask task) {
         Dialog dialog = new Dialog();
         dialog.setHeaderTitle(task.getId() == null ? "Yeni Görev" : "Görevi Düzenle");
-        dialog.setWidth("450px");
+        dialog.setMinWidth("350px");
+        dialog.setMaxWidth("450px");
+        dialog.setWidth("95vw");
 
         FormLayout form = new FormLayout();
         TextField title = new TextField("Görev Başlığı");

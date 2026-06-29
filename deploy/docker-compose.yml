@@ -48,6 +48,7 @@ services:
       REPORTS_DIR: /app/reports
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
     restart: unless-stopped
+    stop_grace_period: 15s
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health"]
       interval: 30s
@@ -87,25 +88,6 @@ services:
         limits:
           cpus: '0.5'
           memory: 256M
-
-  watchtower:
-    image: containrrr/watchtower
-    container_name: cardtracker-watchtower
-    restart: unless-stopped
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-    environment:
-      WATCHTOWER_SCHEDULE: "0 */5 * * * *"
-      WATCHTOWER_CLEANUP: "true"
-      WATCHTOWER_INCLUDE_RESTARTING: "true"
-      WATCHTOWER_NO_STARTUP_MESSAGE: "true"
-      WATCHTOWER_WARN_ON_HEAD_FAILURE: "always"
-    command: cardtracker-app
-    deploy:
-      resources:
-        limits:
-          cpus: '0.25'
-          memory: 64M
 
 volumes:
   pgdata:

@@ -58,6 +58,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
     private final java.util.Set<String> sentAlerts;
     private TelegramBotsApi botsApi;
     private DefaultBotSession botSession;
+    private volatile boolean botStarted = false;
 
     public TelegramBotService(UserService userService, CardService cardService,
                               ExpenseService expenseService, ChequeService chequeService,
@@ -77,17 +78,39 @@ public class TelegramBotService extends TelegramLongPollingBot {
     }
 
     @PostConstruct
-    void init() {
+    public void init() {
+        if (botStarted) return;
         if (environment.getProperty("TELEGRAM_BOT_TOKEN", "").isEmpty()) {
             log.info("TELEGRAM_BOT_TOKEN tanımlı değil, Telegram bot devre dışı.");
         } else {
             try {
+                // Clear any stale webhook/polling state from previous instance
+                try {
+                    execute(org.telegram.telegrambots.meta.api.methods.updates.DeleteWebhook.builder().dropPendingUpdates(true).build());
+                } catch (Exception ignored) {}
+                Thread.sleep(3000);
+
                 botsApi = new TelegramBotsApi(DefaultBotSession.class);
                 botSession = (DefaultBotSession) botsApi.registerBot(this);
+                botStarted = true;
                 registerCommands();
                 log.info("Telegram bot başlatıldı: @raspel_fin_bot (16 komut)");
             } catch (TelegramApiException e) {
-                log.error("Bot kaydedilemedi: {}", e.getMessage(), e);
+                if (e.getMessage() != null && e.getMessage().contains("409")) {
+                    log.warn("Bot zaten kayıtlı (409). 5 saniye bekleyip tekrar deneniyor...");
+                    try { Thread.sleep(5000); } catch (InterruptedException ignored) {}
+                    try {
+                        botsApi = new TelegramBotsApi(DefaultBotSession.class);
+                        botSession = (DefaultBotSession) botsApi.registerBot(this);
+                        botStarted = true;
+                        registerCommands();
+                        log.info("Telegram bot başlatıldı (2. deneme): @raspel_fin_bot");
+                    } catch (Exception e2) {
+                        log.error("Bot 2. denemede de kaydedilemedi: {}", e2.getMessage());
+                    }
+                } else {
+                    log.error("Bot kaydedilemedi: {}", e.getMessage(), e);
+                }
             } catch (Exception e) {
                 log.error("Bot başlatılamadı: {}", e.getMessage(), e);
             }
@@ -95,7 +118,8 @@ public class TelegramBotService extends TelegramLongPollingBot {
     }
 
     @PreDestroy
-    void shutdown() {
+    public void shutdown() {
+        botStarted = false;
         try {
             if (botSession != null && botSession.isRunning()) {
                 botSession.stop();
