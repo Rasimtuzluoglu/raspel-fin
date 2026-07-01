@@ -112,25 +112,7 @@ public class ExpenseView extends VerticalLayout {
         HorizontalLayout filters = createFilters();
         filters.addClassName("filters-layout");
 
-        Div totalBanner = new Div();
-        totalBanner.addClassName("total-spending-banner");
-        totalBanner.setWidthFull();
-        totalBanner.getStyle()
-                .set("padding", "10px 20px")
-                .set("background", "var(--lumo-primary-color-10pct)")
-                .set("border-radius", "8px")
-                .set("font-size", "1em")
-                .set("font-weight", "600")
-                .set("color", "var(--lumo-primary-text-color)")
-                .set("display", "flex")
-                .set("align-items", "center")
-                .set("justify-content", "space-between")
-                .set("min-height", "44px");
-        Span totalLabel = new Span("Toplam Harcama:");
-        totalLabel.getStyle().set("margin-right", "12px");
-        totalBanner.add(totalLabel, totalDisplay);
-
-        add(loadingBar, toolbar, filters, totalBanner, grid);
+        add(loadingBar, toolbar, filters, grid);
 
         configureEmptyState();
         add(emptyState);
@@ -364,10 +346,17 @@ public class ExpenseView extends VerticalLayout {
         Button bankImportBtn = new Button("Banka Ekstresi", new Icon(VaadinIcon.UPLOAD), e -> openBankImportDialog());
         bankImportBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
 
-        HorizontalLayout toolbar = new HorizontalLayout(title, addBtn, importBtn, bankImportBtn, templateAnchor, exportAnchor, pdfExportAnchor);
+        HorizontalLayout toolbar = new HorizontalLayout(title, addBtn, importBtn, bankImportBtn, templateAnchor, exportAnchor, pdfExportAnchor, totalDisplay);
         toolbar.setAlignItems(Alignment.CENTER);
         toolbar.setWidthFull();
+        toolbar.setSpacing(true);
         toolbar.expand(title);
+
+        totalDisplay.getStyle()
+                .set("font-weight", "700")
+                .set("color", "var(--lumo-primary-text-color)")
+                .set("white-space", "nowrap")
+                .set("font-size", "0.95em");
 
         return toolbar;
     }
@@ -844,7 +833,8 @@ public class ExpenseView extends VerticalLayout {
 
         // Calculate total for display
         BigDecimal total = expenseService.sumAmountBySearchTermAndYearAndMonth(term, year, month, cardId);
-        totalDisplay.setText(FormatUtils.formatNumber(total != null ? total : BigDecimal.ZERO) + " ₺");
+        BigDecimal t = total != null ? total : BigDecimal.ZERO;
+        totalDisplay.setText("Toplam: " + FormatUtils.formatNumber(t) + " ₺");
 
         showGrid();
     }
