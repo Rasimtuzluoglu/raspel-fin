@@ -165,7 +165,7 @@ public class ExpenseService {
         LocalDate startDate = expense.getExpenseDate();
 
         for (int i = 0; i < installmentCount; i++) {
-            YearMonth ym = YearMonth.from(startDate).plusMonths(i + 1);
+            YearMonth ym = YearMonth.from(startDate).plusMonths(i);
             BigDecimal amount = (i == installmentCount - 1)
                     ? perInstallment.add(remainder)
                     : perInstallment;
