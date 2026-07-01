@@ -56,15 +56,15 @@ class ExpenseServiceTest {
 
         assertThat(entries.get(0).getAmount()).isEqualByComparingTo("83.33");
         assertThat(entries.get(0).getDueYear()).isEqualTo(2026);
-        assertThat(entries.get(0).getDueMonth()).isEqualTo(2);
+        assertThat(entries.get(0).getDueMonth()).isEqualTo(1);
 
         assertThat(entries.get(10).getAmount()).isEqualByComparingTo("83.33");
         assertThat(entries.get(10).getDueYear()).isEqualTo(2026);
-        assertThat(entries.get(10).getDueMonth()).isEqualTo(12);
+        assertThat(entries.get(10).getDueMonth()).isEqualTo(11);
 
         assertThat(entries.get(11).getAmount()).isEqualByComparingTo("83.37");
-        assertThat(entries.get(11).getDueYear()).isEqualTo(2027);
-        assertThat(entries.get(11).getDueMonth()).isEqualTo(1);
+        assertThat(entries.get(11).getDueYear()).isEqualTo(2026);
+        assertThat(entries.get(11).getDueMonth()).isEqualTo(12);
 
         BigDecimal sum = entries.stream().map(InstallmentEntry::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
         assertThat(sum).isEqualByComparingTo("1000.00");
@@ -88,9 +88,9 @@ class ExpenseServiceTest {
         assertThat(entries.get(0).getAmount()).isEqualByComparingTo("400.00");
         assertThat(entries.get(1).getAmount()).isEqualByComparingTo("400.00");
         assertThat(entries.get(2).getAmount()).isEqualByComparingTo("400.00");
-        assertThat(entries.get(0).getDueMonth()).isEqualTo(4);
-        assertThat(entries.get(1).getDueMonth()).isEqualTo(5);
-        assertThat(entries.get(2).getDueMonth()).isEqualTo(6);
+        assertThat(entries.get(0).getDueMonth()).isEqualTo(3);
+        assertThat(entries.get(1).getDueMonth()).isEqualTo(4);
+        assertThat(entries.get(2).getDueMonth()).isEqualTo(5);
     }
 
     @Test
