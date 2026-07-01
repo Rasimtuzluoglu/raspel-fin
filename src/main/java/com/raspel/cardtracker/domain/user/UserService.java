@@ -33,13 +33,13 @@ public class UserService implements UserDetailsService {
      * - En az 1 rakam
      */
     private static final int MIN_PASSWORD_LENGTH = 8;
-    private static final Pattern UPPERCASE_PATTERN = Pattern.compile("[A-Z]");
+    private static final Pattern UPPERCASE_PATTERN = Pattern.compile("\\p{Lu}");
     private static final Pattern DIGIT_PATTERN = Pattern.compile("[0-9]");
 
     @Override
     @Transactional(readOnly = true)
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        AppUser appUser = userRepository.findByUsername(username.toLowerCase(java.util.Locale.ENGLISH))
+        AppUser appUser = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("Geçersiz kullanıcı adı veya şifre"));
 
         if (!appUser.getActive()) {
@@ -97,13 +97,12 @@ public class UserService implements UserDetailsService {
 
     public AppUser createUser(String username, String rawPassword, String fullName, Role role) {
         validatePassword(rawPassword);
-        String normalizedUsername = username.toLowerCase(java.util.Locale.ENGLISH);
-        if (userRepository.existsByUsername(normalizedUsername)) {
-            throw new IllegalArgumentException("Bu kullanıcı adı zaten kullanılıyor: " + normalizedUsername);
+        if (userRepository.existsByUsername(username)) {
+            throw new IllegalArgumentException("Bu kullanıcı adı zaten kullanılıyor: " + username);
         }
 
         AppUser user = AppUser.builder()
-                .username(normalizedUsername)
+                .username(username)
                 .password(passwordEncoder.encode(rawPassword))
                 .fullName(fullName)
                 .role(role)

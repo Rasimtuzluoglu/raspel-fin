@@ -72,4 +72,7 @@ public class Cheque {
     @Column(name = "updated_at")
     @LastModifiedDate
     private LocalDateTime updatedAt;
+
+    @Column(name = "notification_sent_at")
+    private LocalDateTime notificationSentAt;
 }

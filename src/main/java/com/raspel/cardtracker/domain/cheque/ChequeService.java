@@ -61,6 +61,13 @@ public class ChequeService {
         if (cheque.getMaturityDate() == null) {
             throw new IllegalArgumentException("Vade tarihi zorunludur");
         }
+        // Vade tarihi değiştiyse bildirim durumunu sıfırla
+        if (!isNew) {
+            Optional<Cheque> existing = chequeRepository.findById(cheque.getId());
+            if (existing.isPresent() && !existing.get().getMaturityDate().equals(cheque.getMaturityDate())) {
+                cheque.setNotificationSentAt(null);
+            }
+        }
         Cheque saved = chequeRepository.save(cheque);
         auditLogService.log(
                 isNew ? AuditAction.CREATE : AuditAction.UPDATE,

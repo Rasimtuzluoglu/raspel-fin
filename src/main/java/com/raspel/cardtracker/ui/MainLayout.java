@@ -743,9 +743,9 @@ public class MainLayout extends AppLayout {
         dialog.open();
 
         getElement().executeJs(
-            "setTimeout(function(){" +
-            "fetch('/api/system/status',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin'})" +
-            ".then(r=>{if(!r.ok)throw new Error('HTTP '+r.status);return r.json()})" +
+            "var controller = new AbortController(); var timeoutId = setTimeout(function(){controller.abort();},12000);" +
+            "fetch('/api/system/status',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',signal:controller.signal})" +
+            ".then(r=>{clearTimeout(timeoutId);if(!r.ok)throw new Error('HTTP '+r.status);return r.json()})" +
             ".then(function(d){" +
             "  var lb=document.getElementById('status-loading'); if(lb)lb.remove();" +
             "  var rs=document.getElementById('status-results'); if(!rs)return; rs.style.display='';" +
@@ -778,9 +778,13 @@ public class MainLayout extends AppLayout {
             "  h+='<div style=\"font-size:0.58em;color:var(--lumo-tertiary-text-color);text-align:center;margin-top:8px\">'+d.timestamp+'</div>';" +
             "  h+='</div>';" +
             "  rs.innerHTML=h;" +
-            "}).catch(function(){" +
+            "}).catch(function(e){" +
+            "  clearTimeout(timeoutId);" +
             "  var lb=document.getElementById('status-loading'); if(lb)lb.remove();" +
-            "  var rs=document.getElementById('status-results'); if(rs){rs.style.display='';rs.innerHTML='<div style=\"color:var(--lumo-error-color);text-align:center;padding:12px;font-size:0.82em\">Sistem durumu al\u0131namad\u0131</div>';}" +
+            "  var rs=document.getElementById('status-results'); if(rs){rs.style.display='';" +
+            "    var errMsg = e.name==='AbortError' ? 'İstek zaman aşımına uğradı (12 sn). Docker servisine erişilemiyor olabilir.' : 'Sistem durumu alınamadı: ' + e.message;" +
+            "    rs.innerHTML='<div style=\"color:var(--lumo-error-color);text-align:center;padding:12px;font-size:0.82em\">' + errMsg + '</div>';" +
+            "  }" +
             "});},100);"
         );
     }

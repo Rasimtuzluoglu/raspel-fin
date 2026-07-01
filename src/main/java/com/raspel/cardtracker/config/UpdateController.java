@@ -68,23 +68,31 @@ public class UpdateController {
     }
 
     private Map<String, Object> checkDockerFast() {
-        // Check if Docker socket exists and is accessible
         Path socket = Paths.get("/var/run/docker.sock");
         if (Files.exists(socket)) {
-            return Map.of("status", "yes", "detail", "Docker socket mevcut");
+            try {
+                ProcessBuilder pb = new ProcessBuilder("docker", "version");
+                pb.redirectErrorStream(true);
+                Process p = pb.start();
+                boolean finished = p.waitFor(3, TimeUnit.SECONDS);
+                if (finished && p.exitValue() == 0) {
+                    return Map.of("status", "yes", "detail", "Docker çalışıyor");
+                }
+                if (!finished) p.destroyForcibly();
+            } catch (Exception ignored) {}
+            return Map.of("status", "yes", "detail", "Docker socket mevcut (yanıt alınamadı)");
         }
-        // Try docker command with short timeout
         try {
             ProcessBuilder pb = new ProcessBuilder("docker", "version");
             pb.redirectErrorStream(true);
             Process p = pb.start();
             boolean finished = p.waitFor(3, TimeUnit.SECONDS);
             if (finished && p.exitValue() == 0) {
-                return Map.of("status", "yes", "detail", "Docker \u00E7al\u0131\u015F\u0131yor");
+                return Map.of("status", "yes", "detail", "Docker çalışıyor (socket yok ama CLI mevcut)");
             }
             if (!finished) p.destroyForcibly();
         } catch (Exception ignored) {}
-        return Map.of("status", "unknown", "detail", "Docker kontrol edilemedi (docker.sock mount edilmemi\u015F olabilir)");
+        return Map.of("status", "no", "detail", "Docker kullanılamıyor: docker.sock mount edilmemiş ve docker komutu çalışmadı. Konteynerda çalışıyorsanız docker-compose.yml'a /var/run/docker.sock:/var/run/docker.sock volume ekleyin.");
     }
 
     private Map<String, Object> checkDatabase() {

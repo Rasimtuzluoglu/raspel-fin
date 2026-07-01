@@ -79,6 +79,7 @@ public class ExpenseView extends VerticalLayout {
     private final TextField searchField = new TextField();
     private final ProgressBar loadingBar = new ProgressBar();
     private final Div emptyState = new Div();
+    private final Span totalDisplay = new Span();
 
     public ExpenseView(ExpenseService expenseService, CardService cardService, ContactService contactService,
                        ExcelImportService excelImportService, ExcelExportService excelExportService,
@@ -111,10 +112,22 @@ public class ExpenseView extends VerticalLayout {
         HorizontalLayout filters = createFilters();
         filters.addClassName("filters-layout");
 
-        add(loadingBar, toolbar, filters, grid);
+        add(loadingBar, toolbar, filters, totalDisplay, grid);
 
         configureEmptyState();
         add(emptyState);
+
+        totalDisplay.setId("total-display");
+        totalDisplay.getStyle()
+                .set("font-size", "0.95em")
+                .set("font-weight", "600")
+                .set("color", "var(--lumo-primary-text-color)")
+                .set("padding", "8px 16px")
+                .set("background", "var(--lumo-contrast-5pct)")
+                .set("border-radius", "6px")
+                .set("display", "inline-block")
+                .set("align-self", "flex-start")
+                .set("margin-bottom", "4px");
 
         refreshGrid();
     }
@@ -836,10 +849,7 @@ public class ExpenseView extends VerticalLayout {
 
         // Calculate total for display
         BigDecimal total = expenseService.sumAmountBySearchTermAndYearAndMonth(term, year, month, cardId);
-        getElement().executeJs(
-                "var el = document.getElementById('total-display'); if(el) el.textContent = 'Toplam: ' + $0 + ' ₺'",
-                FormatUtils.formatNumber(total != null ? total : BigDecimal.ZERO)
-        );
+        totalDisplay.setText("Toplam Harcama: " + FormatUtils.formatNumber(total != null ? total : BigDecimal.ZERO) + " ₺");
 
         showGrid();
     }

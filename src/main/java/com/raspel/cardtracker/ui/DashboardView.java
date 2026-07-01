@@ -27,6 +27,7 @@ import com.raspel.cardtracker.domain.cheque.ChequeType;
 import com.github.appreciated.apexcharts.ApexCharts;
 import com.github.appreciated.apexcharts.ApexChartsBuilder;
 import com.github.appreciated.apexcharts.config.builder.*;
+import com.github.appreciated.apexcharts.config.tooltip.builder.YBuilder;
 import com.github.appreciated.apexcharts.config.chart.Type;
 import com.github.appreciated.apexcharts.config.plotoptions.builder.BarBuilder;
 import com.github.appreciated.apexcharts.config.stroke.Curve;
@@ -944,6 +945,11 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
                         .build())
                 .withSeries(series.toArray(new Double[0]))
                 .withLabels(labels.toArray(new String[0]))
+                .withTooltip(TooltipBuilder.get()
+                        .withY(YBuilder.get()
+                                .withFormatter("function(value) { return '₺' + value.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }")
+                                .build())
+                        .build())
                 .build();
         return chart;
     }

@@ -1,0 +1,1 @@
+ALTER TABLE cheque ADD COLUMN IF NOT EXISTS notification_sent_at TIMESTAMP;

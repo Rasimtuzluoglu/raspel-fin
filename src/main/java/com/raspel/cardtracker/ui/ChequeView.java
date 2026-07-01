@@ -431,8 +431,18 @@ public class ChequeView extends VerticalLayout {
             }
 
             String chequeNo = chequeNoField.getValue().trim();
-            if (!chequeNo.matches("\\d{11}")) {
-                Notification.show("Çek numarası tam olarak 11 rakam olmalıdır", 4000, Notification.Position.BOTTOM_CENTER)
+            if (!chequeNo.matches("\\d{7}")) {
+                String msg;
+                if (chequeNo.matches("\\d+")) {
+                    msg = chequeNo.length() < 7
+                            ? "Çek numarası 7 haneli olmalıdır. Eksik rakam girdiniz (" + chequeNo.length() + " hane)."
+                            : "Çek numarası 7 haneli olmalıdır. Fazla rakam girdiniz (" + chequeNo.length() + " hane).";
+                } else if (!chequeNo.matches("\\d*")) {
+                    msg = "Çek numarası yalnızca rakamlardan oluşmalıdır.";
+                } else {
+                    msg = "Çek numarası tam olarak 7 rakam olmalıdır.";
+                }
+                Notification.show(msg, 4000, Notification.Position.BOTTOM_CENTER)
                         .addThemeVariants(NotificationVariant.LUMO_ERROR);
                 return;
             }

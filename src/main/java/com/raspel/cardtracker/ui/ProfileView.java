@@ -72,7 +72,7 @@ public class ProfileView extends VerticalLayout {
         setSizeFull();
         setPadding(true);
         setSpacing(false);
-        getStyle().set("padding-top", "48px").set("gap", "20px");
+        getStyle().set("gap", "20px");
 
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         String username = auth != null ? auth.getName() : "";

@@ -37,6 +37,7 @@ import org.telegram.telegrambots.updatesreceivers.DefaultBotSession;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.YearMonth;
 import java.time.format.DateTimeFormatter;
 import java.time.format.TextStyle;
@@ -300,6 +301,7 @@ public class TelegramBotService extends TelegramLongPollingBot {
         }
 
         // 6. Cheque maturity approaching (within 7 days)
+        LocalDateTime now = LocalDateTime.now();
         List<Cheque> cheques = chequeService.findAll().stream()
                 .filter(c -> c.getStatus() == ChequeStatus.PORTFOLIO)
                 .filter(c -> {
@@ -307,17 +309,32 @@ public class TelegramBotService extends TelegramLongPollingBot {
                     return days >= 0 && days <= 7;
                 }).toList();
         if (!cheques.isEmpty()) {
-            alerts.append("<b>📄 7 GÜN İÇİNDE VADESİ DOLACAK ÇEKLER:</b>\n");
+            boolean hasChequeWarning = false;
+            StringBuilder chequeAlerts = new StringBuilder();
             for (Cheque c : cheques) {
-                String key = "cheque_" + c.getId() + "_" + ChronoUnit.DAYS.between(today, c.getMaturityDate());
-                if (!sentAlerts.add(key)) continue;
+                // Use notification_sent_at to prevent duplicate sends: only send if not yet notified
+                // or if the maturity date was changed after the last notification
+                LocalDateTime lastNotification = c.getNotificationSentAt();
+                if (lastNotification != null && !lastNotification.toLocalDate().isBefore(today)) {
+                    continue; // Already notified today
+                }
+                if (!hasChequeWarning) {
+                    chequeAlerts.append("<b>📄 7 GÜN İÇİNDE VADESİ DOLACAK ÇEKLER:</b>\n");
+                    hasChequeWarning = true;
+                }
                 String type = c.getType() == ChequeType.ENTERING ? "📥 Giriş" : "📤 Çıkış";
                 long days = ChronoUnit.DAYS.between(today, c.getMaturityDate());
-                alerts.append("• ").append(type).append(" <b>").append(esc(c.getChequeNumber())).append("</b> ")
+                chequeAlerts.append("• ").append(type).append(" <b>").append(esc(c.getChequeNumber())).append("</b> ")
                         .append(FormatUtils.formatNumber(c.getAmount())).append(" ₺ (")
                         .append(c.getMaturityDate().format(DateTimeFormatter.ofPattern("dd.MM"))).append(", ").append(days).append(" gün)\n");
+                // Mark as notified
+                c.setNotificationSentAt(now);
+                chequeService.save(c);
             }
-            alerts.append("\n");
+            if (hasChequeWarning) {
+                chequeAlerts.append("\n");
+                alerts.append(chequeAlerts);
+            }
         }
 
         if (alerts.length() > 0) {

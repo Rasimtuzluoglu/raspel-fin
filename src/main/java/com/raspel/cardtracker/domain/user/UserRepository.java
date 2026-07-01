@@ -11,8 +11,11 @@ import java.util.List;
 
 @Repository
 public interface UserRepository extends JpaRepository<AppUser, Long> {
-    Optional<AppUser> findByUsername(String username);
-    boolean existsByUsername(String username);
+    @Query("SELECT u FROM AppUser u WHERE LOWER(u.username) = LOWER(:username)")
+    Optional<AppUser> findByUsername(@Param("username") String username);
+
+    @Query("SELECT COUNT(u) > 0 FROM AppUser u WHERE LOWER(u.username) = LOWER(:username)")
+    boolean existsByUsername(@Param("username") String username);
     List<AppUser> findAllByActiveTrue();
 
     @Modifying
