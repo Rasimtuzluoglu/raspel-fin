@@ -911,8 +911,8 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
         }
 
         if (deptTotals.isEmpty()) {
-            labels.add("Veri Yok");
-            series.add(0.0);
+            labels.add("Henüz veri yok");
+            series.add(1.0);
         }
 
         ApexCharts chart = ApexChartsBuilder.get()
@@ -954,8 +954,8 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
         }
 
         if (categoryTotals.isEmpty()) {
-            labels.add("Veri Yok");
-            series.add(0.0);
+            labels.add("Henüz veri yok");
+            series.add(1.0);
         }
 
         ApexCharts chart = ApexChartsBuilder.get()

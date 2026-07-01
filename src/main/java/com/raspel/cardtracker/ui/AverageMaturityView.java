@@ -386,6 +386,13 @@ public class AverageMaturityView extends VerticalLayout {
             pieData.add(amt.doubleValue());
         }
 
+        if (lineData.isEmpty()) {
+            lineData.add(1.0);
+            catLabels.add("Veri yok");
+            pieData.add(1.0);
+            pieLabels.add("Veri yok");
+        }
+
         // Line chart - Payment timeline
         ApexCharts lineChart = ApexChartsBuilder.get()
                 .withChart(ChartBuilder.get().withType(Type.LINE).withHeight("260px").withBackground("transparent").build())
