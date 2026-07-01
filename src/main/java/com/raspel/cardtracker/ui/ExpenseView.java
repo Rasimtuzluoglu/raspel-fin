@@ -112,7 +112,7 @@ public class ExpenseView extends VerticalLayout {
         HorizontalLayout filters = createFilters();
         filters.addClassName("filters-layout");
 
-        add(loadingBar, toolbar, filters, grid);
+        add(loadingBar, toolbar, filters, totalDisplay, grid);
 
         configureEmptyState();
         add(emptyState);
@@ -346,21 +346,11 @@ public class ExpenseView extends VerticalLayout {
         Button bankImportBtn = new Button("Banka Ekstresi", new Icon(VaadinIcon.UPLOAD), e -> openBankImportDialog());
         bankImportBtn.addThemeVariants(ButtonVariant.LUMO_TERTIARY);
 
-        HorizontalLayout toolbar = new HorizontalLayout(title, addBtn, importBtn, bankImportBtn, templateAnchor, exportAnchor, pdfExportAnchor, totalDisplay);
+        HorizontalLayout toolbar = new HorizontalLayout(title, addBtn, importBtn, bankImportBtn, templateAnchor, exportAnchor, pdfExportAnchor);
         toolbar.setAlignItems(Alignment.CENTER);
         toolbar.setWidthFull();
         toolbar.setSpacing(true);
         toolbar.expand(title);
-
-        totalDisplay.getStyle()
-                .set("font-weight", "700")
-                .set("color", "#1a73e8")
-                .set("white-space", "nowrap")
-                .set("font-size", "0.95em")
-                .set("padding", "4px 12px")
-                .set("background", "#e8f0fe")
-                .set("border-radius", "16px")
-                .set("margin-left", "8px");
 
         return toolbar;
     }
