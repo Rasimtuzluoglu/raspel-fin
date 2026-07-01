@@ -79,7 +79,6 @@ public class ExpenseView extends VerticalLayout {
     private final TextField searchField = new TextField();
     private final ProgressBar loadingBar = new ProgressBar();
     private final Div emptyState = new Div();
-    private final Div totalDisplay = new Div();
 
     public ExpenseView(ExpenseService expenseService, CardService cardService, ContactService contactService,
                        ExcelImportService excelImportService, ExcelExportService excelExportService,
@@ -380,19 +379,6 @@ public class ExpenseView extends VerticalLayout {
         });
 
         filters.add(resetBtn);
-
-        totalDisplay.getStyle()
-                .set("font-weight", "600")
-                .set("color", "#1a73e8")
-                .set("white-space", "nowrap")
-                .set("font-size", "0.9em")
-                .set("margin-left", "8px")
-                .set("padding", "2px 10px")
-                .set("background", "#e8f0fe")
-                .set("border-radius", "10px")
-                .set("display", "inline-block");
-
-        filters.add(totalDisplay);
         return filters;
     }
 
@@ -837,11 +823,6 @@ public class ExpenseView extends VerticalLayout {
                     return (int) page.getTotalElements();
                 }
         ));
-
-        // Calculate total for display
-        BigDecimal total = expenseService.sumAmountBySearchTermAndYearAndMonth(term, year, month, cardId);
-        BigDecimal t = total != null ? total : BigDecimal.ZERO;
-        totalDisplay.setText("Toplam: " + FormatUtils.formatNumber(t) + " ₺");
 
         showGrid();
     }

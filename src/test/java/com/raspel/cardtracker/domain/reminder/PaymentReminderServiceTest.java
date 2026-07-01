@@ -92,7 +92,7 @@ class PaymentReminderServiceTest {
 
         when(installmentEntryRepository.findAllUnpaidWithDetails()).thenReturn(List.of(entry));
 
-        List<InstallmentEntry> result = paymentReminderService.getUpcomingInstallments(30);
+        List<InstallmentEntry> result = paymentReminderService.getUpcomingInstallments(90);
 
         assertThat(result).isNotEmpty();
     }
