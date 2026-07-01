@@ -79,7 +79,7 @@ public class ExpenseView extends VerticalLayout {
     private final TextField searchField = new TextField();
     private final ProgressBar loadingBar = new ProgressBar();
     private final Div emptyState = new Div();
-    private final Span totalDisplay = new Span("Toplam Harcama: 0,00 ₺");
+    private final Span totalDisplay = new Span();
 
     public ExpenseView(ExpenseService expenseService, CardService cardService, ContactService contactService,
                        ExcelImportService excelImportService, ExcelExportService excelExportService,
@@ -112,7 +112,25 @@ public class ExpenseView extends VerticalLayout {
         HorizontalLayout filters = createFilters();
         filters.addClassName("filters-layout");
 
-        add(loadingBar, toolbar, filters, grid);
+        Div totalBanner = new Div();
+        totalBanner.addClassName("total-spending-banner");
+        totalBanner.setWidthFull();
+        totalBanner.getStyle()
+                .set("padding", "10px 20px")
+                .set("background", "var(--lumo-primary-color-10pct)")
+                .set("border-radius", "8px")
+                .set("font-size", "1em")
+                .set("font-weight", "600")
+                .set("color", "var(--lumo-primary-text-color)")
+                .set("display", "flex")
+                .set("align-items", "center")
+                .set("justify-content", "space-between")
+                .set("min-height", "44px");
+        Span totalLabel = new Span("Toplam Harcama:");
+        totalLabel.getStyle().set("margin-right", "12px");
+        totalBanner.add(totalLabel, totalDisplay);
+
+        add(loadingBar, toolbar, filters, totalBanner, grid);
 
         configureEmptyState();
         add(emptyState);
@@ -378,17 +396,7 @@ public class ExpenseView extends VerticalLayout {
             refreshGrid();
         });
 
-        totalDisplay.getStyle()
-                .set("font-size", "0.9em")
-                .set("font-weight", "600")
-                .set("color", "var(--lumo-primary-text-color)")
-                .set("white-space", "nowrap")
-                .set("margin-left", "8px")
-                .set("padding", "0.4em 1em")
-                .set("background", "var(--lumo-primary-color-10pct)")
-                .set("border-radius", "8px");
-
-        filters.add(resetBtn, totalDisplay);
+        filters.add(resetBtn);
         return filters;
     }
 
@@ -836,7 +844,7 @@ public class ExpenseView extends VerticalLayout {
 
         // Calculate total for display
         BigDecimal total = expenseService.sumAmountBySearchTermAndYearAndMonth(term, year, month, cardId);
-        totalDisplay.setText("Toplam Harcama: " + FormatUtils.formatNumber(total != null ? total : BigDecimal.ZERO) + " ₺");
+        totalDisplay.setText(FormatUtils.formatNumber(total != null ? total : BigDecimal.ZERO) + " ₺");
 
         showGrid();
     }
