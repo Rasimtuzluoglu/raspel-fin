@@ -381,7 +381,6 @@ public class ExpenseView extends VerticalLayout {
 
         filters.add(resetBtn);
 
-        totalDisplay.setText("Toplam: 0,00 ₺");
         totalDisplay.getStyle()
                 .set("font-weight", "600")
                 .set("color", "#1a73e8")
