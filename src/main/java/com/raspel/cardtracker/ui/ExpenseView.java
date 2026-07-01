@@ -383,22 +383,12 @@ public class ExpenseView extends VerticalLayout {
                 .set("font-weight", "600")
                 .set("color", "var(--lumo-primary-text-color)")
                 .set("white-space", "nowrap")
-                .set("margin-left", "8px");
+                .set("margin-left", "8px")
+                .set("padding", "0.4em 1em")
+                .set("background", "var(--lumo-primary-color-10pct)")
+                .set("border-radius", "8px");
 
         filters.add(resetBtn, totalDisplay);
-
-        // Toplam tutar gösterimi
-        Div totalDiv = new Div();
-        totalDiv.setId("total-display");
-        totalDiv.getStyle()
-                .set("padding", "0.5em 1em")
-                .set("background", "var(--lumo-primary-color-10pct)")
-                .set("border-radius", "8px")
-                .set("font-weight", "bold")
-                .set("display", "flex")
-                .set("align-items", "center");
-
-        filters.add(totalDiv);
         return filters;
     }
 
