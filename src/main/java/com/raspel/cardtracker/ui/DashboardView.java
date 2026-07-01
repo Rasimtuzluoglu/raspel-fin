@@ -788,6 +788,11 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
                         .withCategories(categories)
                         .build())
                 .withColors("#2196F3")
+                .withTooltip(TooltipBuilder.get()
+                        .withY(YBuilder.get()
+                                .withFormatter("function(value) { return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value); }")
+                                .build())
+                        .build())
                 .build();
         return chart;
     }
@@ -827,6 +832,11 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
                         .withCategories(categories)
                         .build())
                 .withColors("#4CAF50", "#F44336")
+                .withTooltip(TooltipBuilder.get()
+                        .withY(YBuilder.get()
+                                .withFormatter("function(value) { return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value); }")
+                                .build())
+                        .build())
                 .build();
         return chart;
     }
@@ -867,6 +877,11 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
                         .withCategories(categories)
                         .build())
                 .withColors("#4CAF50", "#F44336")
+                .withTooltip(TooltipBuilder.get()
+                        .withY(YBuilder.get()
+                                .withFormatter("function(value) { return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value); }")
+                                .build())
+                        .build())
                 .build();
         return chart;
     }
@@ -907,6 +922,11 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
                         .build())
                 .withSeries(series.toArray(new Double[0]))
                 .withLabels(labels.toArray(new String[0]))
+                .withTooltip(TooltipBuilder.get()
+                        .withY(YBuilder.get()
+                                .withFormatter("function(value) { return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value); }")
+                                .build())
+                        .build())
                 .build();
         return chart;
     }
@@ -947,7 +967,7 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
                 .withLabels(labels.toArray(new String[0]))
                 .withTooltip(TooltipBuilder.get()
                         .withY(YBuilder.get()
-                                .withFormatter("function(value) { return '₺' + value.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }")
+                                .withFormatter("function(value) { return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value); }")
                                 .build())
                         .build())
                 .build();
@@ -1016,6 +1036,11 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
                         .withCategories(categories)
                         .build())
                 .withColors("#4CAF50", "#F44336") // Green & Red
+                .withTooltip(TooltipBuilder.get()
+                        .withY(YBuilder.get()
+                                .withFormatter("function(value) { return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value); }")
+                                .build())
+                        .build())
                 .build();
         return chart;
     }

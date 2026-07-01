@@ -112,22 +112,10 @@ public class ExpenseView extends VerticalLayout {
         HorizontalLayout filters = createFilters();
         filters.addClassName("filters-layout");
 
-        add(loadingBar, toolbar, filters, totalDisplay, grid);
+        add(loadingBar, toolbar, filters, grid);
 
         configureEmptyState();
         add(emptyState);
-
-        totalDisplay.setId("total-display");
-        totalDisplay.getStyle()
-                .set("font-size", "0.95em")
-                .set("font-weight", "600")
-                .set("color", "var(--lumo-primary-text-color)")
-                .set("padding", "8px 16px")
-                .set("background", "var(--lumo-contrast-5pct)")
-                .set("border-radius", "6px")
-                .set("display", "inline-block")
-                .set("align-self", "flex-start")
-                .set("margin-bottom", "4px");
 
         refreshGrid();
     }
@@ -387,8 +375,17 @@ public class ExpenseView extends VerticalLayout {
             monthFilter.setValue(LocalDate.now().getMonthValue());
             cardFilter.clear();
             searchField.clear();
+            refreshGrid();
         });
-        filters.add(resetBtn);
+
+        totalDisplay.getStyle()
+                .set("font-size", "0.9em")
+                .set("font-weight", "600")
+                .set("color", "var(--lumo-primary-text-color)")
+                .set("white-space", "nowrap")
+                .set("margin-left", "8px");
+
+        filters.add(resetBtn, totalDisplay);
 
         // Toplam tutar gösterimi
         Div totalDiv = new Div();

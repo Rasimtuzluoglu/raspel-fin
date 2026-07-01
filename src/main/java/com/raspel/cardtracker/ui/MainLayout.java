@@ -740,53 +740,61 @@ public class MainLayout extends AppLayout {
 
         dialog.add(content);
         dialog.getFooter().add(new Button("Kapat", e -> dialog.close()));
-        dialog.open();
 
-        getElement().executeJs(
-            "var controller = new AbortController(); var timeoutId = setTimeout(function(){controller.abort();},12000);" +
-            "fetch('/api/system/status',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',signal:controller.signal})" +
-            ".then(r=>{clearTimeout(timeoutId);if(!r.ok)throw new Error('HTTP '+r.status);return r.json()})" +
-            ".then(function(d){" +
-            "  var lb=document.getElementById('status-loading'); if(lb)lb.remove();" +
-            "  var rs=document.getElementById('status-results'); if(!rs)return; rs.style.display='';" +
-            "  var c={yes:'#43A047',no:'#E53935',unknown:'#9E9E9E'};" +
-            "  var t={yes:'\u2713',no:'\u2717',unknown:'~'};" +
-            "  var items=[" +
-            "    {name:'Docker',status:d.docker.status,detail:d.docker.detail}," +
-            "    {name:'Uygulama',status:d.container.status,detail:d.container.detail}," +
-            "    {name:'Veritaban\u0131',status:d.database.status,detail:d.database.detail}" +
-            "  ];" +
-            "  var h='<div style=\"padding:2px 0\">';" +
-            "  items.forEach(function(i){" +
-            "    h+='<div style=\"display:flex;align-items:center;padding:5px 0\">" +
-            "      <span style=\"color:'+c[i.status]+';font-size:0.9em;width:14px;flex-shrink:0\">'+t[i.status]+'</span>" +
-            "      <span style=\"font-size:0.85em;font-weight:600;width:75px;flex-shrink:0\">'+i.name+'</span>" +
-            "      <span style=\"font-size:0.72em;color:var(--lumo-secondary-text-color)\">'+i.detail+'</span>" +
-            "    </div>';" +
-            "  });" +
-            "  if(d.restricted){" +
-            "    h+='<div style=\"font-size:0.65em;color:var(--lumo-tertiary-text-color);text-align:center;margin-top:6px\">Hata detaylar\u0131 i\u00E7in y\u00F6netici gerekli</div>';" +
-            "  }else if(d.lastErrors&&d.lastErrors.length>0&&d.lastErrors[0].message&&d.lastErrors[0].message!=='Hata bulunamad\u0131'){" +
-            "    h+='<div style=\"margin-top:8px;border-top:1px solid var(--lumo-contrast-10pct);padding-top:6px\">';" +
-            "    h+='<div style=\"font-size:0.7em;font-weight:600;color:var(--lumo-error-color);margin-bottom:4px\">Son Hatalar</div>';" +
-            "    d.lastErrors.forEach(function(e){" +
-            "      h+='<div style=\"font-size:0.68em;color:#555;padding:2px 0;border-bottom:1px solid var(--lumo-contrast-5pct)\">" +
-            "        <span style=\"color:#888\">'+e.time+'</span> '+e.message+'</div>';" +
-            "    });" +
-            "    h+='</div>';" +
-            "  }" +
-            "  h+='<div style=\"font-size:0.58em;color:var(--lumo-tertiary-text-color);text-align:center;margin-top:8px\">'+d.timestamp+'</div>';" +
-            "  h+='</div>';" +
-            "  rs.innerHTML=h;" +
-            "}).catch(function(e){" +
-            "  clearTimeout(timeoutId);" +
-            "  var lb=document.getElementById('status-loading'); if(lb)lb.remove();" +
-            "  var rs=document.getElementById('status-results'); if(rs){rs.style.display='';" +
-            "    var errMsg = e.name==='AbortError' ? 'İstek zaman aşımına uğradı (12 sn). Docker servisine erişilemiyor olabilir.' : 'Sistem durumu alınamadı: ' + e.message;" +
-            "    rs.innerHTML='<div style=\"color:var(--lumo-error-color);text-align:center;padding:12px;font-size:0.82em\">' + errMsg + '</div>';" +
-            "  }" +
-            "});},100);"
-        );
+        dialog.addOpenedChangeListener(event -> {
+            if (event.isOpened()) {
+                com.vaadin.flow.component.page.Page page = com.vaadin.flow.component.UI.getCurrent().getPage();
+                page.executeJs(
+                    "setTimeout(function(){" +
+                    "var controller = new AbortController(); var timeoutId = setTimeout(function(){controller.abort();},12000);" +
+                    "fetch('/api/system/status',{method:'POST',headers:{'Content-Type':'application/json'},credentials:'same-origin',signal:controller.signal})" +
+                    ".then(r=>{clearTimeout(timeoutId);if(!r.ok)throw new Error('HTTP '+r.status);return r.json()})" +
+                    ".then(function(d){" +
+                    "  var lb=document.getElementById('status-loading'); if(lb)lb.remove();" +
+                    "  var rs=document.getElementById('status-results'); if(!rs)return; rs.style.display='';" +
+                    "  var c={yes:'#43A047',no:'#E53935',unknown:'#9E9E9E'};" +
+                    "  var t={yes:'\u2713',no:'\u2717',unknown:'~'};" +
+                    "  var items=[" +
+                    "    {name:'Docker',status:d.docker.status,detail:d.docker.detail}," +
+                    "    {name:'Uygulama',status:d.container.status,detail:d.container.detail}," +
+                    "    {name:'Veritaban\u0131',status:d.database.status,detail:d.database.detail}" +
+                    "  ];" +
+                    "  var h='<div style=\"padding:2px 0\">';" +
+                    "  items.forEach(function(i){" +
+                    "    h+='<div style=\"display:flex;align-items:center;padding:5px 0\">" +
+                    "      <span style=\"color:'+c[i.status]+';font-size:0.9em;width:14px;flex-shrink:0\">'+t[i.status]+'</span>" +
+                    "      <span style=\"font-size:0.85em;font-weight:600;width:75px;flex-shrink:0\">'+i.name+'</span>" +
+                    "      <span style=\"font-size:0.72em;color:var(--lumo-secondary-text-color)\">'+i.detail+'</span>" +
+                    "    </div>';" +
+                    "  });" +
+                    "  if(d.restricted){" +
+                    "    h+='<div style=\"font-size:0.65em;color:var(--lumo-tertiary-text-color);text-align:center;margin-top:6px\">Hata detaylar\u0131 i\u00E7in y\u00F6netici gerekli</div>';" +
+                    "  }else if(d.lastErrors&&d.lastErrors.length>0&&d.lastErrors[0].message&&d.lastErrors[0].message!=='Hata bulunamad\u0131'){" +
+                    "    h+='<div style=\"margin-top:8px;border-top:1px solid var(--lumo-contrast-10pct);padding-top:6px\">';" +
+                    "    h+='<div style=\"font-size:0.7em;font-weight:600;color:var(--lumo-error-color);margin-bottom:4px\">Son Hatalar</div>';" +
+                    "    d.lastErrors.forEach(function(e){" +
+                    "      h+='<div style=\"font-size:0.68em;color:#555;padding:2px 0;border-bottom:1px solid var(--lumo-contrast-5pct)\">" +
+                    "        <span style=\"color:#888\">'+e.time+'</span> '+e.message+'</div>';" +
+                    "    });" +
+                    "    h+='</div>';" +
+                    "  }" +
+                    "  h+='<div style=\"font-size:0.58em;color:var(--lumo-tertiary-text-color);text-align:center;margin-top:8px\">'+d.timestamp+'</div>';" +
+                    "  h+='</div>';" +
+                    "  rs.innerHTML=h;" +
+                    "}).catch(function(e){" +
+                    "  clearTimeout(timeoutId);" +
+                    "  var lb=document.getElementById('status-loading'); if(lb)lb.remove();" +
+                    "  var rs=document.getElementById('status-results'); if(rs){rs.style.display='';" +
+                    "    var errMsg = e.name==='AbortError' ? 'İstek zaman aşımına uğradı (12 sn). Docker servisine erişilemiyor olabilir.' : 'Sistem durumu alınamadı: ' + e.message;" +
+                    "    rs.innerHTML='<div style=\"color:var(--lumo-error-color);text-align:center;padding:12px;font-size:0.82em\">' + errMsg + '</div>';" +
+                    "  }" +
+                    "});" +
+                    "},250);"
+                );
+            }
+        });
+
+        dialog.open();
     }
 
     @Override
