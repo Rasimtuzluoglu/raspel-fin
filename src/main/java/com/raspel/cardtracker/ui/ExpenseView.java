@@ -79,7 +79,7 @@ public class ExpenseView extends VerticalLayout {
     private final TextField searchField = new TextField();
     private final ProgressBar loadingBar = new ProgressBar();
     private final Div emptyState = new Div();
-    private final Span totalDisplay = new Span();
+    private final Span totalDisplay = new Span("Toplam: 0,00 ₺");
 
     public ExpenseView(ExpenseService expenseService, CardService cardService, ContactService contactService,
                        ExcelImportService excelImportService, ExcelExportService excelExportService,
@@ -354,9 +354,13 @@ public class ExpenseView extends VerticalLayout {
 
         totalDisplay.getStyle()
                 .set("font-weight", "700")
-                .set("color", "var(--lumo-primary-text-color)")
+                .set("color", "#1a73e8")
                 .set("white-space", "nowrap")
-                .set("font-size", "0.95em");
+                .set("font-size", "0.95em")
+                .set("padding", "4px 12px")
+                .set("background", "#e8f0fe")
+                .set("border-radius", "16px")
+                .set("margin-left", "8px");
 
         return toolbar;
     }
