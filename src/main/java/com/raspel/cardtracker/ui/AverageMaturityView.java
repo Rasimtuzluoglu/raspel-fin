@@ -14,6 +14,12 @@ import com.vaadin.flow.component.textfield.IntegerField;
 import com.vaadin.flow.component.textfield.TextField;
 import com.vaadin.flow.router.PageTitle;
 import com.vaadin.flow.router.Route;
+import com.github.appreciated.apexcharts.ApexCharts;
+import com.github.appreciated.apexcharts.ApexChartsBuilder;
+import com.github.appreciated.apexcharts.config.builder.*;
+import com.github.appreciated.apexcharts.config.tooltip.builder.YBuilder;
+import com.github.appreciated.apexcharts.config.chart.Type;
+import com.github.appreciated.apexcharts.helper.Series;
 import com.raspel.cardtracker.ui.utils.FormatUtils;
 import com.raspel.cardtracker.ui.utils.TurkishDatePickerI18n;
 import jakarta.annotation.security.PermitAll;
@@ -39,6 +45,7 @@ public class AverageMaturityView extends VerticalLayout {
     private VerticalLayout dynamicRowsLayout;
     private Span manualTotalSpan;
     private Div manualResultBox;
+    private Div chartsContainer;
     private final List<DatePicker> rowDates = new ArrayList<>();
     private final List<IntegerField> rowDays = new ArrayList<>();
     private final List<TextField> rowAmounts = new ArrayList<>();
@@ -147,6 +154,16 @@ public class AverageMaturityView extends VerticalLayout {
         manualResultBox.addClassName("manual-result-card");
         manualResultBox.setVisible(false);
         p.add(manualResultBox);
+
+        chartsContainer = new Div();
+        chartsContainer.setVisible(false);
+        chartsContainer.getStyle()
+                .set("display", "grid")
+                .set("grid-template-columns", "1fr 1fr")
+                .set("gap", "16px")
+                .set("margin-top", "16px")
+                .set("width", "100%");
+        p.add(chartsContainer);
 
         rebuildRows();
         return p;
@@ -329,6 +346,9 @@ public class AverageMaturityView extends VerticalLayout {
 
         rc.add(rl, rm, rs, rd);
         manualResultBox.add(rc);
+
+        // Build charts
+        buildCharts(validCount, rowAmounts, rowDates, rowDays, dateMode, ref);
     }
 
     private Div buildDetail(String label, String value) {
@@ -345,9 +365,82 @@ public class AverageMaturityView extends VerticalLayout {
         return d;
     }
 
+    private void buildCharts(int count, List<TextField> amounts, List<DatePicker> dates,
+                             List<IntegerField> days, boolean dateMode, LocalDate ref) {
+        chartsContainer.removeAll();
+        chartsContainer.setVisible(true);
+
+        List<String> catLabels = new ArrayList<>();
+        List<Double> lineData = new ArrayList<>();
+        List<Double> pieData = new ArrayList<>();
+        List<String> pieLabels = new ArrayList<>();
+
+        for (int i = 0; i < count; i++) {
+            BigDecimal amt = FormatUtils.parseTurkishCurrency(amounts.get(i).getValue());
+            if (amt.compareTo(BigDecimal.ZERO) <= 0) continue;
+
+            String label = (i + 1) + ". Ödeme";
+            catLabels.add(label);
+            pieLabels.add(label);
+            lineData.add(amt.doubleValue());
+            pieData.add(amt.doubleValue());
+        }
+
+        // Line chart - Payment timeline
+        ApexCharts lineChart = ApexChartsBuilder.get()
+                .withChart(ChartBuilder.get().withType(Type.LINE).withHeight("260px").withBackground("transparent").build())
+                .withXaxis(XAxisBuilder.get().withCategories(catLabels).build())
+                .withSeries(new Series<>("Tutar", lineData.toArray(new Double[0])))
+                .withColors("#2196F3")
+                .withTooltip(TooltipBuilder.get()
+                        .withY(YBuilder.get()
+                                .withFormatter("function(val, opts) { return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(val)); }")
+                                .build())
+                        .build())
+                .build();
+        lineChart.setWidth("100%");
+
+        // Pie chart - Payment distribution
+        ApexCharts pieChart = ApexChartsBuilder.get()
+                .withChart(ChartBuilder.get().withType(Type.DONUT).withHeight("260px").withBackground("transparent").build())
+                .withLabels(pieLabels.toArray(new String[0]))
+                .withSeries(pieData.toArray(new Double[0]))
+                .withTooltip(TooltipBuilder.get()
+                        .withY(YBuilder.get()
+                                .withFormatter("function(val, opts) { return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(val)); }")
+                                .build())
+                        .build())
+                .build();
+        pieChart.setWidth("100%");
+
+        Div lineWrapper = buildChartCard("Ödeme Akışı (Çizgi Grafik)", lineChart);
+        Div pieWrapper = buildChartCard("Ödeme Dağılımı (Pasta Grafik)", pieChart);
+        chartsContainer.add(lineWrapper, pieWrapper);
+    }
+
+    private Div buildChartCard(String title, ApexCharts chart) {
+        Div card = new Div();
+        card.getStyle()
+                .set("border", "1px solid var(--lumo-contrast-10pct)")
+                .set("border-radius", "8px")
+                .set("padding", "12px")
+                .set("background", "var(--lumo-base-color)");
+        Span titleSpan = new Span(title);
+        titleSpan.getStyle()
+                .set("font-size", "0.8em")
+                .set("font-weight", "600")
+                .set("color", "var(--lumo-secondary-text-color)")
+                .set("display", "block")
+                .set("margin-bottom", "8px");
+        card.add(titleSpan, chart);
+        return card;
+    }
+
     private void resetManual() {
         manualResultBox.setVisible(false);
         manualResultBox.removeAll();
+        chartsContainer.setVisible(false);
+        chartsContainer.removeAll();
         modeGroup.setValue("Vade sonu tarihlerini girerek hesapla");
         countSelect.setValue(2);
         manualTotalSpan.setText("0,00 TL");

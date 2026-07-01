@@ -79,7 +79,7 @@ public class ExpenseView extends VerticalLayout {
     private final TextField searchField = new TextField();
     private final ProgressBar loadingBar = new ProgressBar();
     private final Div emptyState = new Div();
-    private final Span totalDisplay = new Span();
+    private final Span totalDisplay = new Span("Toplam Harcama: 0,00 ₺");
 
     public ExpenseView(ExpenseService expenseService, CardService cardService, ContactService contactService,
                        ExcelImportService excelImportService, ExcelExportService excelExportService,

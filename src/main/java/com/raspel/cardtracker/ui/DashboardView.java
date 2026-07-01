@@ -790,7 +790,7 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
                 .withColors("#2196F3")
                 .withTooltip(TooltipBuilder.get()
                         .withY(YBuilder.get()
-                                .withFormatter("function(value) { return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value); }")
+                                .withFormatter("function(val, opts) { return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(val)); }")
                                 .build())
                         .build())
                 .build();
@@ -834,7 +834,7 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
                 .withColors("#4CAF50", "#F44336")
                 .withTooltip(TooltipBuilder.get()
                         .withY(YBuilder.get()
-                                .withFormatter("function(value) { return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value); }")
+                                .withFormatter("function(val, opts) { return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(val)); }")
                                 .build())
                         .build())
                 .build();
@@ -879,7 +879,7 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
                 .withColors("#4CAF50", "#F44336")
                 .withTooltip(TooltipBuilder.get()
                         .withY(YBuilder.get()
-                                .withFormatter("function(value) { return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value); }")
+                                .withFormatter("function(val, opts) { return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(val)); }")
                                 .build())
                         .build())
                 .build();
@@ -912,7 +912,7 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
 
         if (deptTotals.isEmpty()) {
             labels.add("Veri Yok");
-            series.add(100.0);
+            series.add(0.0);
         }
 
         ApexCharts chart = ApexChartsBuilder.get()
@@ -924,7 +924,7 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
                 .withLabels(labels.toArray(new String[0]))
                 .withTooltip(TooltipBuilder.get()
                         .withY(YBuilder.get()
-                                .withFormatter("function(value) { return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value); }")
+                                .withFormatter("function(val, opts) { return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(val)); }")
                                 .build())
                         .build())
                 .build();
@@ -955,7 +955,7 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
 
         if (categoryTotals.isEmpty()) {
             labels.add("Veri Yok");
-            series.add(100.0);
+            series.add(0.0);
         }
 
         ApexCharts chart = ApexChartsBuilder.get()
@@ -966,8 +966,9 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
                 .withSeries(series.toArray(new Double[0]))
                 .withLabels(labels.toArray(new String[0]))
                 .withTooltip(TooltipBuilder.get()
+                        .withEnabled(true)
                         .withY(YBuilder.get()
-                                .withFormatter("function(value) { return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value); }")
+                                .withFormatter("function(val, opts) { return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(val)); }")
                                 .build())
                         .build())
                 .build();
@@ -1038,7 +1039,7 @@ public class DashboardView extends VerticalLayout implements BeforeEnterObserver
                 .withColors("#4CAF50", "#F44336") // Green & Red
                 .withTooltip(TooltipBuilder.get()
                         .withY(YBuilder.get()
-                                .withFormatter("function(value) { return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value); }")
+                                .withFormatter("function(val, opts) { return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(val)); }")
                                 .build())
                         .build())
                 .build();

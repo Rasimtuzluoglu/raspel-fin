@@ -324,7 +324,7 @@ public class ContactView extends VerticalLayout {
         Button yesBtn = new Button("Evet, Sil", e -> {
             try {
                 contactService.delete(contact.getId());
-                Notification.show("Cari silindi.", 3000, Notification.Position.BOTTOM_END)
+                Notification.show("Cari silindi.", 3000, Notification.Position.MIDDLE)
                         .addThemeVariants(NotificationVariant.LUMO_SUCCESS);
                 confirm.close();
                 refreshGrid();

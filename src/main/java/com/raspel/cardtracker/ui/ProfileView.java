@@ -22,6 +22,7 @@ import com.vaadin.flow.router.Route;
 import com.github.appreciated.apexcharts.ApexCharts;
 import com.github.appreciated.apexcharts.ApexChartsBuilder;
 import com.github.appreciated.apexcharts.config.builder.*;
+import com.github.appreciated.apexcharts.config.tooltip.builder.YBuilder;
 import com.github.appreciated.apexcharts.config.chart.Type;
 import com.github.appreciated.apexcharts.helper.Series;
 import com.raspel.cardtracker.domain.card.CardService;
@@ -558,6 +559,12 @@ public class ProfileView extends VerticalLayout {
                 .withSeries(new Series<>("TL", projection.values().stream()
                         .map(v -> v != null ? v.doubleValue() : 0.0).toArray(Double[]::new)))
                 .withColors("#2196F3")
+                .withTooltip(TooltipBuilder.get()
+                        .withEnabled(true)
+                        .withY(YBuilder.get()
+                                .withFormatter("function(val, opts) { return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(val)); }")
+                                .build())
+                        .build())
                 .build();
         miniChart.setWidth("100%");
         chartCard.add(miniChart);
